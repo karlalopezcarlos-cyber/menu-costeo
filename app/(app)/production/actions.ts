@@ -1,0 +1,88 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import Decimal from "decimal.js";
+import { prisma } from "@/lib/prisma";
+import { requireOrgSession } from "@/lib/tenant";
+import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+
+type ProductionRowInput = {
+  subRecipeId: string;
+  quantity: string;
+  comment: string;
+};
+
+export async function createProductionEntries(
+  _prevState: { error?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireOrgSession();
+
+    const productionDateRaw = String(formData.get("productionDate") ?? "");
+    const rowsRaw = String(formData.get("rows") ?? "[]");
+
+    if (!productionDateRaw) throw new Error("Indica la fecha de la produccion.");
+
+    let rows: ProductionRowInput[];
+    try {
+      rows = JSON.parse(rowsRaw);
+    } catch {
+      throw new Error("Datos de produccion invalidos.");
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error("Agrega al menos una subreceta.");
+    }
+
+    const subRecipeIds = [...new Set(rows.map((r) => r.subRecipeId))];
+    const subRecipes = await prisma.recipe.findMany({
+      where: { id: { in: subRecipeIds }, organizationId: user.organizationId, isMenuItem: false },
+    });
+    const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
+
+    const graph = await loadOrgRecipeGraph(user.organizationId);
+    const costMemo = new Map<string, Decimal>();
+
+    const productionDate = new Date(productionDateRaw);
+
+    const toCreate = rows.map((row, index) => {
+      const subRecipe = subRecipeById.get(row.subRecipeId);
+      if (!subRecipe) throw new Error(`Selecciona una subreceta valida (fila ${index + 1}).`);
+
+      const quantity = new Decimal(row.quantity || "0");
+      if (quantity.lte(0)) {
+        throw new Error(`La cantidad producida de "${subRecipe.name}" debe ser mayor a cero.`);
+      }
+
+      const node = graph.recipes.get(subRecipe.id);
+      let unitCost = new Decimal(0);
+      if (node && !node.yieldQty.isZero()) {
+        try {
+          unitCost = getRecipeCost(subRecipe.id, graph, costMemo).dividedBy(node.yieldQty);
+        } catch {
+          unitCost = new Decimal(0);
+        }
+      }
+
+      return {
+        organizationId: user.organizationId,
+        subRecipeId: subRecipe.id,
+        date: productionDate,
+        quantity: quantity.toString(),
+        unit: subRecipe.yieldUnit,
+        unitCost: unitCost.toString(),
+        comment: row.comment.trim() || null,
+        createdByUserId: user.id,
+      };
+    });
+
+    await prisma.productionEntry.createMany({ data: toCreate });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo registrar la produccion." };
+  }
+
+  revalidatePath("/production");
+  revalidatePath("/audit");
+  redirect("/production");
+}

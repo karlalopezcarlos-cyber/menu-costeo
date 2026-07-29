@@ -1,0 +1,585 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPERADMIN
+  OWNER
+  STAFF
+}
+
+enum Unit {
+  G
+  KG
+  ML
+  L
+  OZ
+  PIECE
+}
+
+enum ImportBatchStatus {
+  DRAFT
+  PROCESSED
+}
+
+enum ImportRowStatus {
+  MATCHED
+  PENDING
+  IGNORED
+  ERROR
+}
+
+enum PurchaseOrderStatus {
+  OPEN
+  RECEIVED
+}
+
+enum RecipeActivityType {
+  CREATED
+  ITEM_ADDED
+  ITEM_REMOVED
+  ARCHIVED
+  UPDATED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  /// Siguiente folio a asignar a un pedido nuevo (contador consecutivo por organizacion).
+  nextOrderFolio Int @default(1)
+  /// Siguiente folio a asignar a una compra nueva (contador consecutivo por organizacion).
+  nextPurchaseFolio Int @default(1)
+
+  users             User[]
+  products          Product[]
+  productCategories ProductCategory[]
+  recipeCategories  RecipeCategory[]
+  purchases         Purchase[]
+  suppliers         Supplier[]
+  recipes           Recipe[]
+  dishAliases       DishAlias[]
+  dailySales        DailySale[]
+  importBatches     ImportBatch[]
+  recipeActivities  RecipeActivity[]
+  inventoryCounts   InventoryCount[]
+  wasteEntries      WasteEntry[]
+  purchaseOrders    PurchaseOrder[]
+  productionEntries ProductionEntry[]
+  auditComments     AuditComment[]
+  productPresentations ProductPresentation[]
+  inventoryCountItemChanges InventoryCountItemChange[]
+
+  @@map("organizations")
+}
+
+model ProductCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  createdAt      DateTime     @default(now())
+
+  products Product[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("product_categories")
+}
+
+model RecipeCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  createdAt      DateTime     @default(now())
+
+  recipes Recipe[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("recipe_categories")
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  hashedPassword String
+  name           String?
+  role           Role          @default(STAFF)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  purchasesCreated  Purchase[]        @relation("PurchaseCreatedBy")
+  importBatches     ImportBatch[]     @relation("ImportBatchUploadedBy")
+  recipeActivities  RecipeActivity[]
+  inventoryCounts   InventoryCount[]  @relation("InventoryCountCreatedBy")
+  wasteEntries      WasteEntry[]      @relation("WasteEntryCreatedBy")
+  purchaseOrders    PurchaseOrder[]   @relation("PurchaseOrderCreatedBy")
+  productionEntries ProductionEntry[] @relation("ProductionEntryCreatedBy")
+  auditComments     AuditComment[]    @relation("AuditCommentCreatedBy")
+  inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Product {
+  id                       String       @id @default(cuid())
+  organizationId           String
+  organization             Organization     @relation(fields: [organizationId], references: [id])
+  name                     String
+  categoryId               String?
+  category                 ProductCategory? @relation(fields: [categoryId], references: [id])
+  baseUnit                 Unit
+  /// % de rendimiento neto (100 = sin merma). Ej. cilantro con 20% de merma -> 80.
+  /// El costo unitario de cada compra se divide entre este factor para costear con el neto aprovechable.
+  yieldPercentage          Decimal      @default(100) @db.Decimal(5, 2)
+  currentUnitCost          Decimal      @default(0) @db.Decimal(14, 6)
+  currentUnitCostUpdatedAt DateTime?
+  /// Stock objetivo (par level) en la unidad base del producto. 0 = sin objetivo configurado,
+  /// no aparece en la seccion de pedidos sugeridos.
+  targetStock              Decimal      @default(0) @db.Decimal(14, 4)
+  /// Presentacion de compra fija opcional (ej. "Botella" = 750 ML, en la unidad base del
+  /// producto). Permite comprar/contar por pieza (1 botella) mientras el sistema seguro sigue
+  /// costeando e inventariando en la unidad base (ml). Null = no aplica, se compra/cuenta
+  /// directo en la unidad base.
+  presentationUnitLabel    String?
+  presentationUnitQty      Decimal?     @db.Decimal(14, 4)
+  archivedAt               DateTime?
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  purchases           Purchase[]
+  recipeItems         RecipeItem[]
+  inventoryCountItems InventoryCountItem[]
+  wasteEntries        WasteEntry[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  auditComments       AuditComment[]
+  presentations       ProductPresentation[]
+  inventoryCountItemChanges InventoryCountItemChange[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("products")
+}
+
+/// Catalogo de presentaciones nombradas de un producto (ej. "Lata 2.75kg" = 2.75 KG, "Bulto 25kg" =
+/// 25 KG). Permite capturar Pedidos/Compras/Inventario en piezas ("2 latas") y que el sistema calcule
+/// solo la cantidad equivalente en la unidad base del producto. Independiente del campo unico
+/// presentationUnitLabel/Qty de Product (ese es para el caso de botellas/OZ en recetas).
+model ProductPresentation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label          String
+  quantity       Decimal      @db.Decimal(14, 4)
+  unit           Unit
+  createdAt      DateTime     @default(now())
+
+  @@unique([productId, label])
+  @@index([organizationId, productId])
+  @@map("product_presentations")
+}
+
+model Purchase {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  /// Folio unico consecutivo por organizacion (ej. COM-0042), para identificar la compra.
+  folio             Int
+  productId         String
+  product           Product      @relation(fields: [productId], references: [id])
+  purchaseDate      DateTime     @db.Date
+  presentationLabel String
+  presentationQty   Decimal      @db.Decimal(14, 4)
+  presentationUnit  Unit
+  totalPrice        Decimal      @db.Decimal(12, 2)
+  computedUnitCost  Decimal      @db.Decimal(14, 6)
+  supplierId        String?
+  supplier          Supplier?    @relation(fields: [supplierId], references: [id])
+  createdByUserId   String?
+  createdBy         User?        @relation("PurchaseCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt         DateTime     @default(now())
+  /// Nota auto-generada cuando esta compra viene de un pedido y lo recibido no coincide con lo
+  /// que se esperaba en esa entrega (ej. "Pedido PED-0005: se esperaban 50 KG, llegaron 45 KG").
+  note              String?
+
+  @@unique([organizationId, folio])
+  @@index([organizationId, productId, purchaseDate])
+  @@map("purchases")
+}
+
+/// Proveedor informativo: se captura opcionalmente en cada compra para poder comparar precios
+/// entre proveedores del mismo producto. No bloquea ni obliga la captura de compras.
+model Supplier {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  phone          String?
+  email          String?
+  createdAt      DateTime     @default(now())
+
+  purchases      Purchase[]
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("suppliers")
+}
+
+model Recipe {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  name           String
+  categoryId     String?
+  category       RecipeCategory? @relation(fields: [categoryId], references: [id])
+  yieldQty       Decimal      @db.Decimal(14, 4)
+  yieldUnit      Unit
+  isMenuItem     Boolean      @default(false)
+  sellingPrice   Decimal?     @db.Decimal(12, 2)
+  instructions   String?
+  archivedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  items               RecipeItem[]          @relation("RecipeItems")
+  usedAsIngredient    RecipeItem[]          @relation("SubRecipeUsage")
+  dishAliases         DishAlias[]
+  dailySales          DailySale[]
+  activities          RecipeActivity[]
+  inventoryCountItems InventoryCountItem[]
+  productionEntries   ProductionEntry[]
+  auditComments       AuditComment[]
+  inventoryCountItemChanges InventoryCountItemChange[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("recipes")
+}
+
+model RecipeActivity {
+  id              String             @id @default(cuid())
+  organizationId  String
+  organization    Organization       @relation(fields: [organizationId], references: [id])
+  recipeId        String
+  recipe          Recipe             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  type            RecipeActivityType
+  message         String
+  createdByUserId String?
+  createdBy       User?              @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime           @default(now())
+
+  @@index([recipeId, createdAt])
+  @@map("recipe_activities")
+}
+
+/// Polimorfico: exactamente uno de productId / subRecipeId debe estar presente.
+/// El CHECK constraint real (XOR + no auto-referencia) se agrega en una migracion SQL manual
+/// porque Prisma no soporta CHECK constraints declarativos.
+model RecipeItem {
+  id          String   @id @default(cuid())
+  recipeId    String
+  recipe      Recipe   @relation("RecipeItems", fields: [recipeId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  subRecipeId String?
+  subRecipe   Recipe?  @relation("SubRecipeUsage", fields: [subRecipeId], references: [id])
+  quantity    Decimal  @db.Decimal(14, 4)
+  unit        Unit
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([recipeId])
+  @@index([productId])
+  @@index([subRecipeId])
+  @@map("recipe_items")
+}
+
+/// Mapeo nombre-externo (reporte de POS) -> Receta, con normalizacion para matching tolerante.
+/// Si recipeId es null e ignored=true, ese nombre nunca es un platillo (propinas, descuentos, etc.).
+model DishAlias {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  externalName   String
+  normalizedName String
+  recipeId       String?
+  recipe         Recipe?      @relation(fields: [recipeId], references: [id])
+  ignored        Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, normalizedName])
+  @@index([organizationId])
+  @@map("dish_aliases")
+}
+
+/// Una venta por dia y por receta (reemplaza el antiguo agregado mensual). "source" distingue
+/// captura manual de datos venidos de una importacion de Excel.
+model DailySale {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  recipeId       String
+  recipe         Recipe       @relation(fields: [recipeId], references: [id])
+  date           DateTime     @db.Date
+  quantitySold   Decimal      @db.Decimal(12, 2)
+  unitPrice      Decimal      @db.Decimal(12, 2)
+  source         String       @default("manual")
+  importBatchId  String?
+  importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, recipeId, date])
+  @@index([organizationId, date])
+  @@map("daily_sales")
+}
+
+model ImportBatch {
+  id               String            @id @default(cuid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  fileName         String
+  headers          Json
+  rawRows          Json
+  columnMapping    Json?
+  status           ImportBatchStatus @default(DRAFT)
+  rowsTotal        Int               @default(0)
+  rowsMatched      Int               @default(0)
+  rowsPending      Int               @default(0)
+  uploadedByUserId String?
+  uploadedBy       User?             @relation("ImportBatchUploadedBy", fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime          @default(now())
+
+  rows       ImportRow[]
+  dailySales DailySale[]
+
+  @@index([organizationId])
+  @@map("import_batches")
+}
+
+model ImportRow {
+  id              String          @id @default(cuid())
+  importBatchId   String
+  importBatch     ImportBatch     @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  rawName         String
+  normalizedName  String
+  date            DateTime?       @db.Date
+  quantitySold    Decimal         @db.Decimal(12, 2)
+  unitPrice       Decimal         @db.Decimal(12, 2)
+  status          ImportRowStatus @default(PENDING)
+  matchedRecipeId String?
+  errorMessage    String?
+  createdAt       DateTime        @default(now())
+
+  @@index([importBatchId])
+  @@map("import_rows")
+}
+
+/// Un conteo fisico de inventario en una fecha dada. Cada linea (InventoryCountItem) guarda el
+/// costo unitario vigente AL MOMENTO DEL CONTEO (no se recalcula despues), igual que el costo
+/// de una compra: es un valor historico, no una vista en vivo.
+model InventoryCount {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  date            DateTime @db.Date
+  createdByUserId String?
+  createdBy       User?    @relation("InventoryCountCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items         InventoryCountItem[]
+  auditComments AuditComment[]
+  itemChanges   InventoryCountItemChange[]
+
+  @@index([organizationId, date])
+  @@map("inventory_counts")
+}
+
+/// Polimorfico: exactamente uno de productId / subRecipeId debe estar presente (mismo patron
+/// que RecipeItem). unitCost es el costo unitario congelado al momento de contar.
+model InventoryCountItem {
+  id               String         @id @default(cuid())
+  inventoryCountId String
+  inventoryCount   InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
+  productId        String?
+  product          Product?       @relation(fields: [productId], references: [id])
+  subRecipeId      String?
+  subRecipe        Recipe?        @relation(fields: [subRecipeId], references: [id])
+  quantity         Decimal        @db.Decimal(14, 4)
+  unit             Unit
+  unitCost         Decimal        @db.Decimal(14, 6)
+  /// "net" (costo con rendimiento aplicado, default) o "gross" (costo de compra, sin descontar
+  /// la merma; ej. aguacate entero sin pelar). Solo aplica a productos con rendimiento < 100%.
+  costBasis        String         @default("net")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([inventoryCountId, productId])
+  @@unique([inventoryCountId, subRecipeId])
+  @@index([inventoryCountId])
+  @@map("inventory_count_items")
+}
+
+/// Bitacora de cambios a las cantidades capturadas de un conteo: cada vez que se guarda (manual o
+/// autoguardado) un valor distinto al que ya estaba, se registra el antes/despues, quien y cuando.
+/// Permite detectar si alguien modifica un conteo despues de capturado originalmente. Polimorfico
+/// (productId xor subRecipeId), mismo patron que InventoryCountItem.
+model InventoryCountItemChange {
+  id               String         @id @default(cuid())
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  inventoryCountId String
+  inventoryCount   InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
+  productId        String?
+  product          Product?       @relation(fields: [productId], references: [id])
+  subRecipeId      String?
+  subRecipe        Recipe?        @relation(fields: [subRecipeId], references: [id])
+  previousQuantity Decimal?       @db.Decimal(14, 4)
+  newQuantity      Decimal        @db.Decimal(14, 4)
+  changedByUserId  String?
+  changedBy        User?          @relation("InventoryCountItemChangeChangedBy", fields: [changedByUserId], references: [id])
+  changedAt        DateTime       @default(now())
+
+  @@index([organizationId, inventoryCountId, changedAt])
+  @@map("inventory_count_item_changes")
+}
+
+/// Comentario explicando una variacion (faltante/sobrante) encontrada en la auditoria de
+/// inventario, para un producto o subreceta, en un conteo final especifico. Polimorfico
+/// (productId xor subRecipeId), igual patron que InventoryCountItem.
+model AuditComment {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  finalCountId    String
+  finalCount      InventoryCount @relation(fields: [finalCountId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  subRecipeId     String?
+  subRecipe       Recipe?        @relation(fields: [subRecipeId], references: [id])
+  comment         String
+  createdByUserId String?
+  createdBy       User?          @relation("AuditCommentCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([finalCountId, productId])
+  @@unique([finalCountId, subRecipeId])
+  @@index([finalCountId])
+  @@map("audit_comments")
+}
+
+/// Registro de merma: un producto desechado/echado a perder en una fecha, con su costo
+/// congelado al momento de capturarlo (igual que una compra) y un comentario libre para la razon.
+model WasteEntry {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id])
+  date            DateTime     @db.Date
+  quantity        Decimal      @db.Decimal(14, 4)
+  unit            Unit
+  unitCost        Decimal      @db.Decimal(14, 6)
+  /// "net" (costo con rendimiento aplicado, default) o "gross" (costo de compra, sin descontar
+  /// la merma; ej. aguacate entero sin pelar). Solo aplica a productos con rendimiento < 100%.
+  costBasis       String       @default("net")
+  comment         String?
+  createdByUserId String?
+  createdBy       User?        @relation("WasteEntryCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, date])
+  @@index([organizationId, productId])
+  @@map("waste_entries")
+}
+
+/// Pedido a proveedor generado a partir de los faltantes (stock objetivo - stock actual).
+/// OPEN = pendiente de recibir (los productos que contiene se marcan como "ya en pedido" en la
+/// pantalla de faltantes para no duplicar); RECEIVED = ya llego, libera esos productos de nuevo.
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  organizationId  String
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  /// Folio consecutivo por organizacion (ej. 7 -> "PED-0007"), asignado atomicamente al crear.
+  folio           Int
+  status          PurchaseOrderStatus @default(OPEN)
+  supplierId      String?
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
+  comment         String?
+  createdByUserId String?
+  createdBy       User?               @relation("PurchaseOrderCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime            @default(now())
+  receivedAt      DateTime?
+
+  items PurchaseOrderItem[]
+
+  @@unique([organizationId, folio])
+  @@index([organizationId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  /// Texto libre, autogenerado a partir de la presentacion elegida al capturar la cantidad (o de
+  /// la unidad base si se captura libre). Ya no se edita a mano, ver Cantidad en la UI.
+  presentationLabel String
+  quantity        Decimal       @db.Decimal(14, 4)
+  /// Cantidad que realmente llego al marcar el pedido como recibido. Null mientras el pedido siga
+  /// abierto, o en pedidos recibidos antes de que existiera este campo (se asumen completos).
+  receivedQuantity Decimal?     @db.Decimal(14, 4)
+  /// Nota opcional por renglon (ej. "marca X", "urgente").
+  comment         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([purchaseOrderId, productId])
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+/// Registro de produccion: cuanto de una subreceta se preparo en una fecha. Su costo unitario
+/// (costo de receta / rendimiento) se congela al momento de capturar, igual que una compra.
+/// Alimenta la auditoria de inventario: descuenta los ingredientes que contiene (productos y
+/// sub-subrecetas) y suma al teorico de la subreceta producida.
+model ProductionEntry {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  subRecipeId     String
+  subRecipe       Recipe       @relation(fields: [subRecipeId], references: [id])
+  date            DateTime     @db.Date
+  quantity        Decimal      @db.Decimal(14, 4)
+  unit            Unit
+  unitCost        Decimal      @db.Decimal(14, 6)
+  comment         String?
+  createdByUserId String?
+  createdBy       User?        @relation("ProductionEntryCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, date])
+  @@index([organizationId, subRecipeId])
+  @@map("production_entries")
+}

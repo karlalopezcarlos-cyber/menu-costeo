@@ -1,0 +1,55 @@
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { requireOrgSession } from "@/lib/tenant";
+import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import WasteTable, { type WasteRow } from "./WasteTable";
+
+export default async function WastePage() {
+  const user = await requireOrgSession();
+
+  const entries = await prisma.wasteEntry.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: { date: "desc" },
+    take: 200,
+    include: { product: { include: { category: true } } },
+  });
+
+  const rows: WasteRow[] = entries.map((entry) => ({
+    id: entry.id,
+    dateLabel: entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+    dateValue: entry.date.getTime(),
+    productName: entry.product.name,
+    categoryName: entry.product.category?.name ?? null,
+    quantityLabel: Number(entry.quantity).toLocaleString("es-MX", { maximumFractionDigits: 4 }),
+    quantityValue: Number(entry.quantity),
+    unitLabel: UNIT_LABELS[entry.unit as UnitValue],
+    comment: entry.comment,
+    cost: Number(entry.quantity) * Number(entry.unitCost),
+    costBasisLabel:
+      Number(entry.product.yieldPercentage) !== 100
+        ? entry.costBasis === "gross"
+          ? "De compra"
+          : "Con rendimiento"
+        : null,
+  }));
+
+  const categoryNames = [...new Set(rows.map((r) => r.categoryName).filter((n): n is string => !!n))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-neutral-900">Mermas</h1>
+        <Link
+          href="/waste/new"
+          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+        >
+          Registrar merma
+        </Link>
+      </div>
+
+      <WasteTable rows={rows} categoryNames={categoryNames} />
+    </div>
+  );
+}

@@ -1,0 +1,78 @@
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { requireOrgSession } from "@/lib/tenant";
+import { deleteRecipeCategory } from "./actions";
+import NewRecipeCategoryForm from "./NewRecipeCategoryForm";
+
+export default async function RecipeCategoriesPage() {
+  const user = await requireOrgSession();
+
+  const categories = await prisma.recipeCategory.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: { name: "asc" },
+    include: { _count: { select: { recipes: true } } },
+  });
+
+  return (
+    <div className="max-w-md space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+        <nav className="mt-3 flex gap-4 border-b border-neutral-200 text-sm">
+          <Link href="/settings/categories" className="pb-2 text-neutral-500 hover:text-neutral-900">
+            Categorias de productos
+          </Link>
+          <span className="border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900">
+            Categorias de recetas
+          </span>
+          <Link href="/settings/suppliers" className="pb-2 text-neutral-500 hover:text-neutral-900">
+            Proveedores
+          </Link>
+        </nav>
+        <p className="mt-3 text-sm text-neutral-500">
+          Estas categorias aparecen como lista desplegable al crear una receta nueva.
+        </p>
+      </div>
+
+      <NewRecipeCategoryForm />
+
+      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-neutral-50 text-left text-neutral-500">
+            <tr>
+              <th className="px-4 py-2 font-medium">Nombre</th>
+              <th className="px-4 py-2 font-medium">Recetas</th>
+              <th className="px-4 py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-neutral-400">
+                  Todavia no hay categorias.
+                </td>
+              </tr>
+            )}
+            {categories.map((category) => (
+              <tr key={category.id} className="border-t border-neutral-100">
+                <td className="px-4 py-2">{category.name}</td>
+                <td className="px-4 py-2 text-neutral-500">{category._count.recipes}</td>
+                <td className="px-4 py-2 text-right">
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteRecipeCategory(category.id);
+                    }}
+                  >
+                    <button type="submit" className="text-neutral-400 hover:text-red-600">
+                      Borrar
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
