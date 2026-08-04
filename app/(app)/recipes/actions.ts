@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { loadOrgRecipeGraph, wouldCreateCycle } from "@/lib/costing";
-import { logRecipeActivity } from "@/lib/recipe-activity";
+import { logRecipeActivity, describeQuantity } from "@/lib/recipe-activity";
 
 function parseUnit(value: FormDataEntryValue | null): UnitValue {
   if (typeof value === "string" && (UNITS as readonly string[]).includes(value)) {
@@ -15,6 +15,9 @@ function parseUnit(value: FormDataEntryValue | null): UnitValue {
   }
   throw new Error("Unidad invalida.");
 }
+
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
 
 export async function createRecipe(
   _prevState: { error?: string } | undefined,
@@ -107,15 +110,29 @@ export async function addRecipeItem(
       });
       if (!product) throw new Error("Producto no encontrado.");
 
-      await prisma.recipeItem.create({
-        data: { recipeId: recipe.id, productId: product.id, quantity: quantity.toString(), unit },
+      // Si el producto ya esta en la receta, se sobrescribe cantidad/unidad del renglon existente
+      // en vez de crear un duplicado.
+      const existingItem = await prisma.recipeItem.findFirst({
+        where: { recipeId: recipe.id, productId: product.id },
       });
+      if (existingItem) {
+        await prisma.recipeItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: quantity.toString(), unit },
+        });
+      } else {
+        await prisma.recipeItem.create({
+          data: { recipeId: recipe.id, productId: product.id, quantity: quantity.toString(), unit },
+        });
+      }
 
       await logRecipeActivity({
         organizationId: user.organizationId,
         recipeId: recipe.id,
         type: "ITEM_ADDED",
-        message: `Se agrego "${product.name}" (${quantity.toString()} ${UNIT_LABELS[unit]})`,
+        message: existingItem
+          ? `Se cambio "${product.name}" de ${describeQuantity(existingItem.quantity, existingItem.unit as UnitValue)} a ${describeQuantity(quantity, unit)}`
+          : `Se agrego "${product.name}" (${quantity.toString()} ${UNIT_LABELS[unit]})`,
         createdByUserId: user.id,
       });
     } else if (componentType === "subrecipe") {
@@ -132,15 +149,27 @@ export async function addRecipeItem(
         );
       }
 
-      await prisma.recipeItem.create({
-        data: { recipeId: recipe.id, subRecipeId: subRecipe.id, quantity: quantity.toString(), unit },
+      const existingSubItem = await prisma.recipeItem.findFirst({
+        where: { recipeId: recipe.id, subRecipeId: subRecipe.id },
       });
+      if (existingSubItem) {
+        await prisma.recipeItem.update({
+          where: { id: existingSubItem.id },
+          data: { quantity: quantity.toString(), unit },
+        });
+      } else {
+        await prisma.recipeItem.create({
+          data: { recipeId: recipe.id, subRecipeId: subRecipe.id, quantity: quantity.toString(), unit },
+        });
+      }
 
       await logRecipeActivity({
         organizationId: user.organizationId,
         recipeId: recipe.id,
         type: "ITEM_ADDED",
-        message: `Se agrego la subreceta "${subRecipe.name}" (${quantity.toString()} ${UNIT_LABELS[unit]})`,
+        message: existingSubItem
+          ? `Se cambio la subreceta "${subRecipe.name}" de ${describeQuantity(existingSubItem.quantity, existingSubItem.unit as UnitValue)} a ${describeQuantity(quantity, unit)}`
+          : `Se agrego la subreceta "${subRecipe.name}" (${quantity.toString()} ${UNIT_LABELS[unit]})`,
         createdByUserId: user.id,
       });
     } else {
@@ -277,4 +306,51 @@ export async function archiveRecipe(recipeId: string) {
 
   revalidatePath("/recipes");
   redirect("/recipes");
+}
+
+export async function updateRecipePhoto(
+  recipeId: string,
+  _prevState: { error?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireOrgSession();
+
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, organizationId: user.organizationId },
+    });
+    if (!recipe) throw new Error("Receta no encontrada.");
+
+    const file = formData.get("photo");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Selecciona una imagen.");
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      throw new Error("La imagen debe ser JPG, PNG o WEBP.");
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      throw new Error("La imagen no debe pesar mas de 4MB.");
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    await prisma.recipe.update({
+      where: { id: recipe.id },
+      data: { photo: buffer, photoMimeType: file.type },
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar la foto." };
+  }
+
+  revalidatePath(`/recipes/${recipeId}`);
+  return {};
+}
+
+export async function removeRecipePhoto(recipeId: string) {
+  const user = await requireOrgSession();
+
+  await prisma.recipe.update({
+    where: { id: recipeId, organizationId: user.organizationId },
+    data: { photo: null, photoMimeType: null },
+  });
+
+  revalidatePath(`/recipes/${recipeId}`);
 }

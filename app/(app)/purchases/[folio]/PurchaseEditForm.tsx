@@ -5,6 +5,7 @@ import Link from "next/link";
 import Decimal from "decimal.js";
 import { applyYieldFactor, computeUnitCost, UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { updatePurchase, deletePurchase } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 type SupplierOption = { id: string; name: string };
 
@@ -167,7 +168,7 @@ export default function PurchaseEditForm({
 
         <p className="text-sm text-neutral-700">
           Costo resultante:{" "}
-          <strong>{preview ? `$${preview.toFixed(4)} / ${UNIT_LABELS[baseUnit]}` : "-"}</strong>
+          <strong>{preview ? `${formatMoney(preview.toNumber(), 4)} / ${UNIT_LABELS[baseUnit]}` : "-"}</strong>
         </p>
 
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}

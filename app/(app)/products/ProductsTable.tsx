@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { archiveProduct, restoreProduct } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 export type ProductRow = {
   id: string;
@@ -180,7 +181,7 @@ export default function ProductsTable({
                   {product.yieldPercentage === 100 ? "-" : `${product.yieldPercentage}%`}
                 </td>
                 <td className="px-4 py-2">
-                  {product.currentUnitCost === null ? "Sin compras" : `$${product.currentUnitCost.toFixed(4)}`}
+                  {product.currentUnitCost === null ? "Sin compras" : formatMoney(product.currentUnitCost, 4)}
                 </td>
                 <td className="px-4 py-2 text-right">
                   <form action={action}>

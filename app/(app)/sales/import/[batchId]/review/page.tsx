@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { createRecipeForRow, ignoreRowAlways, linkRowToExistingRecipe } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 export default async function ImportReviewPage({
   params,
@@ -52,7 +53,7 @@ export default async function ImportReviewPage({
                 <p className="font-medium text-neutral-900">{row.rawName}</p>
                 <p className="mb-3 text-sm text-neutral-500">
                   Fecha: {row.date ? row.date.toLocaleDateString("es-MX", { timeZone: "UTC" }) : "-"} - Cantidad:{" "}
-                  {row.quantitySold.toString()} - Precio: ${Number(row.unitPrice).toFixed(2)}
+                  {row.quantitySold.toString()} - Precio: {formatMoney(Number(row.unitPrice))}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">

@@ -13,6 +13,24 @@ enum Role {
   STAFF
 }
 
+/// Secciones de la app que se pueden habilitar/deshabilitar por usuario STAFF (los OWNER siempre
+/// tienen acceso completo, sin importar este catalogo).
+enum Panel {
+  DASHBOARD
+  PRODUCTS
+  PURCHASES
+  WASTE
+  RECIPES
+  PRODUCTION
+  INVENTORY
+  AUDIT
+  ORDERS
+  SALES
+  MENU_ENGINEERING
+  SETTINGS
+  PAYMENTS
+}
+
 enum Unit {
   G
   KG
@@ -76,6 +94,8 @@ model Organization {
   auditComments     AuditComment[]
   productPresentations ProductPresentation[]
   inventoryCountItemChanges InventoryCountItemChange[]
+  supplierPayments  SupplierPayment[]
+  sucursales        Sucursal[]
 
   @@map("organizations")
 }
@@ -108,14 +128,43 @@ model RecipeCategory {
   @@map("recipe_categories")
 }
 
+/// Una sucursal opera como un mini-restaurante independiente (compras, ventas, recetas e
+/// inventario propios); el catalogo de productos y los proveedores se comparten a nivel
+/// Organization. El CEDIS es una sucursal mas, marcada con isCentral=true (no una entidad aparte),
+/// para que las Requisiciones puedan ir de cualquier sucursal a cualquier otra sin caso especial.
+model Sucursal {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  /// Sucursal "matriz"/CEDIS de la organizacion. Se crea una automaticamente para cada
+  /// organizacion existente al migrar; sirve como destino por default y para el backfill.
+  isCentral      Boolean      @default(false)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  users User[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("sucursales")
+}
+
 model User {
   id             String        @id @default(cuid())
   email          String        @unique
   hashedPassword String
   name           String?
   role           Role          @default(STAFF)
+  /// Paneles habilitados para este usuario cuando role = STAFF. Los OWNER ven todo sin importar
+  /// este campo.
+  allowedPanels  Panel[]       @default([])
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
+  /// Sucursal fija asignada a un STAFF (siempre ve solo esa). null = OWNER, que ve/cambia entre
+  /// todas las sucursales de su organizacion mediante un selector.
+  sucursalId     String?
+  sucursal       Sucursal?     @relation(fields: [sucursalId], references: [id])
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -129,6 +178,7 @@ model User {
   productionEntries ProductionEntry[] @relation("ProductionEntryCreatedBy")
   auditComments     AuditComment[]    @relation("AuditCommentCreatedBy")
   inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
+  supplierPayments  SupplierPayment[] @relation("SupplierPaymentCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -217,8 +267,11 @@ model Purchase {
   /// que se esperaba en esa entrega (ej. "Pedido PED-0005: se esperaban 50 KG, llegaron 45 KG").
   note              String?
 
-  @@unique([organizationId, folio])
+  /// El folio ya no es unico por renglon: todos los productos capturados en una misma compra
+  /// (un solo envio del formulario) comparten el mismo folio.
+  @@index([organizationId, folio])
   @@index([organizationId, productId, purchaseDate])
+  @@index([organizationId, purchaseDate])
   @@map("purchases")
 }
 
@@ -233,12 +286,35 @@ model Supplier {
   email          String?
   createdAt      DateTime     @default(now())
 
-  purchases      Purchase[]
-  purchaseOrders PurchaseOrder[]
+  purchases        Purchase[]
+  purchaseOrders   PurchaseOrder[]
+  supplierPayments SupplierPayment[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("suppliers")
+}
+
+/// Un abono (pago parcial o total) a un folio de compra de un proveedor. Un folio puede recibir
+/// varios abonos a lo largo del tiempo hasta cubrir su total; el saldo de un proveedor es el
+/// total comprado menos la suma de todos sus abonos. `folio` nullable solo por compatibilidad con
+/// adelantos antiguos sin folio (ya no se crean nuevos asi: todo abono nuevo debe ligarse a un folio).
+model SupplierPayment {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  supplierId      String
+  supplier        Supplier     @relation(fields: [supplierId], references: [id])
+  folio           Int?
+  amount          Decimal      @db.Decimal(12, 2)
+  paidDate        DateTime     @db.Date
+  note            String?
+  createdByUserId String?
+  createdBy       User?        @relation("SupplierPaymentCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, supplierId])
+  @@map("supplier_payments")
 }
 
 model Recipe {
@@ -253,6 +329,8 @@ model Recipe {
   isMenuItem     Boolean      @default(false)
   sellingPrice   Decimal?     @db.Decimal(12, 2)
   instructions   String?
+  photo          Bytes?
+  photoMimeType  String?
   archivedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

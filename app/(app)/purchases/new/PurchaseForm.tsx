@@ -16,6 +16,7 @@ import { createPurchase } from "../actions";
 import { deletePurchaseOrder } from "../../orders/[orderId]/actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 import type { PresentationOption } from "../../_components/PresentationQuantityInput";
+import { formatMoney } from "@/lib/format";
 
 type ProductOption = {
   id: string;
@@ -419,7 +420,7 @@ export default function PurchaseForm({
             } else if (preview) {
               costCell = (
                 <span className="text-neutral-700">
-                  ${preview.toFixed(4)} / {UNIT_LABELS[product.baseUnit]}
+                  {formatMoney(preview.toNumber(), 4)} / {UNIT_LABELS[product.baseUnit]}
                   {yieldAdjusted && (
                     <span className="text-amber-600"> (rinde {Number(product.yieldPercentage)}%)</span>
                   )}
@@ -564,7 +565,7 @@ export default function PurchaseForm({
 
         <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
           <p className="text-sm text-neutral-700">
-            Total de la compra: <strong className="text-base">${grandTotal.toFixed(2)}</strong>
+            Total de la compra: <strong className="text-base">{formatMoney(grandTotal)}</strong>
           </p>
         </div>
       </div>

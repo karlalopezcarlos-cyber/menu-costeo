@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireOrgSession } from "@/lib/tenant";
 import { computeMenuEngineeringReport, CLASSIFICATION_LABELS, type IvaMode } from "@/lib/menu-engineering";
+import { formatMoney } from "@/lib/format";
 
 const BADGE_CLASSES: Record<string, string> = {
   STAR: "bg-green-100 text-green-800",
@@ -143,9 +144,9 @@ export default async function MenuEngineeringPage({
                     )}
                   </td>
                   <td className="px-4 py-2">{row.quantitySold.toString()}</td>
-                  <td className="px-4 py-2">${row.unitPrice.toFixed(2)}</td>
-                  <td className="px-4 py-2">${row.cost.toFixed(2)}</td>
-                  <td className="px-4 py-2">${row.margin.toFixed(2)}</td>
+                  <td className="px-4 py-2">{formatMoney(row.unitPrice.toNumber())}</td>
+                  <td className="px-4 py-2">{formatMoney(row.cost.toNumber())}</td>
+                  <td className="px-4 py-2">{formatMoney(row.margin.toNumber())}</td>
                   <td className="px-4 py-2">
                     {row.costPct ? (
                       <span

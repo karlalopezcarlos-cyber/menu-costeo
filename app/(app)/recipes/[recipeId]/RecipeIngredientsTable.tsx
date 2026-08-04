@@ -132,17 +132,17 @@ export default function RecipeIngredientsTable({
                           className="hover:underline"
                           title="Ver la compra que registro este costo"
                         >
-                          ${row.unitCost}
+                          {row.unitCost}
                         </Link>
                       ) : (
-                        `$${row.unitCost}`
+                        row.unitCost
                       )
                     ) : (
                       "-"
                     )}
                   </td>
                   <td className="px-3 py-1.5 text-right text-sm font-semibold text-neutral-900">
-                    {row.lineCost ? `$${row.lineCost}` : "-"}
+                    {row.lineCost ? row.lineCost : "-"}
                   </td>
                   <td className="px-1 py-1.5 text-right">
                     <form action={removeAction}>
@@ -166,7 +166,7 @@ export default function RecipeIngredientsTable({
                         <div className="space-y-1 pl-5">
                           <p className="text-xs text-neutral-500">
                             Rendimiento de la subreceta: {row.breakdown.yieldLabel}
-                            {row.breakdown.totalCost && ` - Costo total: $${row.breakdown.totalCost}`}
+                            {row.breakdown.totalCost && ` - Costo total: ${row.breakdown.totalCost}`}
                           </p>
                           <table className="w-full table-fixed text-xs">
                             <colgroup>
@@ -205,17 +205,17 @@ export default function RecipeIngredientsTable({
                                           className="hover:underline"
                                           title="Ver la compra que registro este costo"
                                         >
-                                          ${sub.unitCost}
+                                          {sub.unitCost}
                                         </Link>
                                       ) : (
-                                        `$${sub.unitCost}`
+                                        sub.unitCost
                                       )
                                     ) : (
                                       "-"
                                     )}
                                   </td>
                                   <td className="py-1 text-right font-semibold text-neutral-800">
-                                    {sub.lineCost ? `$${sub.lineCost}` : "-"}
+                                    {sub.lineCost ? sub.lineCost : "-"}
                                   </td>
                                 </tr>
                               ))}

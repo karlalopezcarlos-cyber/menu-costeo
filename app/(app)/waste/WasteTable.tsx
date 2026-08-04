@@ -8,6 +8,7 @@ import {
   type WasteSortKey,
   type SortDir,
 } from "./waste-rows";
+import { formatMoney } from "@/lib/format";
 
 export type { WasteRow };
 
@@ -122,7 +123,7 @@ export default function WasteTable({
 
       <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
         <p className="text-sm text-neutral-500">Costo total de mermas (filtro actual)</p>
-        <p className="text-xl font-semibold text-neutral-900">${totalCost.toFixed(2)}</p>
+        <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -173,7 +174,7 @@ export default function WasteTable({
                 <td className="px-4 py-2 text-neutral-500">{row.quantityLabel}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.unitLabel}</td>
                 <td className="px-4 py-2">
-                  ${row.cost.toFixed(2)}
+                  {formatMoney(row.cost)}
                   {row.costBasisLabel && (
                     <span className="ml-1 text-xs text-amber-600">({row.costBasisLabel})</span>
                   )}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { formatMoney } from "@/lib/format";
 import ProductionTable, { type ProductionRow } from "./ProductionTable";
 
 export default async function ProductionPage() {
@@ -23,7 +24,7 @@ export default async function ProductionPage() {
     quantityLabel: Number(entry.quantity).toLocaleString("es-MX", { maximumFractionDigits: 4 }),
     quantityValue: Number(entry.quantity),
     unitLabel: UNIT_LABELS[entry.unit as UnitValue],
-    unitCostLabel: `$${Number(entry.unitCost).toFixed(4)} / ${UNIT_LABELS[entry.unit as UnitValue]}`,
+    unitCostLabel: `${formatMoney(Number(entry.unitCost), 4)} / ${UNIT_LABELS[entry.unit as UnitValue]}`,
     unitCostValue: Number(entry.unitCost),
     total: Number(entry.quantity) * Number(entry.unitCost),
     comment: entry.comment,

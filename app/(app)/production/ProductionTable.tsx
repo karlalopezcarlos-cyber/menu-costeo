@@ -8,6 +8,7 @@ import {
   type ProductionSortKey,
   type SortDir,
 } from "./production-rows";
+import { formatMoney } from "@/lib/format";
 
 export type { ProductionRow };
 
@@ -127,7 +128,7 @@ export default function ProductionTable({
 
       <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
         <p className="text-sm text-neutral-500">Costo total de produccion (filtro actual)</p>
-        <p className="text-xl font-semibold text-neutral-900">${totalCost.toFixed(2)}</p>
+        <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
@@ -180,7 +181,7 @@ export default function ProductionTable({
                 <td className="px-4 py-2 text-neutral-500">{row.quantityLabel}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.unitLabel}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.unitCostLabel}</td>
-                <td className="px-4 py-2">${row.total.toFixed(2)}</td>
+                <td className="px-4 py-2">{formatMoney(row.total)}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.comment ?? "-"}</td>
               </tr>
             ))}

@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { deleteDailySale } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 export type SaleRow = {
   id: string;
+  recipeId: string;
   dateLabel: string;
   dateValue: number;
+  /** Fecha en formato yyyy-mm-dd, para precargar el input type=date al editar. */
+  dateInputValue: string;
   recipeName: string;
   quantitySold: number;
   unitPrice: number;
@@ -41,7 +46,13 @@ function sortValue(row: SaleRow, key: SortKey): string | number {
   }
 }
 
-export default function SalesTable({ rows }: { rows: SaleRow[] }) {
+export default function SalesTable({
+  rows,
+  onEdit,
+}: {
+  rows: SaleRow[];
+  onEdit: (row: SaleRow) => void;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -83,12 +94,13 @@ export default function SalesTable({ rows }: { rows: SaleRow[] }) {
                 </button>
               </th>
             ))}
+            <th className="px-4 py-2 font-medium"></th>
           </tr>
         </thead>
         <tbody>
           {sortedRows.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
+              <td colSpan={7} className="px-4 py-6 text-center text-neutral-400">
                 No hay ventas capturadas en este periodo.
               </td>
             </tr>
@@ -98,10 +110,32 @@ export default function SalesTable({ rows }: { rows: SaleRow[] }) {
               <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
               <td className="px-4 py-2">{row.recipeName}</td>
               <td className="px-4 py-2">{row.quantitySold}</td>
-              <td className="px-4 py-2">${row.unitPrice.toFixed(2)}</td>
-              <td className="px-4 py-2">${(row.quantitySold * row.unitPrice).toFixed(2)}</td>
+              <td className="px-4 py-2">{formatMoney(row.unitPrice)}</td>
+              <td className="px-4 py-2">{formatMoney(row.quantitySold * row.unitPrice)}</td>
               <td className="px-4 py-2 text-neutral-400">
                 {row.source === "import" ? "Importado" : "Manual"}
+              </td>
+              <td className="px-4 py-2 text-right">
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(row)}
+                    className="text-neutral-400 hover:text-neutral-900"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("¿Eliminar esta venta? Esta accion no se puede deshacer.")) {
+                        deleteDailySale(row.id);
+                      }
+                    }}
+                    className="text-neutral-400 hover:text-red-600"
+                  >
+                    Eliminar
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

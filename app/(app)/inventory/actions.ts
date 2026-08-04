@@ -13,6 +13,14 @@ export async function createInventoryCount(formData: FormData) {
   const date = new Date(`${dateRaw}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) throw new Error("Fecha invalida.");
 
+  const existing = await prisma.inventoryCount.findFirst({
+    where: { organizationId: user.organizationId, date },
+  });
+  if (existing) {
+    // Ya existe un conteo para esta fecha: se abre ese en vez de crear uno duplicado.
+    redirect(`/inventory/${existing.id}?existing=1`);
+  }
+
   const count = await prisma.inventoryCount.create({
     data: {
       organizationId: user.organizationId,

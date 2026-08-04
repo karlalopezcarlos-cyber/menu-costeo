@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { AuditRow } from "@/lib/audit";
 import { filterAuditRows, sumVarianceAmounts } from "@/lib/audit-filters";
 import { saveAuditComments } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 type SortKey =
   | "category"
@@ -46,7 +47,7 @@ function fmt(n: number): string {
 
 function fmtMoney(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "-" : "";
-  return `${sign}$${Math.abs(n).toFixed(2)}`;
+  return `${sign}${formatMoney(Math.abs(n))}`;
 }
 
 /** Ej. "150 ML" -> "150 ML (0.20 Botella)" cuando el producto tiene presentacion fija configurada. */
@@ -412,11 +413,11 @@ export default function AuditTable({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div className="rounded-lg border border-neutral-200 bg-white p-5">
         <p className="text-sm text-neutral-500">Monto total de faltantes</p>
-        <p className="mt-1 text-2xl font-semibold text-red-600">-${totalShortageAmount.toFixed(2)}</p>
+        <p className="mt-1 text-2xl font-semibold text-red-600">-{formatMoney(totalShortageAmount)}</p>
       </div>
       <div className="rounded-lg border border-neutral-200 bg-white p-5">
         <p className="text-sm text-neutral-500">Monto total de sobrantes</p>
-        <p className="mt-1 text-2xl font-semibold text-emerald-700">+${totalSurplusAmount.toFixed(2)}</p>
+        <p className="mt-1 text-2xl font-semibold text-emerald-700">+{formatMoney(totalSurplusAmount)}</p>
       </div>
     </div>
   );

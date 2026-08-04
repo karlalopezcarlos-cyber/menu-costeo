@@ -10,7 +10,7 @@ export const UNIT_LABELS: Record<UnitValue, string> = {
   G: "G",
   KG: "KG",
   ML: "ML",
-  L: "L",
+  L: "LT",
   OZ: "OZ",
   PIECE: "PZA",
 };

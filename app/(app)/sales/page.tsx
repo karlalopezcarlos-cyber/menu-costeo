@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
-import SaleForm from "./SaleForm";
-import SalesTable, { type SaleRow } from "./SalesTable";
+import SalesManager from "./SalesManager";
+import type { SaleRow } from "./SalesTable";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -38,8 +38,10 @@ export default async function SalesPage({
 
   const rows: SaleRow[] = sales.map((sale) => ({
     id: sale.id,
+    recipeId: sale.recipeId,
     dateLabel: sale.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     dateValue: sale.date.getTime(),
+    dateInputValue: sale.date.toISOString().slice(0, 10),
     recipeName: sale.recipe.name,
     quantitySold: Number(sale.quantitySold),
     unitPrice: Number(sale.unitPrice),
@@ -99,22 +101,21 @@ export default async function SalesPage({
         </button>
       </form>
 
-      {recipes.length === 0 ? (
+      {recipes.length === 0 && (
         <p className="text-sm text-neutral-500">
           Todavia no tienes platillos de menu. Marca una receta como &quot;platillo de menu&quot; para
           que aparezca aqui.
         </p>
-      ) : (
-        <SaleForm
-          recipes={recipes.map((r) => ({
-            id: r.id,
-            name: r.name,
-            sellingPrice: r.sellingPrice ? r.sellingPrice.toString() : null,
-          }))}
-        />
       )}
 
-      <SalesTable rows={rows} />
+      <SalesManager
+        recipes={recipes.map((r) => ({
+          id: r.id,
+          name: r.name,
+          sellingPrice: r.sellingPrice ? r.sellingPrice.toString() : null,
+        }))}
+        rows={rows}
+      />
     </div>
   );
 }

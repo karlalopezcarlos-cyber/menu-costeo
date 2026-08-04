@@ -11,10 +11,13 @@ import InventoryChangeLogTable, { type ChangeLogRow } from "./InventoryChangeLog
 
 export default async function InventoryCountPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ countId: string }>;
+  searchParams: Promise<{ existing?: string }>;
 }) {
   const { countId } = await params;
+  const { existing } = await searchParams;
   const user = await requireOrgSession();
 
   const [count, changes] = await Promise.all([
@@ -143,6 +146,11 @@ export default async function InventoryCountPage({
 
   return (
     <div className="space-y-6">
+      {existing === "1" && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Ya existia un conteo para esta fecha, no se puede crear otro. Este es el conteo existente.
+        </p>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { formatMoney } from "@/lib/format";
 
 export type RecipeRow = {
   id: string;
@@ -141,14 +142,14 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
                 {recipe.costError ? (
                   <span className="text-red-600">{recipe.costError}</span>
                 ) : (
-                  `$${recipe.cost!.toFixed(2)}`
+                  formatMoney(recipe.cost!)
                 )}
               </td>
               <td className="px-4 py-2">
-                {recipe.costPerUnit === null ? "-" : `$${recipe.costPerUnit.toFixed(4)}`}
+                {recipe.costPerUnit === null ? "-" : formatMoney(recipe.costPerUnit, 4)}
               </td>
               <td className="px-4 py-2">
-                {recipe.sellingPrice === null ? "-" : `$${recipe.sellingPrice.toFixed(2)}`}
+                {recipe.sellingPrice === null ? "-" : formatMoney(recipe.sellingPrice)}
               </td>
               <td className="px-4 py-2">
                 {recipe.costPct === null ? (

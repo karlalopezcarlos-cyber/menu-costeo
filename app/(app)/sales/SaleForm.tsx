@@ -1,17 +1,35 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { upsertDailySale } from "./actions";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { updateDailySale, upsertDailySale } from "./actions";
 import SearchableSelect from "../_components/SearchableSelect";
+import type { SaleRow } from "./SalesTable";
 
 type RecipeOption = { id: string; name: string; sellingPrice: string | null };
 
 const initialState: { error?: string } = {};
 
-export default function SaleForm({ recipes }: { recipes: RecipeOption[] }) {
-  const [state, formAction, pending] = useActionState(upsertDailySale, initialState);
-  const [recipeId, setRecipeId] = useState("");
-  const [unitPrice, setUnitPrice] = useState("");
+export default function SaleForm({
+  recipes,
+  editing,
+  onCancelEdit,
+}: {
+  recipes: RecipeOption[];
+  editing: SaleRow | null;
+  onCancelEdit: () => void;
+}) {
+  const action = editing ? updateDailySale.bind(null, editing.id) : upsertDailySale;
+  const [state, formAction, pending] = useActionState(action, initialState);
+  const [recipeId, setRecipeId] = useState(editing?.recipeId ?? "");
+  const [unitPrice, setUnitPrice] = useState(editing ? editing.unitPrice.toString() : "");
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    if (wasPending.current && !pending && !state?.error && editing) {
+      onCancelEdit();
+    }
+    wasPending.current = pending;
+  }, [pending, state, editing, onCancelEdit]);
 
   function handleRecipeChange(id: string) {
     setRecipeId(id);
@@ -33,7 +51,7 @@ export default function SaleForm({ recipes }: { recipes: RecipeOption[] }) {
           name="date"
           type="date"
           required
-          defaultValue={new Date().toISOString().slice(0, 10)}
+          defaultValue={editing ? editing.dateInputValue : new Date().toISOString().slice(0, 10)}
           className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
         />
       </div>
@@ -60,6 +78,7 @@ export default function SaleForm({ recipes }: { recipes: RecipeOption[] }) {
           step="any"
           min="0"
           required
+          defaultValue={editing?.quantitySold}
           placeholder="0"
           className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
         />
@@ -88,13 +107,24 @@ export default function SaleForm({ recipes }: { recipes: RecipeOption[] }) {
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-      >
-        {pending ? "Guardando..." : "Guardar"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        >
+          {pending ? "Guardando..." : editing ? "Guardar cambios" : "Guardar"}
+        </button>
+        {editing && (
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            className="text-sm text-neutral-500 hover:underline"
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
 
       {state?.error && <p className="col-span-5 text-sm text-red-600">{state.error}</p>}
     </form>

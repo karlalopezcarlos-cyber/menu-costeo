@@ -20,7 +20,7 @@ export async function buildProductsWorkbook(rows: ProductExportRow[]): Promise<B
     { header: "Categoria", key: "category", width: 18 },
     { header: "Unidad base", key: "baseUnit", width: 16 },
     { header: "Rendimiento %", key: "yieldPercentage", width: 14 },
-    { header: "Costo vigente", key: "currentUnitCost", width: 16 },
+    { header: "Costo vigente", key: "currentUnitCost", width: 16, style: { numFmt: '"$"#,##0.0000' } },
     { header: "Estado", key: "archived", width: 12 },
   ];
   sheet.getRow(1).font = { bold: true };

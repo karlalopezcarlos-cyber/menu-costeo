@@ -3,36 +3,66 @@ import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import PurchasesTable, { type PurchaseRow } from "./PurchasesTable";
 import { toPurchaseRow } from "./purchase-rows";
+import { buildPurchaseWhere, hasAnyPurchaseFilter, resolvePendingProductIds, todayDateInputValue } from "@/lib/purchases/query";
 
-export default async function PurchasesPage() {
+// Tope de seguridad para no traer un historial completo de anios a la pantalla de un jalon:
+// si una busqueda sin acotar por fecha regresa mas de esto, se avisa para que se agregue un filtro.
+const ROW_LIMIT = 500;
+
+function readParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+export default async function PurchasesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireOrgSession();
+  const raw = await searchParams;
 
-  const [purchases, openOrderItems] = await Promise.all([
+  const filters = {
+    search: readParam(raw.q),
+    folio: readParam(raw.folio),
+    dateFrom: readParam(raw.from),
+    dateTo: readParam(raw.to),
+    pendingOnly: readParam(raw.pendingOnly) === "1",
+    supplier: readParam(raw.supplier),
+  };
+  const touched = readParam(raw.touched) === "1";
+
+  // Sin ningun filtro y sin que el usuario haya tocado nada todavia: se acota a las compras de
+  // hoy para no cargar el historial completo. En cuanto se usa cualquier filtro, se respeta tal
+  // cual (busqueda/folio sin fecha buscan en todo el historial, no solo en el dia).
+  const isDefaultToday = !touched && !hasAnyPurchaseFilter(filters);
+  const today = todayDateInputValue();
+  const effectiveFilters = isDefaultToday ? { ...filters, dateFrom: today, dateTo: today } : filters;
+
+  const pendingProductIds = await resolvePendingProductIds(user.organizationId);
+  const pendingIdSet = new Set(pendingProductIds);
+
+  const where = buildPurchaseWhere(
+    user.organizationId,
+    effectiveFilters,
+    effectiveFilters.pendingOnly ? pendingProductIds : null,
+  );
+
+  const [purchases, suppliers] = await Promise.all([
     prisma.purchase.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { purchaseDate: "desc" },
-      take: 100,
+      where,
+      orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
+      take: ROW_LIMIT,
       include: { product: true, supplier: true },
     }),
-    prisma.purchaseOrderItem.findMany({
-      where: { purchaseOrder: { organizationId: user.organizationId, status: "OPEN" } },
-      select: { productId: true, quantity: true, receivedQuantity: true },
+    prisma.supplier.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      select: { name: true },
     }),
   ]);
 
-  // Productos que todavia tienen saldo pendiente en algun pedido abierto (independientemente de
-  // si la compra que se esta mostrando fue la que dejo ese faltante).
-  const productIdsWithPending = new Set(
-    openOrderItems
-      .filter((item) => {
-        const received = item.receivedQuantity != null ? Number(item.receivedQuantity) : 0;
-        return Number(item.quantity) - received > 0;
-      })
-      .map((item) => item.productId),
-  );
-
   const rows: PurchaseRow[] = purchases.map((purchase) =>
-    toPurchaseRow(purchase, productIdsWithPending.has(purchase.productId)),
+    toPurchaseRow(purchase, pendingIdSet.has(purchase.productId)),
   );
 
   return (
@@ -47,7 +77,14 @@ export default async function PurchasesPage() {
         </Link>
       </div>
 
-      <PurchasesTable rows={rows} />
+      <PurchasesTable
+        rows={rows}
+        supplierOptions={suppliers.map((s) => s.name)}
+        filters={filters}
+        isDefaultToday={isDefaultToday}
+        today={today}
+        truncated={rows.length === ROW_LIMIT}
+      />
     </div>
   );
 }

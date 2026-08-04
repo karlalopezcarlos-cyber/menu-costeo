@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatMoney } from "@/lib/format";
 
 export type InventoryCountPdfRow = {
   categoryName: string | null;
@@ -18,16 +19,17 @@ export type InventoryCountPdfData = {
 };
 
 function money(n: number): string {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatMoney(n);
 }
 
 const COLUMNS = [
-  { key: "category", label: "Categoria", frac: 0.15 },
+  { key: "category", label: "Categoria", frac: 0.12 },
   { key: "type", label: "Tipo", frac: 0.1 },
-  { key: "name", label: "Nombre", frac: 0.3 },
-  { key: "quantity", label: "Cantidad", frac: 0.15 },
-  { key: "unitCost", label: "Costo unit.", frac: 0.15 },
-  { key: "total", label: "Total", frac: 0.15 },
+  { key: "name", label: "Nombre", frac: 0.25 },
+  { key: "quantity", label: "Cantidad", frac: 0.12 },
+  { key: "unit", label: "Unidad", frac: 0.09 },
+  { key: "unitCost", label: "Costo unit.", frac: 0.16 },
+  { key: "total", label: "Total", frac: 0.16 },
 ] as const;
 
 const RIGHT_ALIGNED = ["quantity", "unitCost", "total"];
@@ -92,7 +94,8 @@ export async function buildInventoryCountPdf(data: InventoryCountPdfData): Promi
           category: row.categoryName ?? "-",
           type: row.type,
           name: row.name,
-          quantity: `${row.quantity.toLocaleString("es-MX", { maximumFractionDigits: 2 })} ${row.unitLabel}`,
+          quantity: row.quantity.toLocaleString("es-MX", { maximumFractionDigits: 2 }),
+          unit: row.unitLabel,
           unitCost: money(row.unitCost),
           total: money(row.total),
         };

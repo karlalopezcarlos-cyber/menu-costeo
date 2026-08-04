@@ -22,9 +22,14 @@ export async function buildRecipesWorkbook(rows: RecipeExportRow[]): Promise<Buf
     { header: "Rendimiento", key: "yieldQty", width: 14 },
     { header: "Unidad de rendimiento", key: "yieldUnit", width: 20 },
     { header: "Platillo de menu", key: "isMenuItem", width: 16 },
-    { header: "Precio de venta", key: "sellingPrice", width: 16 },
-    { header: "Costo total", key: "totalCost", width: 14 },
-    { header: "Costo por unidad de rendimiento", key: "costPerYieldUnit", width: 26 },
+    { header: "Precio de venta", key: "sellingPrice", width: 16, style: { numFmt: '"$"#,##0.00' } },
+    { header: "Costo total", key: "totalCost", width: 14, style: { numFmt: '"$"#,##0.00' } },
+    {
+      header: "Costo por unidad de rendimiento",
+      key: "costPerYieldUnit",
+      width: 26,
+      style: { numFmt: '"$"#,##0.0000' },
+    },
   ];
   sheet.getRow(1).font = { bold: true };
 

@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { deleteRecipeCategory } from "./actions";
 import NewRecipeCategoryForm from "./NewRecipeCategoryForm";
+import SettingsNav from "../SettingsNav";
 
 export default async function RecipeCategoriesPage() {
   const user = await requireOrgSession();
@@ -17,17 +17,7 @@ export default async function RecipeCategoriesPage() {
     <div className="max-w-md space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
-        <nav className="mt-3 flex gap-4 border-b border-neutral-200 text-sm">
-          <Link href="/settings/categories" className="pb-2 text-neutral-500 hover:text-neutral-900">
-            Categorias de productos
-          </Link>
-          <span className="border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900">
-            Categorias de recetas
-          </span>
-          <Link href="/settings/suppliers" className="pb-2 text-neutral-500 hover:text-neutral-900">
-            Proveedores
-          </Link>
-        </nav>
+        <SettingsNav active="/settings/recipe-categories" />
         <p className="mt-3 text-sm text-neutral-500">
           Estas categorias aparecen como lista desplegable al crear una receta nueva.
         </p>

@@ -35,7 +35,11 @@ export default async function OrganizationsPage() {
           <tbody>
             {organizations.map((org) => (
               <tr key={org.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">{org.name}</td>
+                <td className="px-4 py-2">
+                  <Link href={`/admin/organizations/${org.id}`} className="text-neutral-900 hover:underline">
+                    {org.name}
+                  </Link>
+                </td>
                 <td className="px-4 py-2 text-neutral-500">{org._count.users}</td>
                 <td className="px-4 py-2 text-neutral-500">{org._count.products}</td>
                 <td className="px-4 py-2 text-neutral-500">{org._count.recipes}</td>

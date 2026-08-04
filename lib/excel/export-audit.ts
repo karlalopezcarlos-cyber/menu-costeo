@@ -56,6 +56,7 @@ export async function buildAuditWorkbook(
     { header: "Comentario", key: "comment", width: 30 },
   ];
   sheet.getRow(1).font = { bold: true };
+  sheet.getColumn("varianceAmount").numFmt = '"$"#,##0.00';
 
   for (const row of rows) {
     sheet.addRow({

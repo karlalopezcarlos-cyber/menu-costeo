@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { createInventoryCount } from "./actions";
+import { formatMoney } from "@/lib/format";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -88,7 +89,7 @@ export default async function InventoryPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-2 text-neutral-500">{row.itemCount}</td>
-                <td className="px-4 py-2 font-medium">${row.totalValue.toFixed(2)}</td>
+                <td className="px-4 py-2 font-medium">{formatMoney(row.totalValue)}</td>
               </tr>
             ))}
           </tbody>

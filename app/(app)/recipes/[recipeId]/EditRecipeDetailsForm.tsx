@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { archiveRecipe, updateRecipeDetails } from "../actions";
+import { formatMoney } from "@/lib/format";
 
 const initialState: { error?: string } = {};
 
@@ -42,7 +43,7 @@ export default function EditRecipeDetailsForm({
             <p className="text-sm text-neutral-500">
               Rendimiento: {yieldQty} {UNIT_LABELS[yieldUnit]}
               {isMenuItem && " - Platillo de menu"}
-              {sellingPrice && ` - Precio de venta: $${Number(sellingPrice).toFixed(2)}`}
+              {sellingPrice && ` - Precio de venta: ${formatMoney(Number(sellingPrice))}`}
             </p>
           </div>
         ) : (

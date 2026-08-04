@@ -5,6 +5,7 @@ import Link from "next/link";
 import { convertQty, removeYieldFactor, UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { createWasteEntries } from "../actions";
 import SearchableSelect from "../../_components/SearchableSelect";
+import { formatMoney } from "@/lib/format";
 
 type CostBasis = "net" | "gross";
 
@@ -198,7 +199,7 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
                       Unidad incompatible
                     </span>
                   ) : cost !== null ? (
-                    <span>${cost.toFixed(2)}</span>
+                    <span>{formatMoney(cost)}</span>
                   ) : (
                     <span className="text-neutral-300">-</span>
                   )}
@@ -234,7 +235,7 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
 
         <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
           <p className="text-sm text-neutral-700">
-            Costo total de la merma: <strong className="text-base">${grandTotal.toFixed(2)}</strong>
+            Costo total de la merma: <strong className="text-base">{formatMoney(grandTotal)}</strong>
           </p>
         </div>
       </div>

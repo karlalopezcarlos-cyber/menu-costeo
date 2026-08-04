@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { computeInventoryAudit } from "@/lib/audit";
+import { formatMoney } from "@/lib/format";
 
 function inventoryValue(items: { quantity: unknown; unitCost: unknown }[]): number {
   return items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unitCost), 0);
@@ -100,16 +101,16 @@ export default async function DashboardPage({
   const wasteCostPct = totalSales > 0 ? (totalWaste / totalSales) * 100 : null;
 
   const cards = [
-    { label: `Inventario inicial (${formatDate(initialCount.date)})`, value: `$${initialValue.toFixed(2)}` },
-    { label: `Inventario final (${formatDate(finalCount.date)})`, value: `$${finalValue.toFixed(2)}` },
-    { label: "Total de compras del periodo", value: `$${totalPurchases.toFixed(2)}` },
-    { label: "Total de ventas del periodo", value: `$${totalSales.toFixed(2)}` },
-    { label: "Total de mermas del periodo", value: `$${totalWaste.toFixed(2)}` },
+    { label: `Inventario inicial (${formatDate(initialCount.date)})`, value: formatMoney(initialValue) },
+    { label: `Inventario final (${formatDate(finalCount.date)})`, value: formatMoney(finalValue) },
+    { label: "Total de compras del periodo", value: formatMoney(totalPurchases) },
+    { label: "Total de ventas del periodo", value: formatMoney(totalSales) },
+    { label: "Total de mermas del periodo", value: formatMoney(totalWaste) },
     { label: "Costo %", value: costPct !== null ? `${costPct.toFixed(1)}%` : "-" },
     { label: "Costo de compra %", value: purchaseCostPct !== null ? `${purchaseCostPct.toFixed(1)}%` : "-" },
     { label: "Costo de mermas %", value: wasteCostPct !== null ? `${wasteCostPct.toFixed(1)}%` : "-" },
-    { label: "Monto total de faltantes", value: `-$${audit.totalShortageAmount.toFixed(2)}`, negative: true },
-    { label: "Monto total de sobrantes", value: `+$${audit.totalSurplusAmount.toFixed(2)}`, positive: true },
+    { label: "Monto total de faltantes", value: `-${formatMoney(audit.totalShortageAmount)}`, negative: true },
+    { label: "Monto total de sobrantes", value: `+${formatMoney(audit.totalSurplusAmount)}`, positive: true },
   ];
 
   return (

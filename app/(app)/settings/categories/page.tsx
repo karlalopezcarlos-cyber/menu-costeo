@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { deleteCategory } from "./actions";
 import NewCategoryForm from "./NewCategoryForm";
+import SettingsNav from "../SettingsNav";
 
 export default async function ProductCategoriesPage() {
   const user = await requireOrgSession();
@@ -17,20 +17,7 @@ export default async function ProductCategoriesPage() {
     <div className="max-w-md space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
-        <nav className="mt-3 flex gap-4 border-b border-neutral-200 text-sm">
-          <span className="border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900">
-            Categorias de productos
-          </span>
-          <Link
-            href="/settings/recipe-categories"
-            className="pb-2 text-neutral-500 hover:text-neutral-900"
-          >
-            Categorias de recetas
-          </Link>
-          <Link href="/settings/suppliers" className="pb-2 text-neutral-500 hover:text-neutral-900">
-            Proveedores
-          </Link>
-        </nav>
+        <SettingsNav active="/settings/categories" />
         <p className="mt-3 text-sm text-neutral-500">
           Estas categorias aparecen como lista desplegable al crear o editar un producto.
         </p>

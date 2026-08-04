@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import type { Role } from "@/generated/prisma/client";
+import type { Panel, Role } from "@/generated/prisma/client";
 
 declare module "next-auth" {
   interface Session {
@@ -12,6 +12,9 @@ declare module "next-auth" {
       name?: string | null;
       role: Role;
       organizationId: string | null;
+      allowedPanels: Panel[];
+      /// Sucursal fija del usuario (STAFF). null = OWNER/SUPERADMIN, ve/cambia entre todas.
+      sucursalId: string | null;
     };
   }
 }
@@ -21,6 +24,8 @@ declare module "@auth/core/jwt" {
     userId: string;
     role: Role;
     organizationId: string | null;
+    allowedPanels: Panel[];
+    sucursalId: string | null;
   }
 }
 
@@ -55,6 +60,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           organizationId: user.organizationId,
+          allowedPanels: user.allowedPanels,
+          sucursalId: user.sucursalId,
         };
       },
     }),
@@ -65,6 +72,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.userId = user.id as string;
         token.role = (user as { role: Role }).role;
         token.organizationId = (user as { organizationId: string | null }).organizationId;
+        token.allowedPanels = (user as { allowedPanels: Panel[] }).allowedPanels;
+        token.sucursalId = (user as { sucursalId: string | null }).sucursalId;
       }
       return token;
     },
@@ -72,6 +81,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.userId;
       session.user.role = token.role;
       session.user.organizationId = token.organizationId;
+      session.user.allowedPanels = token.allowedPanels ?? [];
+      session.user.sucursalId = token.sucursalId ?? null;
       return session;
     },
   },

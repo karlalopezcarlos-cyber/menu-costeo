@@ -157,16 +157,15 @@ export async function createPurchase(
     }));
 
     await prisma.$transaction(async (tx) => {
+      // Todos los productos capturados en este envio del formulario comparten un solo folio,
+      // sin importar cuantos renglones tenga la compra.
       const org = await tx.organization.update({
         where: { id: user.organizationId },
-        data: { nextPurchaseFolio: { increment: toCreateWithNotes.length } },
+        data: { nextPurchaseFolio: { increment: 1 } },
         select: { nextPurchaseFolio: true },
       });
-      const startFolio = org.nextPurchaseFolio - toCreateWithNotes.length;
-      const withFolios = toCreateWithNotes.map((entry, index) => ({
-        ...entry,
-        folio: startFolio + index,
-      }));
+      const folio = org.nextPurchaseFolio - 1;
+      const withFolios = toCreateWithNotes.map((entry) => ({ ...entry, folio }));
       await tx.purchase.createMany({ data: withFolios });
       if (!purchaseOrder) return;
 

@@ -7,9 +7,11 @@ import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { updateRecipeInstructions } from "../actions";
 import AddRecipeItemForm from "./AddRecipeItemForm";
 import EditRecipeDetailsForm from "./EditRecipeDetailsForm";
+import RecipePhotoForm from "./RecipePhotoForm";
 import RecipeIngredientsTable, { type IngredientRow } from "./RecipeIngredientsTable";
 import type { RecipeGraph } from "@/lib/costing";
 import Decimal from "decimal.js";
+import { formatMoney } from "@/lib/format";
 
 type ItemLike = { productId: string | null; subRecipeId: string | null; quantity: Decimal; unit: string };
 type ProductLike = { baseUnit: string; currentUnitCost: Decimal } | null;
@@ -129,7 +131,7 @@ export default async function RecipeDetailPage({
 
   const rows: IngredientRow[] = recipe.items.map((item) => {
     const unitCost = computeUnitCost(item, item.product, item.subRecipe, graph, memo);
-    const lineCost = unitCost ? unitCost.times(item.quantity).toFixed(2) : null;
+    const lineCost = unitCost ? formatMoney(unitCost.times(item.quantity).toNumber()) : null;
     const label = item.product?.name ?? item.subRecipe?.name ?? "?";
 
     let breakdown: IngredientRow["breakdown"];
@@ -137,7 +139,7 @@ export default async function RecipeDetailPage({
       const subItems = nestedItemsByRecipeId.get(item.subRecipeId) ?? [];
       let subTotalCost: string | null = null;
       try {
-        subTotalCost = getRecipeCost(item.subRecipeId, graph, memo).toFixed(2);
+        subTotalCost = formatMoney(getRecipeCost(item.subRecipeId, graph, memo).toNumber());
       } catch {
         subTotalCost = null;
       }
@@ -152,8 +154,8 @@ export default async function RecipeDetailPage({
             categoryName: si.product?.category?.name ?? null,
             quantity: si.quantity.toString(),
             unitLabel: UNIT_LABELS[si.unit as UnitValue],
-            unitCost: siUnitCost ? siUnitCost.toFixed(4) : null,
-            lineCost: siUnitCost ? siUnitCost.times(si.quantity).toFixed(2) : null,
+            unitCost: siUnitCost ? formatMoney(siUnitCost.toNumber(), 4) : null,
+            lineCost: siUnitCost ? formatMoney(siUnitCost.times(si.quantity).toNumber()) : null,
             latestPurchaseFolio: si.productId ? latestFolioByProduct.get(si.productId) ?? null : null,
           };
         }),
@@ -168,7 +170,7 @@ export default async function RecipeDetailPage({
       categoryName: item.product?.category?.name ?? null,
       quantity: item.quantity.toString(),
       unitLabel: UNIT_LABELS[item.unit as UnitValue],
-      unitCost: unitCost ? unitCost.toFixed(4) : null,
+      unitCost: unitCost ? formatMoney(unitCost.toNumber(), 4) : null,
       lineCost,
       latestPurchaseFolio: item.productId ? latestFolioByProduct.get(item.productId) ?? null : null,
       breakdown,
@@ -178,14 +180,23 @@ export default async function RecipeDetailPage({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <EditRecipeDetailsForm
-          recipeId={recipe.id}
-          name={recipe.name}
-          yieldQty={recipe.yieldQty.toString()}
-          yieldUnit={recipe.yieldUnit as UnitValue}
-          isMenuItem={recipe.isMenuItem}
-          sellingPrice={recipe.sellingPrice ? recipe.sellingPrice.toString() : null}
-        />
+        <div className="flex items-start gap-4">
+          <RecipePhotoForm
+            recipeId={recipe.id}
+            hasPhoto={!!recipe.photo}
+            updatedAt={recipe.updatedAt.getTime()}
+          />
+          <div className="flex-1">
+            <EditRecipeDetailsForm
+              recipeId={recipe.id}
+              name={recipe.name}
+              yieldQty={recipe.yieldQty.toString()}
+              yieldUnit={recipe.yieldUnit as UnitValue}
+              isMenuItem={recipe.isMenuItem}
+              sellingPrice={recipe.sellingPrice ? recipe.sellingPrice.toString() : null}
+            />
+          </div>
+        </div>
         <nav className="flex gap-4 border-b border-neutral-200 text-sm">
           <span className="border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900">
             Detalle
@@ -206,7 +217,7 @@ export default async function RecipeDetailPage({
         ) : (
           <>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-semibold text-neutral-900">${totalCost!.toFixed(2)}</p>
+              <p className="text-3xl font-semibold text-neutral-900">{formatMoney(totalCost!.toNumber())}</p>
               {costPct !== null && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-sm font-semibold ${
@@ -219,7 +230,7 @@ export default async function RecipeDetailPage({
             </div>
             {!recipe.yieldQty.isZero() && (
               <p className="text-sm text-neutral-500">
-                ${totalCost!.dividedBy(recipe.yieldQty).toFixed(4)} por{" "}
+                {formatMoney(totalCost!.dividedBy(recipe.yieldQty).toNumber(), 4)} por{" "}
                 {UNIT_LABELS[recipe.yieldUnit as UnitValue]}
               </p>
             )}

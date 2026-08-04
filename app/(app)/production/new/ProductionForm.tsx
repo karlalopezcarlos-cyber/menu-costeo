@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { createProductionEntries } from "../actions";
 import SearchableSelect from "../../_components/SearchableSelect";
+import { formatMoney } from "@/lib/format";
 
 type SubRecipeOption = { id: string; name: string; yieldUnit: UnitValue; unitCost: number };
 
@@ -134,7 +135,7 @@ export default function ProductionForm({ subRecipes }: { subRecipes: SubRecipeOp
                 <div className="text-sm leading-tight text-neutral-700">
                   {subRecipe ? (
                     cost !== null ? (
-                      <span>${cost.toFixed(2)}</span>
+                      <span>{formatMoney(cost)}</span>
                     ) : (
                       <span className="text-neutral-300">-</span>
                     )
@@ -162,7 +163,7 @@ export default function ProductionForm({ subRecipes }: { subRecipes: SubRecipeOp
 
         <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
           <p className="text-sm text-neutral-700">
-            Costo total de la produccion: <strong className="text-base">${grandTotal.toFixed(2)}</strong>
+            Costo total de la produccion: <strong className="text-base">{formatMoney(grandTotal)}</strong>
           </p>
         </div>
       </div>

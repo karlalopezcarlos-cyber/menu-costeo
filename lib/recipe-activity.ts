@@ -30,6 +30,7 @@ export type TimelineEntry = {
   date: Date;
   type: RecipeActivityType;
   message: string;
+  userName: string | null;
 };
 
 /**
@@ -41,6 +42,7 @@ export async function getRecipeTimeline(organizationId: string, recipeId: string
   const activities = await prisma.recipeActivity.findMany({
     where: { organizationId, recipeId },
     orderBy: { createdAt: "desc" },
+    include: { createdBy: { select: { name: true, email: true } } },
   });
 
   return activities.map((a) => ({
@@ -48,5 +50,6 @@ export async function getRecipeTimeline(organizationId: string, recipeId: string
     date: a.createdAt,
     type: a.type,
     message: a.message,
+    userName: a.createdBy?.name ?? a.createdBy?.email ?? null,
   }));
 }

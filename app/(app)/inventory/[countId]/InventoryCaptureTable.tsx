@@ -6,6 +6,7 @@ import PresentationQuantityInput, {
   type PresentationOption,
 } from "../../_components/PresentationQuantityInput";
 import type { UnitValue } from "@/lib/units";
+import { formatMoney } from "@/lib/format";
 
 export type CostBasis = "net" | "gross";
 
@@ -192,7 +193,7 @@ export default function InventoryCaptureTable({
       <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
         <div>
           <p className="text-sm text-neutral-500">Valor de inventario</p>
-          <p className="text-2xl font-semibold text-neutral-900">${grandTotal.toFixed(2)}</p>
+          <p className="text-2xl font-semibold text-neutral-900">{formatMoney(grandTotal)}</p>
         </div>
         <div className="flex items-center gap-3">
           {autoSaveStatus === "saving" && (
@@ -316,7 +317,7 @@ export default function InventoryCaptureTable({
                         $0.0000 ⚠
                       </span>
                     ) : (
-                      <span>${effectiveCost.toFixed(4)}</span>
+                      <span>{formatMoney(effectiveCost, 4)}</span>
                     )}
                     {hasYield && (
                       <select
@@ -347,7 +348,7 @@ export default function InventoryCaptureTable({
                     />
                   </td>
                   <td className="px-4 py-2 text-base font-bold text-neutral-900">
-                    ${(qty * effectiveCost).toFixed(2)}
+                    {formatMoney(qty * effectiveCost)}
                   </td>
                 </tr>
               );

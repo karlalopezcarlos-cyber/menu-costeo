@@ -22,13 +22,25 @@ export type RecipePdfData = {
   costPerYieldUnit: string | null;
   costPct: string | null;
   items: RecipePdfItem[];
+  photo: Buffer | null;
 };
+
+const PHOTO_SIZE = 110;
 
 function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
   const left = doc.page.margins.left;
   const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const headerTop = doc.y;
+  const titleWidth = data.photo ? usableWidth - PHOTO_SIZE - 16 : usableWidth;
 
-  doc.font("Helvetica-Bold").fontSize(20).text(data.name, left, doc.y);
+  if (data.photo) {
+    doc.image(data.photo, left + usableWidth - PHOTO_SIZE, headerTop, {
+      width: PHOTO_SIZE,
+      height: PHOTO_SIZE,
+    });
+  }
+
+  doc.font("Helvetica-Bold").fontSize(20).text(data.name, left, doc.y, { width: titleWidth });
   doc.moveDown(0.3);
 
   doc.font("Helvetica").fontSize(10).fillColor("#555555");
@@ -36,11 +48,15 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
     data.categoryName ? `Categoria: ${data.categoryName}` : null,
     `Rendimiento: ${data.yieldQty} ${data.yieldUnitLabel}`,
     data.isMenuItem ? "Platillo de menu" : "Subreceta",
-    data.sellingPrice ? `Precio de venta: $${data.sellingPrice}` : null,
+    data.sellingPrice ? `Precio de venta: ${data.sellingPrice}` : null,
   ].filter(Boolean);
-  doc.text(metaParts.join("   -   "), left, doc.y);
+  doc.text(metaParts.join("   -   "), left, doc.y, { width: titleWidth });
   doc.fillColor("#000000");
   doc.moveDown(1);
+
+  if (data.photo) {
+    doc.y = Math.max(doc.y, headerTop + PHOTO_SIZE + 10);
+  }
 
   // Resumen de costo
   doc.font("Helvetica-Bold").fontSize(12).text("Costo", left, doc.y);
@@ -50,9 +66,9 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
     doc.fillColor("#b91c1c").text(`Error de costeo: ${data.costError}`, left, doc.y);
     doc.fillColor("#000000");
   } else {
-    doc.text(`Costo total: $${data.totalCost}`, left, doc.y);
+    doc.text(`Costo total: ${data.totalCost}`, left, doc.y);
     if (data.costPerYieldUnit) {
-      doc.text(`Costo por ${data.yieldUnitLabel}: $${data.costPerYieldUnit}`, left, doc.y);
+      doc.text(`Costo por ${data.yieldUnitLabel}: ${data.costPerYieldUnit}`, left, doc.y);
     }
     if (data.costPct) {
       doc.text(`Costo %: ${data.costPct}%`, left, doc.y);
@@ -102,11 +118,11 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
       doc.text(label, colX.name, rowY, { width: colX.qty - colX.name - GAP });
       doc.text(item.quantity, colX.qty, rowY, { width: colX.unit - colX.qty - GAP, align: "right" });
       doc.text(item.unitLabel, colX.unit, rowY, { width: colX.unitCost - colX.unit - GAP });
-      doc.text(item.unitCost ? `$${item.unitCost}` : "-", colX.unitCost, rowY, {
+      doc.text(item.unitCost ? item.unitCost : "-", colX.unitCost, rowY, {
         width: colX.lineCost - colX.unitCost - GAP,
         align: "right",
       });
-      doc.text(item.lineCost ? `$${item.lineCost}` : "-", colX.lineCost, rowY, {
+      doc.text(item.lineCost ? item.lineCost : "-", colX.lineCost, rowY, {
         width: left + usableWidth - colX.lineCost,
         align: "right",
       });

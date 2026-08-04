@@ -12,8 +12,8 @@ export async function buildPurchasesWorkbook(rows: PurchaseRow[]): Promise<Buffe
     { header: "Cantidad", key: "quantity", width: 14 },
     { header: "Unidad", key: "unit", width: 10 },
     { header: "Proveedor", key: "supplier", width: 20 },
-    { header: "Precio", key: "price", width: 12 },
-    { header: "Costo unitario resultante", key: "cost", width: 26 },
+    { header: "Precio", key: "price", width: 12, style: { numFmt: '"$"#,##0.00' } },
+    { header: "Costo unitario", key: "unitCost", width: 14, style: { numFmt: '"$"#,##0.0000' } },
   ];
   sheet.getRow(1).font = { bold: true };
 
@@ -26,7 +26,7 @@ export async function buildPurchasesWorkbook(rows: PurchaseRow[]): Promise<Buffe
       unit: row.unitLabel,
       supplier: row.supplierName ?? "",
       price: row.totalPrice,
-      cost: row.unitCostLabel,
+      unitCost: row.unitCostValue,
     });
   }
 

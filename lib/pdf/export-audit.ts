@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { formatMoney } from "@/lib/format";
 
 export type AuditPdfRow = {
   categoryName: string | null;
@@ -26,7 +27,7 @@ export type AuditPdfData = {
 
 function money(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "-" : "";
-  return `${sign}$${Math.abs(n).toFixed(2)}`;
+  return `${sign}${formatMoney(Math.abs(n))}`;
 }
 
 const COLUMNS = [
@@ -107,7 +108,7 @@ export async function buildAuditPdf(data: AuditPdfData): Promise<Buffer> {
       .font("Helvetica-Bold")
       .fontSize(20)
       .fillColor("#dc2626")
-      .text(`-$${data.totalShortageAmount.toFixed(2)}`, left + 14, cardY + 32);
+      .text(`-${formatMoney(data.totalShortageAmount)}`, left + 14, cardY + 32);
 
     const card2X = left + cardWidth + 20;
     doc.roundedRect(card2X, cardY, cardWidth, cardHeight, 6).strokeColor("#dddddd").stroke();
@@ -116,7 +117,7 @@ export async function buildAuditPdf(data: AuditPdfData): Promise<Buffer> {
       .font("Helvetica-Bold")
       .fontSize(20)
       .fillColor("#059669")
-      .text(`+$${data.totalSurplusAmount.toFixed(2)}`, card2X + 14, cardY + 32);
+      .text(`+${formatMoney(data.totalSurplusAmount)}`, card2X + 14, cardY + 32);
 
     doc.fillColor("#000000");
 
