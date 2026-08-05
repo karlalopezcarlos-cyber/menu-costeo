@@ -9,6 +9,8 @@ const TYPE_LABELS: Record<string, string> = {
   venta: "Venta",
   produccion_entrada: "Produccion",
   produccion_salida: "Produccion (consumo)",
+  requisicion_entrada: "Requisicion (entrada)",
+  requisicion_salida: "Requisicion (salida)",
 };
 
 const TYPE_STYLES: Record<string, string> = {
@@ -17,6 +19,8 @@ const TYPE_STYLES: Record<string, string> = {
   venta: "bg-blue-100 text-blue-700",
   produccion_entrada: "bg-purple-100 text-purple-700",
   produccion_salida: "bg-amber-100 text-amber-700",
+  requisicion_entrada: "bg-teal-100 text-teal-700",
+  requisicion_salida: "bg-orange-100 text-orange-700",
 };
 
 function fmt(n: number): string {

@@ -10,6 +10,7 @@ import {
 } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { sumVarianceAmounts } from "@/lib/audit-filters";
+import { formatRequisicionFolio } from "@/lib/requisitions/folio";
 
 export { filterAuditRows, sumVarianceAmounts, type AuditRowFilters } from "@/lib/audit-filters";
 
@@ -29,6 +30,8 @@ export type AuditRow = {
   wasteQty: number;
   productionConsumedQty: number;
   salesQty: number;
+  requisicionesInQty: number;
+  requisicionesOutQty: number;
   theoreticalFinalQty: number;
   actualFinalQty: number | null;
   varianceQty: number | null;
@@ -103,43 +106,62 @@ export async function computeInventoryAudit(
   const rangeEnd = finalCount?.date ?? null;
   const dateFilter = rangeEnd ? { gt: rangeStart, lte: rangeEnd } : { gt: rangeStart };
 
-  const [products, subRecipes, purchases, purchaseOrderItems, wasteEntries, productionEntries, sales, graph, comments] =
-    await Promise.all([
-      prisma.product.findMany({
-        where: { organizationId, archivedAt: null },
-        orderBy: { name: "asc" },
-        include: { category: true },
-      }),
-      prisma.recipe.findMany({
-        where: { sucursalId, archivedAt: null, isMenuItem: false },
-        orderBy: { name: "asc" },
-        include: { category: true },
-      }),
-      prisma.purchase.findMany({
-        where: { sucursalId, purchaseDate: dateFilter },
-        select: { productId: true, presentationQty: true, presentationUnit: true },
-      }),
-      prisma.purchaseOrderItem.findMany({
-        where: { purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
-        select: { productId: true, quantity: true },
-      }),
-      prisma.wasteEntry.findMany({
-        where: { sucursalId, date: dateFilter },
-        select: { productId: true, quantity: true, unit: true },
-      }),
-      prisma.productionEntry.findMany({
-        where: { sucursalId, date: dateFilter },
-        select: { subRecipeId: true, quantity: true },
-      }),
-      prisma.dailySale.findMany({
-        where: { sucursalId, date: dateFilter },
-        select: { recipeId: true, quantitySold: true },
-      }),
-      loadOrgRecipeGraph(sucursalId),
-      finalCountId
-        ? prisma.auditComment.findMany({ where: { sucursalId, finalCountId } })
-        : Promise.resolve([]),
-    ]);
+  const [
+    products,
+    subRecipes,
+    purchases,
+    purchaseOrderItems,
+    wasteEntries,
+    productionEntries,
+    sales,
+    requisicionesOut,
+    requisicionesIn,
+    graph,
+    comments,
+  ] = await Promise.all([
+    prisma.product.findMany({
+      where: { organizationId, archivedAt: null },
+      orderBy: { name: "asc" },
+      include: { category: true },
+    }),
+    prisma.recipe.findMany({
+      where: { sucursalId, archivedAt: null, isMenuItem: false },
+      orderBy: { name: "asc" },
+      include: { category: true },
+    }),
+    prisma.purchase.findMany({
+      where: { sucursalId, purchaseDate: dateFilter },
+      select: { productId: true, presentationQty: true, presentationUnit: true },
+    }),
+    prisma.purchaseOrderItem.findMany({
+      where: { purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
+      select: { productId: true, quantity: true },
+    }),
+    prisma.wasteEntry.findMany({
+      where: { sucursalId, date: dateFilter },
+      select: { productId: true, quantity: true, unit: true },
+    }),
+    prisma.productionEntry.findMany({
+      where: { sucursalId, date: dateFilter },
+      select: { subRecipeId: true, quantity: true },
+    }),
+    prisma.dailySale.findMany({
+      where: { sucursalId, date: dateFilter },
+      select: { recipeId: true, quantitySold: true },
+    }),
+    prisma.requisicionItem.findMany({
+      where: { requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
+      select: { productId: true, quantity: true, unit: true },
+    }),
+    prisma.requisicionItem.findMany({
+      where: { requisicion: { toSucursalId: sucursalId, date: dateFilter } },
+      select: { productId: true, quantity: true, unit: true },
+    }),
+    loadOrgRecipeGraph(sucursalId),
+    finalCountId
+      ? prisma.auditComment.findMany({ where: { sucursalId, finalCountId } })
+      : Promise.resolve([]),
+  ]);
 
   const productCosts = await getSucursalProductCosts(
     sucursalId,
@@ -194,6 +216,36 @@ export async function computeInventoryAudit(
     }
     wasteByProductId.set(entry.productId, (wasteByProductId.get(entry.productId) ?? new Decimal(0)).plus(qtyInBase));
   }
+  const requisicionesOutByProductId = new Map<string, Decimal>();
+  for (const item of requisicionesOut) {
+    const baseUnit = baseUnitByProductId.get(item.productId);
+    if (!baseUnit) continue;
+    let qtyInBase: Decimal;
+    try {
+      qtyInBase = convertQty(item.quantity, item.unit as UnitValue, baseUnit);
+    } catch {
+      continue;
+    }
+    requisicionesOutByProductId.set(
+      item.productId,
+      (requisicionesOutByProductId.get(item.productId) ?? new Decimal(0)).plus(qtyInBase),
+    );
+  }
+  const requisicionesInByProductId = new Map<string, Decimal>();
+  for (const item of requisicionesIn) {
+    const baseUnit = baseUnitByProductId.get(item.productId);
+    if (!baseUnit) continue;
+    let qtyInBase: Decimal;
+    try {
+      qtyInBase = convertQty(item.quantity, item.unit as UnitValue, baseUnit);
+    } catch {
+      continue;
+    }
+    requisicionesInByProductId.set(
+      item.productId,
+      (requisicionesInByProductId.get(item.productId) ?? new Decimal(0)).plus(qtyInBase),
+    );
+  }
   const producedBySubRecipeId = toDecimalMap(
     productionEntries.map((i) => ({ key: i.subRecipeId, quantity: i.quantity })),
   );
@@ -224,11 +276,15 @@ export async function computeInventoryAudit(
     const wasteQty = wasteByProductId.get(product.id) ?? new Decimal(0);
     const productionConsumedQty = productionConsumedByProductId.get(product.id) ?? new Decimal(0);
     const salesQty = salesConsumedByProductId.get(product.id) ?? new Decimal(0);
+    const requisicionesInQty = requisicionesInByProductId.get(product.id) ?? new Decimal(0);
+    const requisicionesOutQty = requisicionesOutByProductId.get(product.id) ?? new Decimal(0);
     const theoreticalFinalQty = initialQty
       .plus(purchasesQty)
+      .plus(requisicionesInQty)
       .minus(wasteQty)
       .minus(productionConsumedQty)
-      .minus(salesQty);
+      .minus(salesQty)
+      .minus(requisicionesOutQty);
     const actualFinalQty = finalByKey ? finalByKey.get(product.id) ?? new Decimal(0) : null;
     const varianceQty = actualFinalQty !== null ? actualFinalQty.minus(theoreticalFinalQty) : null;
     const variancePct =
@@ -252,6 +308,8 @@ export async function computeInventoryAudit(
       wasteQty: wasteQty.toNumber(),
       productionConsumedQty: productionConsumedQty.toNumber(),
       salesQty: salesQty.toNumber(),
+      requisicionesInQty: requisicionesInQty.toNumber(),
+      requisicionesOutQty: requisicionesOutQty.toNumber(),
       theoreticalFinalQty: theoreticalFinalQty.toNumber(),
       actualFinalQty: actualFinalQty !== null ? actualFinalQty.toNumber() : null,
       varianceQty: varianceQty !== null ? varianceQty.toNumber() : null,
@@ -299,6 +357,8 @@ export async function computeInventoryAudit(
       wasteQty: 0,
       productionConsumedQty: productionConsumedQty.toNumber(),
       salesQty: salesQty.toNumber(),
+      requisicionesInQty: 0,
+      requisicionesOutQty: 0,
       theoreticalFinalQty: theoreticalFinalQty.toNumber(),
       actualFinalQty: actualFinalQty !== null ? actualFinalQty.toNumber() : null,
       varianceQty: varianceQty !== null ? varianceQty.toNumber() : null,
@@ -347,7 +407,14 @@ export async function computeInventoryAudit(
 export type KardexMovement = {
   date: Date;
   dateLabel: string;
-  type: "compra" | "merma" | "venta" | "produccion_entrada" | "produccion_salida";
+  type:
+    | "compra"
+    | "merma"
+    | "venta"
+    | "produccion_entrada"
+    | "produccion_salida"
+    | "requisicion_entrada"
+    | "requisicion_salida";
   label: string;
   qtyDelta: number;
   runningBalance: number;
@@ -419,7 +486,17 @@ export async function computeItemKardex(
   const rangeEnd = finalCount?.date ?? null;
   const dateFilter = rangeEnd ? { gt: rangeStart, lte: rangeEnd } : { gt: rangeStart };
 
-  const [purchases, purchaseOrderItems, wasteEntries, ownProduction, allProduction, sales, graph] = await Promise.all([
+  const [
+    purchases,
+    purchaseOrderItems,
+    wasteEntries,
+    ownProduction,
+    allProduction,
+    sales,
+    requisicionesOut,
+    requisicionesIn,
+    graph,
+  ] = await Promise.all([
     itemType === "product"
       ? prisma.purchase.findMany({
           where: { sucursalId, productId: itemId, purchaseDate: dateFilter },
@@ -446,6 +523,18 @@ export async function computeItemKardex(
       where: { sucursalId, date: dateFilter },
       include: { recipe: { select: { name: true } } },
     }),
+    itemType === "product"
+      ? prisma.requisicionItem.findMany({
+          where: { productId: itemId, requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
+          include: { requisicion: { include: { toSucursal: { select: { name: true } } } } },
+        })
+      : Promise.resolve([]),
+    itemType === "product"
+      ? prisma.requisicionItem.findMany({
+          where: { productId: itemId, requisicion: { toSucursalId: sucursalId, date: dateFilter } },
+          include: { requisicion: { include: { fromSucursal: { select: { name: true } } } } },
+        })
+      : Promise.resolve([]),
     loadOrgRecipeGraph(sucursalId),
   ]);
 
@@ -554,6 +643,44 @@ export async function computeItemKardex(
       runningBalance: 0,
       href: `/recipes/${sale.recipeId}`,
       sortIndex: 4000 + index,
+    });
+  });
+
+  requisicionesOut.forEach((reqItem, index) => {
+    let qtyInBase: Decimal;
+    try {
+      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, (item as { baseUnit: UnitValue }).baseUnit);
+    } catch {
+      return;
+    }
+    movements.push({
+      date: reqItem.requisicion.date,
+      dateLabel: dateLabel(reqItem.requisicion.date),
+      type: "requisicion_salida",
+      label: `Requisicion: ${formatRequisicionFolio(reqItem.requisicion.folio)} (a ${reqItem.requisicion.toSucursal.name})`,
+      qtyDelta: -qtyInBase.toNumber(),
+      runningBalance: 0,
+      href: `/requisitions/${reqItem.requisicionId}`,
+      sortIndex: 5000 + index,
+    });
+  });
+
+  requisicionesIn.forEach((reqItem, index) => {
+    let qtyInBase: Decimal;
+    try {
+      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, (item as { baseUnit: UnitValue }).baseUnit);
+    } catch {
+      return;
+    }
+    movements.push({
+      date: reqItem.requisicion.date,
+      dateLabel: dateLabel(reqItem.requisicion.date),
+      type: "requisicion_entrada",
+      label: `Requisicion: ${formatRequisicionFolio(reqItem.requisicion.folio)} (de ${reqItem.requisicion.fromSucursal.name})`,
+      qtyDelta: qtyInBase.toNumber(),
+      runningBalance: 0,
+      href: `/requisitions/${reqItem.requisicionId}`,
+      sortIndex: 6000 + index,
     });
   });
 

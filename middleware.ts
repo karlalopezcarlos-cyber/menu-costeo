@@ -24,6 +24,7 @@ export const config = {
     "/dashboard/:path*",
     "/products/:path*",
     "/purchases/:path*",
+    "/requisitions/:path*",
     "/waste/:path*",
     "/recipes/:path*",
     "/production/:path*",
@@ -32,6 +33,7 @@ export const config = {
     "/orders/:path*",
     "/sales/:path*",
     "/menu-engineering/:path*",
+    "/payments/:path*",
     "/settings/:path*",
   ],
 };

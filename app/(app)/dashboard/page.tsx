@@ -71,7 +71,7 @@ export default async function DashboardPage({
   const auditInitialCountId = initialCount.date <= finalCount.date ? initialCount.id : finalCount.id;
   const auditFinalCountId = initialCount.date <= finalCount.date ? finalCount.id : initialCount.id;
 
-  const [purchaseSum, sales, wasteEntries, audit] = await Promise.all([
+  const [purchaseSum, sales, wasteEntries, requisicionesOut, audit] = await Promise.all([
     prisma.purchase.aggregate({
       _sum: { totalPrice: true },
       where: {
@@ -87,6 +87,15 @@ export default async function DashboardPage({
       where: { sucursalId: user.sucursalId, date: { gte: rangeStart, lte: rangeEnd } },
       select: { quantity: true, unitCost: true },
     }),
+    prisma.requisicionItem.findMany({
+      where: {
+        requisicion: {
+          fromSucursalId: user.sucursalId,
+          date: { gte: rangeStart, lte: rangeEnd },
+        },
+      },
+      select: { quantity: true, unitCost: true },
+    }),
     computeInventoryAudit(user.organizationId, user.sucursalId, auditInitialCountId, auditFinalCountId),
   ]);
 
@@ -95,8 +104,15 @@ export default async function DashboardPage({
   const totalPurchases = Number(purchaseSum._sum.totalPrice ?? 0);
   const totalSales = sales.reduce((sum, s) => sum + Number(s.quantitySold) * Number(s.unitPrice), 0);
   const totalWaste = wasteEntries.reduce((sum, w) => sum + Number(w.quantity) * Number(w.unitCost), 0);
+  const totalRequisicionesSalida = requisicionesOut.reduce(
+    (sum, r) => sum + Number(r.quantity) * Number(r.unitCost),
+    0,
+  );
 
-  const costPct = totalSales > 0 ? ((initialValue + totalPurchases - finalValue) / totalSales) * 100 : null;
+  const costPct =
+    totalSales > 0
+      ? ((initialValue + totalPurchases - finalValue - totalRequisicionesSalida) / totalSales) * 100
+      : null;
   const purchaseCostPct = totalSales > 0 ? (totalPurchases / totalSales) * 100 : null;
   const wasteCostPct = totalSales > 0 ? (totalWaste / totalSales) * 100 : null;
 
@@ -106,6 +122,7 @@ export default async function DashboardPage({
     { label: "Total de compras del periodo", value: formatMoney(totalPurchases) },
     { label: "Total de ventas del periodo", value: formatMoney(totalSales) },
     { label: "Total de mermas del periodo", value: formatMoney(totalWaste) },
+    { label: "Total de requisiciones enviadas del periodo", value: formatMoney(totalRequisicionesSalida) },
     { label: "Costo %", value: costPct !== null ? `${costPct.toFixed(1)}%` : "-" },
     { label: "Costo de compra %", value: purchaseCostPct !== null ? `${purchaseCostPct.toFixed(1)}%` : "-" },
     { label: "Costo de mermas %", value: wasteCostPct !== null ? `${wasteCostPct.toFixed(1)}%` : "-" },

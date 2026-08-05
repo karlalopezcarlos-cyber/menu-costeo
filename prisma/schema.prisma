@@ -29,6 +29,7 @@ enum Panel {
   MENU_ENGINEERING
   SETTINGS
   PAYMENTS
+  REQUISITIONS
 }
 
 enum Unit {
@@ -75,6 +76,8 @@ model Organization {
   nextOrderFolio Int @default(1)
   /// Siguiente folio a asignar a una compra nueva (contador consecutivo por organizacion).
   nextPurchaseFolio Int @default(1)
+  /// Siguiente folio a asignar a una requisicion nueva (contador consecutivo por organizacion).
+  nextRequisicionFolio Int @default(1)
 
   users             User[]
   products          Product[]
@@ -96,6 +99,7 @@ model Organization {
   inventoryCountItemChanges InventoryCountItemChange[]
   supplierPayments  SupplierPayment[]
   sucursales        Sucursal[]
+  requisiciones     Requisicion[]
 
   @@map("organizations")
 }
@@ -157,6 +161,8 @@ model Sucursal {
   importBatches     ImportBatch[]
   recipeActivities  RecipeActivity[]
   inventoryCountItemChanges InventoryCountItemChange[]
+  requisicionesEnviadas   Requisicion[] @relation("RequisicionFrom")
+  requisicionesRecibidas  Requisicion[] @relation("RequisicionTo")
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -192,6 +198,7 @@ model User {
   auditComments     AuditComment[]    @relation("AuditCommentCreatedBy")
   inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
   supplierPayments  SupplierPayment[] @relation("SupplierPaymentCreatedBy")
+  requisiciones     Requisicion[] @relation("RequisicionCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -231,6 +238,7 @@ model Product {
   auditComments       AuditComment[]
   presentations       ProductPresentation[]
   inventoryCountItemChanges InventoryCountItemChange[]
+  requisicionItems    RequisicionItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -714,4 +722,49 @@ model ProductionEntry {
   @@index([organizationId, subRecipeId])
   @@index([sucursalId, date])
   @@map("production_entries")
+}
+
+/// Movimiento de productos entre dos sucursales de la misma organizacion (ej. el CEDIS surte a un
+/// restaurante). Es de un solo paso: al guardarse, ya se considera enviado/recibido de inmediato
+/// (sin confirmacion posterior) — descuenta el inventario teorico de fromSucursal y lo suma al de
+/// toSucursal en la Auditoria/Kardex de cada una.
+model Requisicion {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  /// Folio consecutivo por organizacion (ej. 7 -> "REQ-0007"), asignado atomicamente al crear.
+  folio           Int
+  fromSucursalId  String
+  fromSucursal    Sucursal          @relation("RequisicionFrom", fields: [fromSucursalId], references: [id])
+  toSucursalId    String
+  toSucursal      Sucursal          @relation("RequisicionTo", fields: [toSucursalId], references: [id])
+  date            DateTime          @db.Date
+  note            String?
+  createdByUserId String?
+  createdBy       User?             @relation("RequisicionCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime          @default(now())
+
+  items RequisicionItem[]
+
+  @@unique([organizationId, folio])
+  @@index([organizationId, fromSucursalId, date])
+  @@index([organizationId, toSucursalId, date])
+  @@map("requisiciones")
+}
+
+model RequisicionItem {
+  id            String      @id @default(cuid())
+  requisicionId String
+  requisicion   Requisicion @relation(fields: [requisicionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Decimal     @db.Decimal(14, 4)
+  unit          Unit
+  /// Costo unitario congelado al momento de enviar (de la sucursal de origen), mismo patron que
+  /// Purchase/WasteEntry/ProductionEntry: nunca se recalcula despues.
+  unitCost      Decimal     @db.Decimal(14, 6)
+
+  @@index([requisicionId])
+  @@index([productId])
+  @@map("requisicion_items")
 }
