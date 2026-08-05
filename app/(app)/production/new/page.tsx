@@ -1,20 +1,20 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import type { UnitValue } from "@/lib/units";
 import ProductionForm from "./ProductionForm";
 
 export default async function NewProductionPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [subRecipes, graph] = await Promise.all([
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null, isMenuItem: false },
+      where: { sucursalId: user.sucursalId, archivedAt: null, isMenuItem: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, yieldUnit: true },
     }),
-    loadOrgRecipeGraph(user.organizationId),
+    loadOrgRecipeGraph(user.sucursalId),
   ]);
 
   const memo = new Map<string, Decimal>();

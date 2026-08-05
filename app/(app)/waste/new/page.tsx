@@ -1,16 +1,22 @@
+import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
+import { getSucursalProductCosts } from "@/lib/costing";
 import type { UnitValue } from "@/lib/units";
 import WasteForm from "./WasteForm";
 
 export default async function NewWastePage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const products = await prisma.product.findMany({
     where: { organizationId: user.organizationId, archivedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, baseUnit: true, currentUnitCost: true, yieldPercentage: true },
+    select: { id: true, name: true, baseUnit: true, yieldPercentage: true },
   });
+  const productCosts = await getSucursalProductCosts(
+    user.sucursalId,
+    products.map((p) => p.id),
+  );
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -24,7 +30,7 @@ export default async function NewWastePage() {
           products={products.map((p) => ({
             ...p,
             baseUnit: p.baseUnit as UnitValue,
-            currentUnitCost: p.currentUnitCost.toString(),
+            currentUnitCost: (productCosts.get(p.id) ?? new Decimal(0)).toString(),
             yieldPercentage: p.yieldPercentage.toString(),
           }))}
         />

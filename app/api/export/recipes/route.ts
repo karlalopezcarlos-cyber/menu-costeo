@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import Decimal from "decimal.js";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { buildRecipesWorkbook, type RecipeExportRow } from "@/lib/excel/export-recipes";
 import type { UnitValue } from "@/lib/units";
 
 export async function GET() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [graph, recipes] = await Promise.all([
-    loadOrgRecipeGraph(user.organizationId),
+    loadOrgRecipeGraph(user.sucursalId),
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       include: { category: true },
     }),

@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { formatMoney } from "@/lib/format";
 import ProductionTable, { type ProductionRow } from "./ProductionTable";
 
 export default async function ProductionPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const entries = await prisma.productionEntry.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { date: "desc" },
     take: 200,
     include: { subRecipe: { include: { category: true } } },

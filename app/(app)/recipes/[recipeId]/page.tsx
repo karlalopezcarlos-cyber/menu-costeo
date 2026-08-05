@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { updateRecipeInstructions } from "../actions";
@@ -27,7 +27,7 @@ function computeUnitCost(
   try {
     if (item.productId && product) {
       const perUnit = convertQty(1, item.unit as UnitValue, product.baseUnit as UnitValue);
-      return perUnit.times(product.currentUnitCost);
+      return perUnit.times(graph.productCosts.get(item.productId) ?? new Decimal(0));
     }
     if (item.subRecipeId && subRecipe) {
       const subCost = getRecipeCost(item.subRecipeId, graph, memo);
@@ -49,10 +49,10 @@ export default async function RecipeDetailPage({
   params: Promise<{ recipeId: string }>;
 }) {
   const { recipeId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     include: {
       items: {
         orderBy: { sortOrder: "asc" },
@@ -62,7 +62,7 @@ export default async function RecipeDetailPage({
   });
   if (!recipe) notFound();
 
-  const graph = await loadOrgRecipeGraph(user.organizationId);
+  const graph = await loadOrgRecipeGraph(user.sucursalId);
   const memo = new Map<string, Decimal>();
 
   let totalCost;
@@ -105,7 +105,7 @@ export default async function RecipeDetailPage({
   ];
   const latestPurchases = ingredientProductIds.length
     ? await prisma.purchase.findMany({
-        where: { organizationId: user.organizationId, productId: { in: ingredientProductIds } },
+        where: { sucursalId: user.sucursalId, productId: { in: ingredientProductIds } },
         orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
         select: { productId: true, folio: true },
       })
@@ -122,7 +122,7 @@ export default async function RecipeDetailPage({
       select: { id: true, name: true, baseUnit: true },
     }),
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, yieldUnit: true },
     }),

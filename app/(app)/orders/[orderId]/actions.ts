@@ -4,15 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { buildOrderPdf, type OrderPdfItem } from "@/lib/pdf/export-order";
 import { formatOrderItemQuantityLabel } from "@/lib/orders/quantity-label";
 import { formatOrderFolio } from "@/lib/orders/folio";
 import { sendOrderEmail as sendOrderEmailViaResend } from "@/lib/email/send-order-email";
 
-async function getOrder(orderId: string, organizationId: string) {
+async function getOrder(orderId: string, sucursalId: string) {
   const order = await prisma.purchaseOrder.findFirst({
-    where: { id: orderId, organizationId },
+    where: { id: orderId, sucursalId },
     include: { items: true },
   });
   if (!order) throw new Error("Pedido no encontrado.");
@@ -20,8 +20,8 @@ async function getOrder(orderId: string, organizationId: string) {
 }
 
 export async function updatePurchaseOrderItems(orderId: string, formData: FormData) {
-  const user = await requireOrgSession();
-  const order = await getOrder(orderId, user.organizationId);
+  const user = await requireSucursalContext();
+  const order = await getOrder(orderId, user.sucursalId);
   const itemById = new Map(order.items.map((i) => [i.id, i]));
 
   const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
@@ -86,8 +86,8 @@ export async function addPurchaseOrderItem(
   formData: FormData,
 ): Promise<{ error?: string; success?: boolean }> {
   try {
-    const user = await requireOrgSession();
-    const order = await getOrder(orderId, user.organizationId);
+    const user = await requireSucursalContext();
+    const order = await getOrder(orderId, user.sucursalId);
 
     const productId = String(formData.get("productId") ?? "").trim();
     if (!productId) throw new Error("Selecciona un producto.");
@@ -120,8 +120,8 @@ export async function addPurchaseOrderItem(
 }
 
 export async function reopenPurchaseOrder(orderId: string) {
-  const user = await requireOrgSession();
-  await getOrder(orderId, user.organizationId);
+  const user = await requireSucursalContext();
+  await getOrder(orderId, user.sucursalId);
 
   await prisma.purchaseOrder.update({
     where: { id: orderId },
@@ -138,11 +138,11 @@ export async function sendOrderEmail(
   _prevState: { error?: string; success?: boolean } | undefined,
 ): Promise<{ error?: string; success?: boolean }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const [order, organization] = await Promise.all([
       prisma.purchaseOrder.findFirst({
-        where: { id: orderId, organizationId: user.organizationId },
+        where: { id: orderId, sucursalId: user.sucursalId },
         include: {
           items: { include: { product: { include: { presentations: true } } }, orderBy: { createdAt: "asc" } },
           supplier: true,
@@ -184,8 +184,8 @@ export async function sendOrderEmail(
 }
 
 export async function deletePurchaseOrder(orderId: string) {
-  const user = await requireOrgSession();
-  await getOrder(orderId, user.organizationId);
+  const user = await requireSucursalContext();
+  await getOrder(orderId, user.sucursalId);
 
   await prisma.purchaseOrder.delete({ where: { id: orderId } });
 

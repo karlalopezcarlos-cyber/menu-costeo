@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeMenuEngineeringReport, type IvaMode } from "@/lib/menu-engineering";
 import { buildMenuEngineeringWorkbook } from "@/lib/excel/export-menu-engineering";
 
 export async function GET(request: NextRequest) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const now = new Date();
   const defaultFrom = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const toDate = toParam ? new Date(`${toParam}T00:00:00Z`) : defaultTo;
   const ivaMode: IvaMode = request.nextUrl.searchParams.get("iva") === "sin" ? "sin" : "con";
 
-  const rows = await computeMenuEngineeringReport(user.organizationId, fromDate, toDate, ivaMode);
+  const rows = await computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode);
   const buffer = await buildMenuEngineeringWorkbook(rows, fromDate, toDate, ivaMode);
 
   const fileLabel = `${fromDate.toISOString().slice(0, 10)}_${toDate.toISOString().slice(0, 10)}`;

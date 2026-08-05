@@ -144,6 +144,19 @@ model Sucursal {
   createdAt      DateTime     @default(now())
 
   users User[]
+  purchases         Purchase[]
+  purchaseOrders    PurchaseOrder[]
+  dailySales        DailySale[]
+  recipes           Recipe[]
+  inventoryCounts   InventoryCount[]
+  wasteEntries      WasteEntry[]
+  productionEntries ProductionEntry[]
+  auditComments     AuditComment[]
+  supplierPayments  SupplierPayment[]
+  dishAliases       DishAlias[]
+  importBatches     ImportBatch[]
+  recipeActivities  RecipeActivity[]
+  inventoryCountItemChanges InventoryCountItemChange[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -248,6 +261,8 @@ model Purchase {
   id                String       @id @default(cuid())
   organizationId    String
   organization      Organization @relation(fields: [organizationId], references: [id])
+  sucursalId        String
+  sucursal          Sucursal     @relation(fields: [sucursalId], references: [id])
   /// Folio unico consecutivo por organizacion (ej. COM-0042), para identificar la compra.
   folio             Int
   productId         String
@@ -272,6 +287,7 @@ model Purchase {
   @@index([organizationId, folio])
   @@index([organizationId, productId, purchaseDate])
   @@index([organizationId, purchaseDate])
+  @@index([sucursalId, purchaseDate])
   @@map("purchases")
 }
 
@@ -303,6 +319,8 @@ model SupplierPayment {
   id              String       @id @default(cuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
   supplierId      String
   supplier        Supplier     @relation(fields: [supplierId], references: [id])
   folio           Int?
@@ -314,6 +332,7 @@ model SupplierPayment {
   createdAt       DateTime     @default(now())
 
   @@index([organizationId, supplierId])
+  @@index([sucursalId, supplierId])
   @@map("supplier_payments")
 }
 
@@ -321,6 +340,15 @@ model Recipe {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization    @relation(fields: [organizationId], references: [id])
+  sucursalId     String
+  sucursal       Sucursal        @relation(fields: [sucursalId], references: [id])
+  /// Cuando esta receta se creo por clonado automatico desde la receta de la sucursal principal
+  /// (ver createRecipe), apunta a esa receta original. Puramente informativo/de rastro: nunca se
+  /// usa para recalcular ni resincronizar; una vez clonada, cada copia es independiente y editable
+  /// sin afectar al original ni a las demas copias.
+  sourceRecipeId String?
+  sourceRecipe   Recipe?         @relation("RecipeSource", fields: [sourceRecipeId], references: [id], onDelete: SetNull)
+  copies         Recipe[]        @relation("RecipeSource")
   name           String
   categoryId     String?
   category       RecipeCategory? @relation(fields: [categoryId], references: [id])
@@ -345,8 +373,9 @@ model Recipe {
   auditComments       AuditComment[]
   inventoryCountItemChanges InventoryCountItemChange[]
 
-  @@unique([organizationId, name])
+  @@unique([sucursalId, name])
   @@index([organizationId])
+  @@index([sucursalId])
   @@map("recipes")
 }
 
@@ -354,6 +383,8 @@ model RecipeActivity {
   id              String             @id @default(cuid())
   organizationId  String
   organization    Organization       @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal           @relation(fields: [sucursalId], references: [id])
   recipeId        String
   recipe          Recipe             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   type            RecipeActivityType
@@ -394,6 +425,8 @@ model DishAlias {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
+  sucursalId     String
+  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id])
   externalName   String
   normalizedName String
   recipeId       String?
@@ -401,7 +434,7 @@ model DishAlias {
   ignored        Boolean      @default(false)
   createdAt      DateTime     @default(now())
 
-  @@unique([organizationId, normalizedName])
+  @@unique([sucursalId, normalizedName])
   @@index([organizationId])
   @@map("dish_aliases")
 }
@@ -412,6 +445,8 @@ model DailySale {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
+  sucursalId     String
+  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id])
   recipeId       String
   recipe         Recipe       @relation(fields: [recipeId], references: [id])
   date           DateTime     @db.Date
@@ -425,6 +460,7 @@ model DailySale {
 
   @@unique([organizationId, recipeId, date])
   @@index([organizationId, date])
+  @@index([sucursalId, date])
   @@map("daily_sales")
 }
 
@@ -432,6 +468,8 @@ model ImportBatch {
   id               String            @id @default(cuid())
   organizationId   String
   organization     Organization      @relation(fields: [organizationId], references: [id])
+  sucursalId       String
+  sucursal         Sucursal          @relation(fields: [sucursalId], references: [id])
   fileName         String
   headers          Json
   rawRows          Json
@@ -476,6 +514,8 @@ model InventoryCount {
   id              String   @id @default(cuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal @relation(fields: [sucursalId], references: [id])
   date            DateTime @db.Date
   createdByUserId String?
   createdBy       User?    @relation("InventoryCountCreatedBy", fields: [createdByUserId], references: [id])
@@ -487,6 +527,7 @@ model InventoryCount {
   itemChanges   InventoryCountItemChange[]
 
   @@index([organizationId, date])
+  @@index([sucursalId, date])
   @@map("inventory_counts")
 }
 
@@ -523,6 +564,8 @@ model InventoryCountItemChange {
   id               String         @id @default(cuid())
   organizationId   String
   organization     Organization   @relation(fields: [organizationId], references: [id])
+  sucursalId       String
+  sucursal         Sucursal       @relation(fields: [sucursalId], references: [id])
   inventoryCountId String
   inventoryCount   InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
   productId        String?
@@ -546,6 +589,8 @@ model AuditComment {
   id              String         @id @default(cuid())
   organizationId  String
   organization    Organization   @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal       @relation(fields: [sucursalId], references: [id])
   finalCountId    String
   finalCount      InventoryCount @relation(fields: [finalCountId], references: [id], onDelete: Cascade)
   productId       String?
@@ -570,6 +615,8 @@ model WasteEntry {
   id              String       @id @default(cuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
   productId       String
   product         Product      @relation(fields: [productId], references: [id])
   date            DateTime     @db.Date
@@ -586,6 +633,7 @@ model WasteEntry {
 
   @@index([organizationId, date])
   @@index([organizationId, productId])
+  @@index([sucursalId, date])
   @@map("waste_entries")
 }
 
@@ -596,6 +644,8 @@ model PurchaseOrder {
   id              String              @id @default(cuid())
   organizationId  String
   organization    Organization        @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal            @relation(fields: [sucursalId], references: [id])
   /// Folio consecutivo por organizacion (ej. 7 -> "PED-0007"), asignado atomicamente al crear.
   folio           Int
   status          PurchaseOrderStatus @default(OPEN)
@@ -611,6 +661,7 @@ model PurchaseOrder {
 
   @@unique([organizationId, folio])
   @@index([organizationId, status])
+  @@index([sucursalId, status])
   @@map("purchase_orders")
 }
 
@@ -646,6 +697,8 @@ model ProductionEntry {
   id              String       @id @default(cuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
   subRecipeId     String
   subRecipe       Recipe       @relation(fields: [subRecipeId], references: [id])
   date            DateTime     @db.Date
@@ -659,5 +712,6 @@ model ProductionEntry {
 
   @@index([organizationId, date])
   @@index([organizationId, subRecipeId])
+  @@index([sucursalId, date])
   @@map("production_entries")
 }

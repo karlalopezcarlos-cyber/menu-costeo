@@ -1,6 +1,13 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { loadOrgRecipeGraph, getRecipeCost, getRecipeUsagePerUnit, type RecipeGraph, type RecipeUsage } from "@/lib/costing";
+import {
+  loadOrgRecipeGraph,
+  getRecipeCost,
+  getRecipeUsagePerUnit,
+  getSucursalProductCosts,
+  type RecipeGraph,
+  type RecipeUsage,
+} from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { sumVarianceAmounts } from "@/lib/audit-filters";
 
@@ -72,6 +79,7 @@ function safeUsage(recipeId: string, graph: RecipeGraph): RecipeUsage | null {
  */
 export async function computeInventoryAudit(
   organizationId: string,
+  sucursalId: string,
   initialCountId: string,
   finalCountId: string | null,
   options: { includePreviousVariance?: boolean } = {},
@@ -79,12 +87,12 @@ export async function computeInventoryAudit(
   const { includePreviousVariance = true } = options;
   const [initialCount, finalCount] = await Promise.all([
     prisma.inventoryCount.findFirst({
-      where: { id: initialCountId, organizationId },
+      where: { id: initialCountId, sucursalId },
       include: { items: true },
     }),
     finalCountId
       ? prisma.inventoryCount.findFirst({
-          where: { id: finalCountId, organizationId },
+          where: { id: finalCountId, sucursalId },
           include: { items: true },
         })
       : Promise.resolve(null),
@@ -103,36 +111,40 @@ export async function computeInventoryAudit(
         include: { category: true },
       }),
       prisma.recipe.findMany({
-        where: { organizationId, archivedAt: null, isMenuItem: false },
+        where: { sucursalId, archivedAt: null, isMenuItem: false },
         orderBy: { name: "asc" },
         include: { category: true },
       }),
       prisma.purchase.findMany({
-        where: { organizationId, purchaseDate: dateFilter },
+        where: { sucursalId, purchaseDate: dateFilter },
         select: { productId: true, presentationQty: true, presentationUnit: true },
       }),
       prisma.purchaseOrderItem.findMany({
-        where: { purchaseOrder: { organizationId, status: "RECEIVED", receivedAt: dateFilter } },
+        where: { purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
         select: { productId: true, quantity: true },
       }),
       prisma.wasteEntry.findMany({
-        where: { organizationId, date: dateFilter },
+        where: { sucursalId, date: dateFilter },
         select: { productId: true, quantity: true, unit: true },
       }),
       prisma.productionEntry.findMany({
-        where: { organizationId, date: dateFilter },
+        where: { sucursalId, date: dateFilter },
         select: { subRecipeId: true, quantity: true },
       }),
       prisma.dailySale.findMany({
-        where: { organizationId, date: dateFilter },
+        where: { sucursalId, date: dateFilter },
         select: { recipeId: true, quantitySold: true },
       }),
-      loadOrgRecipeGraph(organizationId),
+      loadOrgRecipeGraph(sucursalId),
       finalCountId
-        ? prisma.auditComment.findMany({ where: { organizationId, finalCountId } })
+        ? prisma.auditComment.findMany({ where: { sucursalId, finalCountId } })
         : Promise.resolve([]),
     ]);
 
+  const productCosts = await getSucursalProductCosts(
+    sucursalId,
+    products.map((p) => p.id),
+  );
   const baseUnitByProductId = new Map(products.map((p) => [p.id, p.baseUnit as UnitValue]));
 
   const commentByKey = new Map(comments.map((c) => [c.productId ?? c.subRecipeId ?? "", c.comment]));
@@ -223,7 +235,7 @@ export async function computeInventoryAudit(
       varianceQty !== null && !theoreticalFinalQty.isZero()
         ? varianceQty.dividedBy(theoreticalFinalQty.abs()).times(100)
         : null;
-    const unitCost = new Decimal(product.currentUnitCost);
+    const unitCost = productCosts.get(product.id) ?? new Decimal(0);
     const varianceAmount = varianceQty !== null ? varianceQty.times(unitCost) : null;
 
     return {
@@ -301,14 +313,18 @@ export async function computeInventoryAudit(
 
   if (includePreviousVariance) {
     const priorCount = await prisma.inventoryCount.findFirst({
-      where: { organizationId, date: { lt: initialCount.date } },
+      where: { sucursalId, date: { lt: initialCount.date } },
       orderBy: { date: "desc" },
       select: { id: true },
     });
     if (priorCount) {
-      const priorResult = await computeInventoryAudit(organizationId, priorCount.id, initialCountId, {
-        includePreviousVariance: false,
-      });
+      const priorResult = await computeInventoryAudit(
+        organizationId,
+        sucursalId,
+        priorCount.id,
+        initialCountId,
+        { includePreviousVariance: false },
+      );
       const priorVarianceByKey = new Map(priorResult.rows.map((r) => [`${r.itemType}:${r.itemId}`, r.varianceQty]));
       for (const row of rows) {
         row.previousVarianceQty = priorVarianceByKey.get(`${row.itemType}:${row.itemId}`) ?? null;
@@ -365,6 +381,7 @@ function dateLabel(d: Date): string {
  */
 export async function computeItemKardex(
   organizationId: string,
+  sucursalId: string,
   itemType: ItemType,
   itemId: string,
   initialCountId: string,
@@ -373,14 +390,14 @@ export async function computeItemKardex(
   const [item, initialCount, finalCount] = await Promise.all([
     itemType === "product"
       ? prisma.product.findFirst({ where: { id: itemId, organizationId }, include: { category: true } })
-      : prisma.recipe.findFirst({ where: { id: itemId, organizationId }, include: { category: true } }),
+      : prisma.recipe.findFirst({ where: { id: itemId, sucursalId }, include: { category: true } }),
     prisma.inventoryCount.findFirst({
-      where: { id: initialCountId, organizationId },
+      where: { id: initialCountId, sucursalId },
       include: { items: true },
     }),
     finalCountId
       ? prisma.inventoryCount.findFirst({
-          where: { id: finalCountId, organizationId },
+          where: { id: finalCountId, sucursalId },
           include: { items: true },
         })
       : Promise.resolve(null),
@@ -405,31 +422,31 @@ export async function computeItemKardex(
   const [purchases, purchaseOrderItems, wasteEntries, ownProduction, allProduction, sales, graph] = await Promise.all([
     itemType === "product"
       ? prisma.purchase.findMany({
-          where: { organizationId, productId: itemId, purchaseDate: dateFilter },
+          where: { sucursalId, productId: itemId, purchaseDate: dateFilter },
           include: { supplier: true },
         })
       : Promise.resolve([]),
     itemType === "product"
       ? prisma.purchaseOrderItem.findMany({
-          where: { productId: itemId, purchaseOrder: { organizationId, status: "RECEIVED", receivedAt: dateFilter } },
+          where: { productId: itemId, purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
           include: { purchaseOrder: { include: { supplier: true } } },
         })
       : Promise.resolve([]),
     itemType === "product"
-      ? prisma.wasteEntry.findMany({ where: { organizationId, productId: itemId, date: dateFilter } })
+      ? prisma.wasteEntry.findMany({ where: { sucursalId, productId: itemId, date: dateFilter } })
       : Promise.resolve([]),
     itemType === "subrecipe"
-      ? prisma.productionEntry.findMany({ where: { organizationId, subRecipeId: itemId, date: dateFilter } })
+      ? prisma.productionEntry.findMany({ where: { sucursalId, subRecipeId: itemId, date: dateFilter } })
       : Promise.resolve([]),
     prisma.productionEntry.findMany({
-      where: { organizationId, date: dateFilter },
+      where: { sucursalId, date: dateFilter },
       include: { subRecipe: { select: { name: true } } },
     }),
     prisma.dailySale.findMany({
-      where: { organizationId, date: dateFilter },
+      where: { sucursalId, date: dateFilter },
       include: { recipe: { select: { name: true } } },
     }),
-    loadOrgRecipeGraph(organizationId),
+    loadOrgRecipeGraph(sucursalId),
   ]);
 
   const movements: (KardexMovement & { sortIndex: number })[] = [];

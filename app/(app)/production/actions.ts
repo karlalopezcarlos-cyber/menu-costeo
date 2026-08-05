@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 
 type ProductionRowInput = {
@@ -18,7 +18,7 @@ export async function createProductionEntries(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const productionDateRaw = String(formData.get("productionDate") ?? "");
     const rowsRaw = String(formData.get("rows") ?? "[]");
@@ -37,11 +37,11 @@ export async function createProductionEntries(
 
     const subRecipeIds = [...new Set(rows.map((r) => r.subRecipeId))];
     const subRecipes = await prisma.recipe.findMany({
-      where: { id: { in: subRecipeIds }, organizationId: user.organizationId, isMenuItem: false },
+      where: { id: { in: subRecipeIds }, sucursalId: user.sucursalId, isMenuItem: false },
     });
     const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
 
-    const graph = await loadOrgRecipeGraph(user.organizationId);
+    const graph = await loadOrgRecipeGraph(user.sucursalId);
     const costMemo = new Map<string, Decimal>();
 
     const productionDate = new Date(productionDateRaw);
@@ -67,6 +67,7 @@ export async function createProductionEntries(
 
       return {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         subRecipeId: subRecipe.id,
         date: productionDate,
         quantity: quantity.toString(),

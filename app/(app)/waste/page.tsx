@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import WasteTable, { type WasteRow } from "./WasteTable";
 
 export default async function WastePage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const entries = await prisma.wasteEntry.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { date: "desc" },
     take: 200,
     include: { product: { include: { category: true } } },

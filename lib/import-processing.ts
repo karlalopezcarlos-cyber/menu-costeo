@@ -60,6 +60,7 @@ export function parseDateLoose(raw: string): Date | null {
  */
 export async function processBatchRows(
   organizationId: string,
+  sucursalId: string,
   batchId: string,
   headers: string[],
   rawRows: string[][],
@@ -105,7 +106,7 @@ export async function processBatchRows(
 
     const normalizedName = normalize(rawName);
     const alias = await prisma.dishAlias.findUnique({
-      where: { organizationId_normalizedName: { organizationId, normalizedName } },
+      where: { sucursalId_normalizedName: { sucursalId, normalizedName } },
     });
 
     if (alias?.ignored) {
@@ -124,7 +125,15 @@ export async function processBatchRows(
     }
 
     if (alias?.recipeId) {
-      await upsertSaleForRow(organizationId, alias.recipeId, date, qty.toString(), price.toString(), batchId);
+      await upsertSaleForRow(
+        organizationId,
+        sucursalId,
+        alias.recipeId,
+        date,
+        qty.toString(),
+        price.toString(),
+        batchId,
+      );
       await prisma.importRow.create({
         data: {
           importBatchId: batchId,
@@ -160,6 +169,7 @@ export async function processBatchRows(
 
 async function upsertSaleForRow(
   organizationId: string,
+  sucursalId: string,
   recipeId: string,
   date: Date,
   quantitySold: string,
@@ -172,6 +182,7 @@ async function upsertSaleForRow(
     },
     create: {
       organizationId,
+      sucursalId,
       recipeId,
       date,
       quantitySold,
@@ -194,17 +205,29 @@ type PendingRow = {
 };
 
 /** Vincula un ImportRow pendiente a una receta existente: crea/actualiza el DishAlias y el DailySale. */
-export async function linkRowToRecipe(organizationId: string, row: PendingRow, recipeId: string) {
+export async function linkRowToRecipe(
+  organizationId: string,
+  sucursalId: string,
+  row: PendingRow,
+  recipeId: string,
+) {
   if (!row.date) throw new Error("La fila no tiene una fecha valida.");
 
   await prisma.dishAlias.upsert({
-    where: { organizationId_normalizedName: { organizationId, normalizedName: row.normalizedName } },
-    create: { organizationId, externalName: row.rawName, normalizedName: row.normalizedName, recipeId },
+    where: { sucursalId_normalizedName: { sucursalId, normalizedName: row.normalizedName } },
+    create: {
+      organizationId,
+      sucursalId,
+      externalName: row.rawName,
+      normalizedName: row.normalizedName,
+      recipeId,
+    },
     update: { recipeId, ignored: false },
   });
 
   await upsertSaleForRow(
     organizationId,
+    sucursalId,
     recipeId,
     row.date,
     row.quantitySold.toString(),
@@ -219,10 +242,11 @@ export async function linkRowToRecipe(organizationId: string, row: PendingRow, r
 }
 
 /** Crea una receta nueva (platillo de menu) a partir de un ImportRow pendiente y la vincula. */
-export async function createRecipeAndLinkRow(organizationId: string, row: PendingRow) {
+export async function createRecipeAndLinkRow(organizationId: string, sucursalId: string, row: PendingRow) {
   const recipe = await prisma.recipe.create({
     data: {
       organizationId,
+      sucursalId,
       name: row.rawName,
       yieldQty: "1",
       yieldUnit: "PIECE",
@@ -231,16 +255,22 @@ export async function createRecipeAndLinkRow(organizationId: string, row: Pendin
     },
   });
 
-  await linkRowToRecipe(organizationId, row, recipe.id);
+  await linkRowToRecipe(organizationId, sucursalId, row, recipe.id);
 
   return recipe;
 }
 
 /** Marca un ImportRow pendiente como "nunca es un platillo" (propinas, descuentos, etc.). */
-export async function ignoreRowPermanently(organizationId: string, row: PendingRow) {
+export async function ignoreRowPermanently(organizationId: string, sucursalId: string, row: PendingRow) {
   await prisma.dishAlias.upsert({
-    where: { organizationId_normalizedName: { organizationId, normalizedName: row.normalizedName } },
-    create: { organizationId, externalName: row.rawName, normalizedName: row.normalizedName, ignored: true },
+    where: { sucursalId_normalizedName: { sucursalId, normalizedName: row.normalizedName } },
+    create: {
+      organizationId,
+      sucursalId,
+      externalName: row.rawName,
+      normalizedName: row.normalizedName,
+      ignored: true,
+    },
     update: { ignored: true, recipeId: null },
   });
 

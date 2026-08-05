@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeUnitCost, type UnitValue } from "@/lib/units";
 import { formatOrderFolio } from "@/lib/orders/folio";
 import PurchaseForm, { type PendingOrderOption } from "./PurchaseForm";
@@ -10,7 +10,7 @@ export default async function NewPurchasePage({
   searchParams: Promise<{ pedido?: string }>;
 }) {
   const { pedido } = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [products, suppliers, recentPurchases, openOrders] = await Promise.all([
     prisma.product.findMany({
@@ -32,7 +32,7 @@ export default async function NewPurchasePage({
       select: { id: true, name: true },
     }),
     prisma.purchase.findMany({
-      where: { organizationId: user.organizationId },
+      where: { sucursalId: user.sucursalId },
       orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
       select: {
         productId: true,
@@ -43,7 +43,7 @@ export default async function NewPurchasePage({
       },
     }),
     prisma.purchaseOrder.findMany({
-      where: { organizationId: user.organizationId, status: "OPEN" },
+      where: { sucursalId: user.sucursalId, status: "OPEN" },
       orderBy: { folio: "desc" },
       include: {
         items: true,

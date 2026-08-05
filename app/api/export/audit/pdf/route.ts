@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { computeInventoryAudit, filterAuditRows, sumVarianceAmounts, type AuditRowFilters } from "@/lib/audit";
 import { buildAuditPdf, type AuditPdfRow } from "@/lib/pdf/export-audit";
@@ -9,7 +9,7 @@ function fmtQty(n: number): string {
 }
 
 export async function GET(request: NextRequest) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const params = request.nextUrl.searchParams;
 
   const initialCountId = params.get("initial");
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   };
 
   const [result, organization] = await Promise.all([
-    computeInventoryAudit(user.organizationId, initialCountId, finalCountId || null),
+    computeInventoryAudit(user.organizationId, user.sucursalId, initialCountId, finalCountId || null),
     prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
   ]);
 

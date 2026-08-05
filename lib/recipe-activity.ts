@@ -5,6 +5,7 @@ type RecipeActivityType = "CREATED" | "ITEM_ADDED" | "ITEM_REMOVED" | "ARCHIVED"
 
 export async function logRecipeActivity(params: {
   organizationId: string;
+  sucursalId: string;
   recipeId: string;
   type: RecipeActivityType;
   message: string;
@@ -13,6 +14,7 @@ export async function logRecipeActivity(params: {
   await prisma.recipeActivity.create({
     data: {
       organizationId: params.organizationId,
+      sucursalId: params.sucursalId,
       recipeId: params.recipeId,
       type: params.type,
       message: params.message,

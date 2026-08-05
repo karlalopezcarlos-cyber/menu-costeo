@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import ShortfallTable, { type ShortfallRow } from "./ShortfallTable";
 
 export default async function NewOrderPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [products, latestCount, openOrderItems, recentPurchases, suppliers] = await Promise.all([
     prisma.product.findMany({
@@ -14,16 +14,16 @@ export default async function NewOrderPage() {
       include: { category: true, presentations: true },
     }),
     prisma.inventoryCount.findFirst({
-      where: { organizationId: user.organizationId },
+      where: { sucursalId: user.sucursalId },
       orderBy: { date: "desc" },
       include: { items: true },
     }),
     prisma.purchaseOrderItem.findMany({
-      where: { purchaseOrder: { organizationId: user.organizationId, status: "OPEN" } },
+      where: { purchaseOrder: { sucursalId: user.sucursalId, status: "OPEN" } },
       select: { productId: true },
     }),
     prisma.purchase.findMany({
-      where: { organizationId: user.organizationId },
+      where: { sucursalId: user.sucursalId },
       orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
       select: { productId: true, presentationLabel: true },
     }),

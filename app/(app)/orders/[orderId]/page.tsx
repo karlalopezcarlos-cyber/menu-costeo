@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import OrderItemsForm, { type OrderItemRow } from "./OrderItemsForm";
 import AddProductToOrder, { type CandidateProduct } from "./AddProductToOrder";
@@ -20,11 +20,11 @@ export default async function OrderDetailPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [order, suppliers, allProducts, latestCount] = await Promise.all([
     prisma.purchaseOrder.findFirst({
-      where: { id: orderId, organizationId: user.organizationId },
+      where: { id: orderId, sucursalId: user.sucursalId },
       include: {
         items: { include: { product: { include: { presentations: true } } }, orderBy: { createdAt: "asc" } },
         supplier: { select: { name: true, phone: true, email: true } },
@@ -41,7 +41,7 @@ export default async function OrderDetailPage({
       include: { presentations: true },
     }),
     prisma.inventoryCount.findFirst({
-      where: { organizationId: user.organizationId },
+      where: { sucursalId: user.sucursalId },
       orderBy: { date: "desc" },
       include: { items: true },
     }),

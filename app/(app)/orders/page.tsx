@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { formatOrderFolio } from "@/lib/orders/folio";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -9,10 +9,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function OrdersPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const orders = await prisma.purchaseOrder.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { folio: "desc" },
     include: { items: true, supplier: true },
   });

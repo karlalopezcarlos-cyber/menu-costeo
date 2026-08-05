@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Decimal from "decimal.js";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost, type RecipeGraph } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
@@ -21,7 +21,7 @@ function computeUnitCost(
   try {
     if (item.productId && product) {
       const perUnit = convertQty(1, item.unit as UnitValue, product.baseUnit as UnitValue);
-      return perUnit.times(product.currentUnitCost);
+      return perUnit.times(graph.productCosts.get(item.productId) ?? new Decimal(0));
     }
     if (item.subRecipeId && subRecipe) {
       const subCost = getRecipeCost(item.subRecipeId, graph, memo);
@@ -38,11 +38,11 @@ function computeUnitCost(
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ recipeId: string }> }) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const { recipeId } = await params;
 
   const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     include: {
       items: { orderBy: { sortOrder: "asc" }, include: { product: true, subRecipe: true } },
       category: true,
@@ -52,7 +52,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
     return new NextResponse("Receta no encontrada", { status: 404 });
   }
 
-  const graph = await loadOrgRecipeGraph(user.organizationId);
+  const graph = await loadOrgRecipeGraph(user.sucursalId);
   const memo = new Map<string, Decimal>();
 
   let totalCost: Decimal | null = null;

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import StockTargetTable, { type StockRow } from "./StockTargetTable";
 
 export default async function StockTargetPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [products, latestCount] = await Promise.all([
     prisma.product.findMany({
@@ -14,7 +14,7 @@ export default async function StockTargetPage() {
       include: { category: true },
     }),
     prisma.inventoryCount.findFirst({
-      where: { organizationId: user.organizationId },
+      where: { sucursalId: user.sucursalId },
       orderBy: { date: "desc" },
       include: { items: true },
     }),

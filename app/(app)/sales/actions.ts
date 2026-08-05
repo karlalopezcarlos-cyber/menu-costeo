@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 
 export async function upsertDailySale(
   _prevState: { error?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const recipeId = String(formData.get("recipeId") ?? "");
     const dateRaw = String(formData.get("date") ?? "");
@@ -23,7 +23,7 @@ export async function upsertDailySale(
     if (unitPrice.lt(0)) throw new Error("El precio no puede ser negativo.");
 
     const recipe = await prisma.recipe.findFirst({
-      where: { id: recipeId, organizationId: user.organizationId },
+      where: { id: recipeId, sucursalId: user.sucursalId },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
 
@@ -36,6 +36,7 @@ export async function upsertDailySale(
       },
       create: {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         recipeId: recipe.id,
         date,
         quantitySold: quantitySold.toString(),
@@ -63,10 +64,10 @@ export async function updateDailySale(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const sale = await prisma.dailySale.findFirst({
-      where: { id: saleId, organizationId: user.organizationId },
+      where: { id: saleId, sucursalId: user.sucursalId },
     });
     if (!sale) throw new Error("Venta no encontrada.");
 
@@ -81,7 +82,7 @@ export async function updateDailySale(
     if (unitPrice.lt(0)) throw new Error("El precio no puede ser negativo.");
 
     const recipe = await prisma.recipe.findFirst({
-      where: { id: recipeId, organizationId: user.organizationId },
+      where: { id: recipeId, sucursalId: user.sucursalId },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
 
@@ -92,7 +93,7 @@ export async function updateDailySale(
     // existente para esa combinacion (en vez de sobreescribirla en silencio).
     if (recipeId !== sale.recipeId || date.getTime() !== sale.date.getTime()) {
       const conflict = await prisma.dailySale.findFirst({
-        where: { organizationId: user.organizationId, recipeId, date, id: { not: sale.id } },
+        where: { sucursalId: user.sucursalId, recipeId, date, id: { not: sale.id } },
       });
       if (conflict) {
         throw new Error("Ya existe una venta de ese platillo en esa fecha; edita esa fila en su lugar.");
@@ -119,9 +120,9 @@ export async function updateDailySale(
 }
 
 export async function deleteDailySale(saleId: string): Promise<void> {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const sale = await prisma.dailySale.findFirst({
-    where: { id: saleId, organizationId: user.organizationId },
+    where: { id: saleId, sucursalId: user.sucursalId },
   });
   if (!sale) throw new Error("Venta no encontrada.");
 

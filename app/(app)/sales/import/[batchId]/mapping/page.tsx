@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { processImportBatch } from "../../actions";
 
 export default async function ImportMappingPage({
@@ -9,10 +9,10 @@ export default async function ImportMappingPage({
   params: Promise<{ batchId: string }>;
 }) {
   const { batchId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const batch = await prisma.importBatch.findFirst({
-    where: { id: batchId, organizationId: user.organizationId },
+    where: { id: batchId, sucursalId: user.sucursalId },
   });
   if (!batch) notFound();
 

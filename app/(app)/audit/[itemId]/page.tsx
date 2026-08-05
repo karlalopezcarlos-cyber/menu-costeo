@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeItemKardex, type ItemType } from "@/lib/audit";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -41,14 +41,21 @@ export default async function ItemKardexPage({
 }) {
   const { itemId } = await params;
   const { initial, final, type } = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   if (!initial) notFound();
   const itemType: ItemType = type === "subrecipe" ? "subrecipe" : "product";
 
   let kardex;
   try {
-    kardex = await computeItemKardex(user.organizationId, itemType, itemId, initial, final || null);
+    kardex = await computeItemKardex(
+      user.organizationId,
+      user.sucursalId,
+      itemType,
+      itemId,
+      initial,
+      final || null,
+    );
   } catch {
     notFound();
   }

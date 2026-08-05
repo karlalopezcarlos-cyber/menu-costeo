@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
-import { loadOrgRecipeGraph, getRecipeCost, type RecipeGraph } from "@/lib/costing";
+import { requireSucursalContext } from "@/lib/tenant";
+import { loadOrgRecipeGraph, getRecipeCost, getSucursalProductCosts, type RecipeGraph } from "@/lib/costing";
 import { removeYieldFactor } from "@/lib/units";
 
-async function getCount(countId: string, organizationId: string) {
-  const count = await prisma.inventoryCount.findFirst({ where: { id: countId, organizationId } });
+async function getCount(countId: string, sucursalId: string) {
+  const count = await prisma.inventoryCount.findFirst({ where: { id: countId, sucursalId } });
   if (!count) throw new Error("Conteo de inventario no encontrado.");
   return count;
 }
@@ -36,17 +36,22 @@ export type InventoryCaptureEntry = {
 async function persistInventoryCount(
   countId: string,
   organizationId: string,
+  sucursalId: string,
   userId: string | null,
   entries: InventoryCaptureEntry[],
 ) {
-  const count = await getCount(countId, organizationId);
+  const count = await getCount(countId, sucursalId);
 
   const [products, subRecipes, graph, existingItems] = await Promise.all([
     prisma.product.findMany({ where: { organizationId, archivedAt: null } }),
-    prisma.recipe.findMany({ where: { organizationId, archivedAt: null, isMenuItem: false } }),
-    loadOrgRecipeGraph(organizationId),
+    prisma.recipe.findMany({ where: { sucursalId, archivedAt: null, isMenuItem: false } }),
+    loadOrgRecipeGraph(sucursalId),
     prisma.inventoryCountItem.findMany({ where: { inventoryCountId: count.id } }),
   ]);
+  const productCosts = await getSucursalProductCosts(
+    sucursalId,
+    products.map((p) => p.id),
+  );
   const productById = new Map(products.map((p) => [p.id, p]));
   const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
   const existingByProductId = new Map(
@@ -130,7 +135,7 @@ async function persistInventoryCount(
   await prisma.$transaction([
     ...toUpsertProduct.map(({ id, quantity, costBasis }) => {
       const product = productById.get(id)!;
-      const netCost = new Decimal(product.currentUnitCost);
+      const netCost = productCosts.get(id) ?? new Decimal(0);
       const unitCost =
         costBasis === "gross" ? removeYieldFactor(netCost, product.yieldPercentage) : netCost;
       return prisma.inventoryCountItem.upsert({
@@ -179,6 +184,7 @@ async function persistInventoryCount(
       prisma.inventoryCountItemChange.create({
         data: {
           organizationId,
+          sucursalId,
           inventoryCountId: count.id,
           productId: log.productId,
           subRecipeId: log.subRecipeId,
@@ -192,7 +198,7 @@ async function persistInventoryCount(
 }
 
 export async function saveInventoryCount(countId: string, formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const basisByProductId = new Map<string, string>();
   for (const [key, rawValue] of formData.entries()) {
@@ -209,7 +215,7 @@ export async function saveInventoryCount(countId: string, formData: FormData) {
     entries.push({ type, id, quantity: String(rawValue), costBasis: basisByProductId.get(id) });
   }
 
-  await persistInventoryCount(countId, user.organizationId, user.id, entries);
+  await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
 
   revalidatePath(`/inventory/${countId}`);
   revalidatePath("/inventory");
@@ -225,8 +231,8 @@ export async function autoSaveInventoryCount(
   entries: InventoryCaptureEntry[],
 ): Promise<{ savedAt: string } | { error: string }> {
   try {
-    const user = await requireOrgSession();
-    await persistInventoryCount(countId, user.organizationId, user.id, entries);
+    const user = await requireSucursalContext();
+    await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
     return { savedAt: new Date().toISOString() };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo autoguardar." };

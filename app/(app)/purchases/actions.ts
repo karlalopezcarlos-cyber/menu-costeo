@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { applyYieldFactor, computeUnitCost, convertQty, UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatOrderFolio } from "@/lib/orders/folio";
@@ -30,7 +30,7 @@ export async function createPurchase(
 ): Promise<{ error?: string }> {
   let purchaseOrderId: string | null = null;
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const purchaseDateRaw = String(formData.get("purchaseDate") ?? "");
     const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
@@ -59,7 +59,7 @@ export async function createPurchase(
 
     const purchaseOrder = purchaseOrderId
       ? await prisma.purchaseOrder.findFirst({
-          where: { id: purchaseOrderId, organizationId: user.organizationId },
+          where: { id: purchaseOrderId, sucursalId: user.sucursalId },
           include: { items: true },
         })
       : null;
@@ -115,6 +115,7 @@ export async function createPurchase(
 
       return {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         productId: product.id,
         purchaseDate,
         presentationLabel,

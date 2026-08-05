@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { createInventoryCount } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -9,10 +9,10 @@ function toDateInputValue(d: Date): string {
 }
 
 export default async function InventoryPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const counts = await prisma.inventoryCount.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { date: "desc" },
     include: { items: true },
   });

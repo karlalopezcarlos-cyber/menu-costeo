@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { createRecipeForRow, ignoreRowAlways, linkRowToExistingRecipe } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -11,10 +11,10 @@ export default async function ImportReviewPage({
   params: Promise<{ batchId: string }>;
 }) {
   const { batchId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const batch = await prisma.importBatch.findFirst({
-    where: { id: batchId, organizationId: user.organizationId },
+    where: { id: batchId, sucursalId: user.sucursalId },
   });
   if (!batch) notFound();
 
@@ -24,7 +24,7 @@ export default async function ImportReviewPage({
       orderBy: { rawName: "asc" },
     }),
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

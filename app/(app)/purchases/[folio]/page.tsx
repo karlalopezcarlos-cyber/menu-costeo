@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio, parsePurchaseFolio } from "@/lib/purchases/folio";
 import type { UnitValue } from "@/lib/units";
 import PurchaseEditForm from "./PurchaseEditForm";
@@ -16,14 +16,14 @@ export default async function PurchaseDetailPage({
 }) {
   const { folio: folioParam } = await params;
   const { recipeId } = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const folio = parsePurchaseFolio(folioParam);
   if (!folio) notFound();
 
   const [purchases, suppliers, recipe] = await Promise.all([
     prisma.purchase.findMany({
-      where: { organizationId: user.organizationId, folio },
+      where: { sucursalId: user.sucursalId, folio },
       include: { product: true },
       orderBy: { createdAt: "asc" },
     }),
@@ -34,7 +34,7 @@ export default async function PurchaseDetailPage({
     }),
     recipeId
       ? prisma.recipe.findFirst({
-          where: { id: recipeId, organizationId: user.organizationId },
+          where: { id: recipeId, sucursalId: user.sucursalId },
           select: { id: true, name: true },
         })
       : null,

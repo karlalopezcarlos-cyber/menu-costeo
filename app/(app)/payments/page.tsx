@@ -1,10 +1,10 @@
 import PaymentsSupplierList, { type SupplierBalanceRow } from "./PaymentsSupplierList";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeAllSupplierBalances } from "@/lib/payments";
 
 export default async function PaymentsPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [suppliers, balances] = await Promise.all([
     prisma.supplier.findMany({
@@ -12,7 +12,7 @@ export default async function PaymentsPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    computeAllSupplierBalances(user.organizationId),
+    computeAllSupplierBalances(user.sucursalId),
   ]);
 
   const rows: SupplierBalanceRow[] = suppliers.map((s) => {

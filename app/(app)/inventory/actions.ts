@@ -2,10 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 
 export async function createInventoryCount(formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const dateRaw = String(formData.get("date") ?? "");
   if (!dateRaw) throw new Error("Indica la fecha del conteo.");
@@ -14,7 +14,7 @@ export async function createInventoryCount(formData: FormData) {
   if (Number.isNaN(date.getTime())) throw new Error("Fecha invalida.");
 
   const existing = await prisma.inventoryCount.findFirst({
-    where: { organizationId: user.organizationId, date },
+    where: { sucursalId: user.sucursalId, date },
   });
   if (existing) {
     // Ya existe un conteo para esta fecha: se abre ese en vez de crear uno duplicado.
@@ -24,6 +24,7 @@ export async function createInventoryCount(formData: FormData) {
   const count = await prisma.inventoryCount.create({
     data: {
       organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
       date,
       createdByUserId: user.id,
     },

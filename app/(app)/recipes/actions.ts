@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { loadOrgRecipeGraph, wouldCreateCycle } from "@/lib/costing";
 import { logRecipeActivity, describeQuantity } from "@/lib/recipe-activity";
@@ -19,13 +19,81 @@ function parseUnit(value: FormDataEntryValue | null): UnitValue {
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
 
+/**
+ * Cuando una receta se crea desde la sucursal central, se clona (receta + ingredientes que ya
+ * tenga en ese momento) hacia cada una de las demas sucursales activas de la organizacion, dejando
+ * `sourceRecipeId` como rastro de origen. A partir de ahi cada copia es independiente: editarla no
+ * afecta al original ni a las demas copias (ver decision de diseno en el plan de Sucursales). Si
+ * una sucursal ya tiene una receta con ese nombre, simplemente se omite esa copia en vez de fallar
+ * la creacion completa (que ya se confirmo exitosa en la sucursal de origen).
+ */
+async function cloneRecipeToOtherSucursales(
+  sourceRecipeId: string,
+  organizationId: string,
+  createdInSucursalId: string,
+) {
+  const central = await prisma.sucursal.findFirst({
+    where: { organizationId, isCentral: true },
+    select: { id: true },
+  });
+  if (!central || central.id !== createdInSucursalId) return;
+
+  const [source, otherSucursales] = await Promise.all([
+    prisma.recipe.findUnique({
+      where: { id: sourceRecipeId },
+      include: { items: true },
+    }),
+    prisma.sucursal.findMany({
+      where: { organizationId, isActive: true, id: { not: central.id } },
+      select: { id: true },
+    }),
+  ]);
+  if (!source || otherSucursales.length === 0) return;
+
+  for (const target of otherSucursales) {
+    try {
+      await prisma.recipe.create({
+        data: {
+          organizationId,
+          sucursalId: target.id,
+          sourceRecipeId: source.id,
+          name: source.name,
+          categoryId: source.categoryId,
+          yieldQty: source.yieldQty.toString(),
+          yieldUnit: source.yieldUnit,
+          isMenuItem: source.isMenuItem,
+          sellingPrice: source.sellingPrice?.toString() ?? null,
+          instructions: source.instructions,
+          // Solo se clonan ingredientes de tipo producto (compartido a nivel organizacion). Los de
+          // tipo subreceta se omiten: la subreceta referenciada pertenece a la sucursal de origen,
+          // y no hay una copia equivalente en la sucursal destino a la cual apuntar sin arriesgar
+          // una referencia cruzada entre sucursales.
+          items: {
+            create: source.items
+              .filter((item) => item.productId)
+              .map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity.toString(),
+                unit: item.unit,
+                sortOrder: item.sortOrder,
+              })),
+          },
+        },
+      });
+    } catch (error) {
+      // Colision de nombre u otro conflicto en esa sucursal: se omite esa copia sin abortar las demas.
+      console.error(`No se pudo clonar la receta "${source.name}" a la sucursal ${target.id}:`, error);
+    }
+  }
+}
+
 export async function createRecipe(
   _prevState: { error?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string }> {
   let recipeId: string;
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const name = String(formData.get("name") ?? "").trim();
     const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
@@ -38,7 +106,7 @@ export async function createRecipe(
     if (yieldQty.lte(0)) throw new Error("El rendimiento debe ser mayor a cero.");
 
     const duplicate = await prisma.recipe.findFirst({
-      where: { organizationId: user.organizationId, name: { equals: name, mode: "insensitive" } },
+      where: { sucursalId: user.sucursalId, name: { equals: name, mode: "insensitive" } },
     });
     if (duplicate) {
       throw new Error(
@@ -58,6 +126,7 @@ export async function createRecipe(
     const recipe = await prisma.recipe.create({
       data: {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         name,
         categoryId,
         yieldQty: yieldQty.toString(),
@@ -69,11 +138,14 @@ export async function createRecipe(
 
     await logRecipeActivity({
       organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
       recipeId: recipe.id,
       type: "CREATED",
       message: `Receta creada`,
       createdByUserId: user.id,
     });
+
+    await cloneRecipeToOtherSucursales(recipe.id, user.organizationId, user.sucursalId);
 
     recipeId = recipe.id;
   } catch (error) {
@@ -90,7 +162,7 @@ export async function addRecipeItem(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const componentType = String(formData.get("componentType") ?? "");
     const quantity = new Decimal(String(formData.get("quantity") ?? "0"));
@@ -99,7 +171,7 @@ export async function addRecipeItem(
     if (quantity.lte(0)) throw new Error("La cantidad debe ser mayor a cero.");
 
     const recipe = await prisma.recipe.findFirst({
-      where: { id: recipeId, organizationId: user.organizationId },
+      where: { id: recipeId, sucursalId: user.sucursalId },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
 
@@ -128,6 +200,7 @@ export async function addRecipeItem(
 
       await logRecipeActivity({
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         recipeId: recipe.id,
         type: "ITEM_ADDED",
         message: existingItem
@@ -138,11 +211,11 @@ export async function addRecipeItem(
     } else if (componentType === "subrecipe") {
       const subRecipeId = String(formData.get("subRecipeId") ?? "");
       const subRecipe = await prisma.recipe.findFirst({
-        where: { id: subRecipeId, organizationId: user.organizationId },
+        where: { id: subRecipeId, sucursalId: user.sucursalId },
       });
       if (!subRecipe) throw new Error("Subreceta no encontrada.");
 
-      const graph = await loadOrgRecipeGraph(user.organizationId);
+      const graph = await loadOrgRecipeGraph(user.sucursalId);
       if (wouldCreateCycle(recipe.id, subRecipe.id, graph)) {
         throw new Error(
           `No se puede agregar "${subRecipe.name}": crearia una referencia circular de subrecetas.`,
@@ -165,6 +238,7 @@ export async function addRecipeItem(
 
       await logRecipeActivity({
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         recipeId: recipe.id,
         type: "ITEM_ADDED",
         message: existingSubItem
@@ -185,10 +259,10 @@ export async function addRecipeItem(
 }
 
 export async function removeRecipeItem(recipeId: string, itemId: string) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
   });
   if (!recipe) throw new Error("Receta no encontrada.");
 
@@ -204,6 +278,7 @@ export async function removeRecipeItem(recipeId: string, itemId: string) {
   const kind = item.subRecipeId ? "la subreceta " : "";
   await logRecipeActivity({
     organizationId: user.organizationId,
+    sucursalId: user.sucursalId,
     recipeId: recipe.id,
     type: "ITEM_REMOVED",
     message: `Se quito ${kind}"${label}" (${item.quantity.toString()} ${UNIT_LABELS[item.unit as UnitValue]})`,
@@ -220,7 +295,7 @@ export async function updateRecipeDetails(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const name = String(formData.get("name") ?? "").trim();
     const yieldQty = new Decimal(String(formData.get("yieldQty") ?? "0"));
@@ -230,13 +305,13 @@ export async function updateRecipeDetails(
     if (yieldQty.lte(0)) throw new Error("El rendimiento debe ser mayor a cero.");
 
     const recipe = await prisma.recipe.findFirst({
-      where: { id: recipeId, organizationId: user.organizationId },
+      where: { id: recipeId, sucursalId: user.sucursalId },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
 
     const duplicate = await prisma.recipe.findFirst({
       where: {
-        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         name: { equals: name, mode: "insensitive" },
         id: { not: recipeId },
       },
@@ -259,6 +334,7 @@ export async function updateRecipeDetails(
     if (changes.length > 0) {
       await logRecipeActivity({
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         recipeId,
         type: "UPDATED",
         message: `Se actualizo ${changes.join(" y ")}`,
@@ -276,12 +352,12 @@ export async function updateRecipeDetails(
 }
 
 export async function updateRecipeInstructions(recipeId: string, formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const instructions = String(formData.get("instructions") ?? "").trim();
 
   await prisma.recipe.update({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     data: { instructions: instructions || null },
   });
 
@@ -289,15 +365,16 @@ export async function updateRecipeInstructions(recipeId: string, formData: FormD
 }
 
 export async function archiveRecipe(recipeId: string) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   await prisma.recipe.update({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     data: { archivedAt: new Date() },
   });
 
   await logRecipeActivity({
     organizationId: user.organizationId,
+    sucursalId: user.sucursalId,
     recipeId,
     type: "ARCHIVED",
     message: "Receta archivada",
@@ -314,10 +391,10 @@ export async function updateRecipePhoto(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const recipe = await prisma.recipe.findFirst({
-      where: { id: recipeId, organizationId: user.organizationId },
+      where: { id: recipeId, sucursalId: user.sucursalId },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
 
@@ -345,10 +422,10 @@ export async function updateRecipePhoto(
 }
 
 export async function removeRecipePhoto(recipeId: string) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   await prisma.recipe.update({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     data: { photo: null, photoMimeType: null },
   });
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
 
@@ -14,7 +14,7 @@ export default async function SalesPage({
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const params = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const now = new Date();
   const defaultFrom = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
@@ -25,12 +25,12 @@ export default async function SalesPage({
 
   const [recipes, sales] = await Promise.all([
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, isMenuItem: true, archivedAt: null },
+      where: { sucursalId: user.sucursalId, isMenuItem: true, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, sellingPrice: true },
     }),
     prisma.dailySale.findMany({
-      where: { organizationId: user.organizationId, date: { gte: from, lte: to } },
+      where: { sucursalId: user.sucursalId, date: { gte: from, lte: to } },
       include: { recipe: true },
       orderBy: { date: "desc" },
     }),

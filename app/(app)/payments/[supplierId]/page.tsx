@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import SupplierPaymentsManager, { type LegacyAdvanceRow, type FolioRow } from "./SupplierPaymentsManager";
 
@@ -10,7 +10,7 @@ export default async function SupplierPaymentsPage({
   params: Promise<{ supplierId: string }>;
 }) {
   const { supplierId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [supplier, allSuppliers, purchases, payments] = await Promise.all([
     prisma.supplier.findFirst({ where: { id: supplierId, organizationId: user.organizationId } }),
@@ -20,11 +20,11 @@ export default async function SupplierPaymentsPage({
       select: { id: true, name: true },
     }),
     prisma.purchase.findMany({
-      where: { organizationId: user.organizationId, supplierId },
+      where: { sucursalId: user.sucursalId, supplierId },
       select: { folio: true, purchaseDate: true, totalPrice: true },
     }),
     prisma.supplierPayment.findMany({
-      where: { organizationId: user.organizationId, supplierId },
+      where: { sucursalId: user.sucursalId, supplierId },
     }),
   ]);
   if (!supplier) notFound();

@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { buildInventoryCountWorkbook, type InventoryCountExportRow } from "@/lib/excel/export-inventory-count";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ countId: string }> }) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const { countId } = await params;
 
   const count = await prisma.inventoryCount.findFirst({
-    where: { id: countId, organizationId: user.organizationId },
+    where: { id: countId, sucursalId: user.sucursalId },
     include: {
       items: {
         include: {

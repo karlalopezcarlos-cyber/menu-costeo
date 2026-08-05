@@ -30,22 +30,62 @@ type RecipeNode = {
 
 export type RecipeGraph = {
   recipes: Map<string, RecipeNode>;
+  /** Costo unitario vigente de cada producto EN ESTA SUCURSAL (ver getSucursalProductCosts). */
+  productCosts: Map<string, Decimal>;
 };
 
 const MAX_DEPTH = 20;
 
-/** Carga todas las recetas (no archivadas) de una organizacion en una sola consulta, para costear sin N+1 queries. */
-export async function loadOrgRecipeGraph(organizationId: string): Promise<RecipeGraph> {
+/**
+ * Costo unitario vigente de un producto para una sucursal especifica: el `computedUnitCost` de su
+ * compra mas reciente EN ESA SUCURSAL (no el ultimo `Product.currentUnitCost` global, que se
+ * actualiza con la compra mas reciente de cualquier sucursal y por lo tanto mezclaria precios entre
+ * sucursales). Si esa sucursal nunca ha comprado el producto, no aparece en el mapa (costo 0 /
+ * "no confiable" para quien lo consuma).
+ */
+export async function getSucursalProductCosts(
+  sucursalId: string,
+  productIds: string[],
+): Promise<Map<string, Decimal>> {
+  const costByProduct = new Map<string, Decimal>();
+  if (productIds.length === 0) return costByProduct;
+
+  const purchases = await prisma.purchase.findMany({
+    where: { sucursalId, productId: { in: productIds } },
+    orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
+    select: { productId: true, computedUnitCost: true },
+  });
+  for (const p of purchases) {
+    if (!costByProduct.has(p.productId)) costByProduct.set(p.productId, new Decimal(p.computedUnitCost));
+  }
+  return costByProduct;
+}
+
+/**
+ * Carga todas las recetas (no archivadas) de una sucursal en una sola consulta, para costear sin
+ * N+1 queries. Cada sucursal opera como un mini-restaurante independiente: sus recetas, las
+ * referencias a subrecetas que contienen, y el costo de cada producto (su compra mas reciente EN
+ * ESA SUCURSAL, no el costo global del catalogo) quedan siempre dentro de la misma sucursal.
+ */
+export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGraph> {
   const recipes = await prisma.recipe.findMany({
-    where: { organizationId, archivedAt: null },
+    where: { sucursalId, archivedAt: null },
     include: {
       items: {
-        include: { product: { select: { baseUnit: true, currentUnitCost: true } } },
+        include: { product: { select: { id: true, baseUnit: true } } },
       },
     },
   });
 
+  const productIds = [
+    ...new Set(
+      recipes.flatMap((r) => r.items.map((i) => i.productId).filter((id): id is string => !!id)),
+    ),
+  ];
+  const productCosts = await getSucursalProductCosts(sucursalId, productIds);
+
   return {
+    productCosts,
     recipes: new Map(
       recipes.map((r) => [
         r.id,
@@ -63,7 +103,7 @@ export async function loadOrgRecipeGraph(organizationId: string): Promise<Recipe
             product: i.product
               ? {
                   baseUnit: i.product.baseUnit as UnitValue,
-                  currentUnitCost: new Decimal(i.product.currentUnitCost),
+                  currentUnitCost: productCosts.get(i.product.id) ?? new Decimal(0),
                 }
               : null,
           })),

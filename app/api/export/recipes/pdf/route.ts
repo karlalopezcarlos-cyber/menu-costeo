@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Decimal from "decimal.js";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost, type RecipeGraph } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
@@ -21,7 +21,7 @@ function computeUnitCost(
   try {
     if (item.productId && product) {
       const perUnit = convertQty(1, item.unit as UnitValue, product.baseUnit as UnitValue);
-      return perUnit.times(product.currentUnitCost);
+      return perUnit.times(graph.productCosts.get(item.productId) ?? new Decimal(0));
     }
     if (item.subRecipeId && subRecipe) {
       const subCost = getRecipeCost(item.subRecipeId, graph, memo);
@@ -38,10 +38,10 @@ function computeUnitCost(
 }
 
 export async function GET() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const recipes = await prisma.recipe.findMany({
-    where: { organizationId: user.organizationId, archivedAt: null },
+    where: { sucursalId: user.sucursalId, archivedAt: null },
     orderBy: { name: "asc" },
     include: {
       items: { orderBy: { sortOrder: "asc" }, include: { product: true, subRecipe: true } },
@@ -49,7 +49,7 @@ export async function GET() {
     },
   });
 
-  const graph = await loadOrgRecipeGraph(user.organizationId);
+  const graph = await loadOrgRecipeGraph(user.sucursalId);
   const memo = new Map<string, Decimal>();
 
   const recipesData: RecipePdfData[] = recipes.map((recipe) => {

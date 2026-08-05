@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import PurchasesTable, { type PurchaseRow } from "./PurchasesTable";
 import { toPurchaseRow } from "./purchase-rows";
 import { buildPurchaseWhere, hasAnyPurchaseFilter, resolvePendingProductIds, todayDateInputValue } from "@/lib/purchases/query";
@@ -18,7 +18,7 @@ export default async function PurchasesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const raw = await searchParams;
 
   const filters = {
@@ -38,11 +38,11 @@ export default async function PurchasesPage({
   const today = todayDateInputValue();
   const effectiveFilters = isDefaultToday ? { ...filters, dateFrom: today, dateTo: today } : filters;
 
-  const pendingProductIds = await resolvePendingProductIds(user.organizationId);
+  const pendingProductIds = await resolvePendingProductIds(user.sucursalId);
   const pendingIdSet = new Set(pendingProductIds);
 
   const where = buildPurchaseWhere(
-    user.organizationId,
+    user.sucursalId,
     effectiveFilters,
     effectiveFilters.pendingOnly ? pendingProductIds : null,
   );

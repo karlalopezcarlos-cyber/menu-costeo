@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { applyYieldFactor, computeUnitCost, UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { recalcProductCurrentCost } from "@/lib/costing";
 
@@ -19,12 +19,12 @@ export async function updatePurchase(
   _prevState: { error?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const purchaseId = String(formData.get("purchaseId") ?? "");
   const recipeId = String(formData.get("recipeId") ?? "").trim() || null;
 
   const purchase = await prisma.purchase.findFirst({
-    where: { id: purchaseId, organizationId: user.organizationId },
+    where: { id: purchaseId, sucursalId: user.sucursalId },
     include: { product: true },
   });
   if (!purchase) return { error: "Compra no encontrada." };
@@ -93,9 +93,9 @@ export async function updatePurchase(
 }
 
 export async function deletePurchase(purchaseId: string): Promise<void> {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const purchase = await prisma.purchase.findFirst({
-    where: { id: purchaseId, organizationId: user.organizationId },
+    where: { id: purchaseId, sucursalId: user.sucursalId },
   });
   if (!purchase) throw new Error("Compra no encontrada.");
 

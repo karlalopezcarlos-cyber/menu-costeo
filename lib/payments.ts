@@ -5,20 +5,22 @@ import { prisma } from "@/lib/prisma";
  * pagado genera un SupplierPayment por el total de ese folio, y cada adelanto (folio null) resta
  * directo. No hace falta llevar un booleano "pagado" aparte en Purchase.
  *
- * Saldo de todos los proveedores de la organizacion, en dos consultas agrupadas (sin N+1).
+ * Saldo de todos los proveedores de UNA SUCURSAL, en dos consultas agrupadas (sin N+1). Un
+ * proveedor compartido por la organizacion puede tener saldo distinto en cada sucursal, porque sus
+ * compras y pagos ya son por sucursal (cada una compra/paga de forma independiente).
  */
 export async function computeAllSupplierBalances(
-  organizationId: string,
+  sucursalId: string,
 ): Promise<Map<string, { totalPurchased: number; totalPaid: number; balance: number }>> {
   const [purchaseGroups, paymentGroups] = await Promise.all([
     prisma.purchase.groupBy({
       by: ["supplierId"],
-      where: { organizationId, supplierId: { not: null } },
+      where: { sucursalId, supplierId: { not: null } },
       _sum: { totalPrice: true },
     }),
     prisma.supplierPayment.groupBy({
       by: ["supplierId"],
-      where: { organizationId },
+      where: { sucursalId },
       _sum: { amount: true },
     }),
   ]);

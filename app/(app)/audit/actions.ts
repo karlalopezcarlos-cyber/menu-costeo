@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 
 export async function saveAuditComments(finalCountId: string, formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const count = await prisma.inventoryCount.findFirst({
-    where: { id: finalCountId, organizationId: user.organizationId },
+    where: { id: finalCountId, sucursalId: user.sucursalId },
   });
   if (!count) throw new Error("Conteo no encontrado.");
 
@@ -31,6 +31,7 @@ export async function saveAuditComments(finalCountId: string, formData: FormData
             where: { finalCountId_productId: { finalCountId: count.id, productId: id } },
             create: {
               organizationId: user.organizationId,
+              sucursalId: user.sucursalId,
               finalCountId: count.id,
               productId: id,
               comment,
@@ -42,6 +43,7 @@ export async function saveAuditComments(finalCountId: string, formData: FormData
             where: { finalCountId_subRecipeId: { finalCountId: count.id, subRecipeId: id } },
             create: {
               organizationId: user.organizationId,
+              sucursalId: user.sucursalId,
               finalCountId: count.id,
               subRecipeId: id,
               comment,

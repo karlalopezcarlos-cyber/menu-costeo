@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeMenuEngineeringReport, CLASSIFICATION_LABELS, type IvaMode } from "@/lib/menu-engineering";
 import { formatMoney } from "@/lib/format";
 
@@ -20,7 +20,7 @@ export default async function MenuEngineeringPage({
   searchParams: Promise<{ from?: string; to?: string; iva?: string }>;
 }) {
   const params = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const now = new Date();
   const defaultFrom = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
@@ -30,7 +30,7 @@ export default async function MenuEngineeringPage({
   const toDate = params.to ? new Date(`${params.to}T00:00:00Z`) : defaultTo;
   const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
-  const rows = await computeMenuEngineeringReport(user.organizationId, fromDate, toDate, ivaMode);
+  const rows = await computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode);
 
   const baseQuery = `from=${toDateInputValue(fromDate)}&to=${toDateInputValue(toDate)}`;
 

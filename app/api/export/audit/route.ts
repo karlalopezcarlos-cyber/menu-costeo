@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeInventoryAudit } from "@/lib/audit";
 import { buildAuditWorkbook } from "@/lib/excel/export-audit";
 
 export async function GET(request: NextRequest) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const initialCountId = request.nextUrl.searchParams.get("initial");
   const finalCountId = request.nextUrl.searchParams.get("final");
@@ -13,7 +13,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Falta el inventario inicial." }, { status: 400 });
   }
 
-  const result = await computeInventoryAudit(user.organizationId, initialCountId, finalCountId || null);
+  const result = await computeInventoryAudit(
+    user.organizationId,
+    user.sucursalId,
+    initialCountId,
+    finalCountId || null,
+  );
   const buffer = await buildAuditWorkbook(result.rows, result.initialDateLabel, result.finalDateLabel);
 
   const fileLabel = `${result.initialDateLabel}${result.finalDateLabel ? `_${result.finalDateLabel}` : ""}`.replace(

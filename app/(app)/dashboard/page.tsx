@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeInventoryAudit } from "@/lib/audit";
 import { formatMoney } from "@/lib/format";
 
@@ -17,10 +17,10 @@ export default async function DashboardPage({
   searchParams: Promise<{ initial?: string; final?: string }>;
 }) {
   const params = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const counts = await prisma.inventoryCount.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { date: "asc" },
     select: { id: true, date: true },
   });
@@ -49,11 +49,11 @@ export default async function DashboardPage({
 
   const [initialCount, finalCount] = await Promise.all([
     prisma.inventoryCount.findFirst({
-      where: { id: initialCountId, organizationId: user.organizationId },
+      where: { id: initialCountId, sucursalId: user.sucursalId },
       include: { items: true },
     }),
     prisma.inventoryCount.findFirst({
-      where: { id: finalCountId, organizationId: user.organizationId },
+      where: { id: finalCountId, sucursalId: user.sucursalId },
       include: { items: true },
     }),
   ]);
@@ -75,19 +75,19 @@ export default async function DashboardPage({
     prisma.purchase.aggregate({
       _sum: { totalPrice: true },
       where: {
-        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         purchaseDate: { gte: rangeStart, lte: rangeEnd },
       },
     }),
     prisma.dailySale.findMany({
-      where: { organizationId: user.organizationId, date: { gte: rangeStart, lte: rangeEnd } },
+      where: { sucursalId: user.sucursalId, date: { gte: rangeStart, lte: rangeEnd } },
       select: { quantitySold: true, unitPrice: true },
     }),
     prisma.wasteEntry.findMany({
-      where: { organizationId: user.organizationId, date: { gte: rangeStart, lte: rangeEnd } },
+      where: { sucursalId: user.sucursalId, date: { gte: rangeStart, lte: rangeEnd } },
       select: { quantity: true, unitCost: true },
     }),
-    computeInventoryAudit(user.organizationId, auditInitialCountId, auditFinalCountId),
+    computeInventoryAudit(user.organizationId, user.sucursalId, auditInitialCountId, auditFinalCountId),
   ]);
 
   const initialValue = inventoryValue(initialCount.items);

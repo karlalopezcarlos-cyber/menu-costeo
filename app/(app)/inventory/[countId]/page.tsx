@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
-import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import { requireSucursalContext } from "@/lib/tenant";
+import { loadOrgRecipeGraph, getRecipeCost, getSucursalProductCosts } from "@/lib/costing";
 import { removeYieldFactor, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import InventoryCaptureTable, { type CaptureRow } from "./InventoryCaptureTable";
 import InventoryCountTabs from "./InventoryCountTabs";
@@ -18,15 +18,15 @@ export default async function InventoryCountPage({
 }) {
   const { countId } = await params;
   const { existing } = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [count, changes] = await Promise.all([
     prisma.inventoryCount.findFirst({
-      where: { id: countId, organizationId: user.organizationId },
+      where: { id: countId, sucursalId: user.sucursalId },
       include: { items: true },
     }),
     prisma.inventoryCountItemChange.findMany({
-      where: { inventoryCount: { id: countId, organizationId: user.organizationId } },
+      where: { inventoryCount: { id: countId, sucursalId: user.sucursalId } },
       orderBy: { changedAt: "desc" },
       include: {
         product: { select: { name: true, baseUnit: true } },
@@ -58,12 +58,16 @@ export default async function InventoryCountPage({
       include: { category: true, presentations: true },
     }),
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null, isMenuItem: false },
+      where: { sucursalId: user.sucursalId, archivedAt: null, isMenuItem: false },
       orderBy: { name: "asc" },
       include: { category: true },
     }),
-    loadOrgRecipeGraph(user.organizationId),
+    loadOrgRecipeGraph(user.sucursalId),
   ]);
+  const productCosts = await getSucursalProductCosts(
+    user.sucursalId,
+    products.map((p) => p.id),
+  );
 
   const itemByProductId = new Map(
     count.items
@@ -79,7 +83,7 @@ export default async function InventoryCountPage({
   const rows: CaptureRow[] = [
     ...products.map((product) => {
       const existing = itemByProductId.get(product.id);
-      const netUnitCost = new Decimal(product.currentUnitCost);
+      const netUnitCost = productCosts.get(product.id) ?? new Decimal(0);
       const yieldPercentage = Number(product.yieldPercentage);
       const grossUnitCost =
         yieldPercentage !== 100 ? removeYieldFactor(netUnitCost, yieldPercentage) : netUnitCost;

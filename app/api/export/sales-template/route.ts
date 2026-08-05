@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { buildSalesTemplateWorkbook, type SalesTemplateRow } from "@/lib/excel/export-sales-template";
 
 export async function GET() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const recipes = await prisma.recipe.findMany({
-    where: { organizationId: user.organizationId, isMenuItem: true, archivedAt: null },
+    where: { sucursalId: user.sucursalId, isMenuItem: true, archivedAt: null },
     orderBy: { name: "asc" },
     select: { name: true, sellingPrice: true },
   });

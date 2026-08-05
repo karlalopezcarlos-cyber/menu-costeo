@@ -22,6 +22,9 @@ export async function createOrganization(formData: FormData) {
 
   await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({ data: { name: orgName } });
+    await tx.sucursal.create({
+      data: { organizationId: org.id, name: "Sucursal Principal", isCentral: true },
+    });
     await tx.user.create({
       data: {
         email: ownerEmail,

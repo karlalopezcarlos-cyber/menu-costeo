@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { buildPurchasesWorkbook } from "@/lib/excel/export-purchases";
 import { buildPurchaseWhere, resolvePendingProductIds } from "@/lib/purchases/query";
@@ -17,7 +17,7 @@ import {
 const ROW_LIMIT = 5000;
 
 export async function GET(request: NextRequest) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const params = request.nextUrl.searchParams;
   const search = params.get("q") ?? "";
@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
   const supplier = params.get("supplier") ?? "";
 
   const filters = { search, folio, dateFrom, dateTo, pendingOnly, supplier };
-  const pendingProductIds = pendingOnly ? await resolvePendingProductIds(user.organizationId) : null;
-  const where = buildPurchaseWhere(user.organizationId, filters, pendingProductIds);
+  const pendingProductIds = pendingOnly ? await resolvePendingProductIds(user.sucursalId) : null;
+  const where = buildPurchaseWhere(user.sucursalId, filters, pendingProductIds);
 
   const purchases = await prisma.purchase.findMany({
     where,

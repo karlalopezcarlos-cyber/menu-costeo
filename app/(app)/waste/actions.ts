@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
+import { getSucursalProductCosts } from "@/lib/costing";
 import { convertQty, removeYieldFactor, UNIT_META, UNITS, type UnitValue } from "@/lib/units";
 
 type WasteRowInput = {
@@ -20,7 +21,7 @@ export async function createWasteEntries(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const wasteDateRaw = String(formData.get("wasteDate") ?? "");
     const rowsRaw = String(formData.get("rows") ?? "[]");
@@ -38,9 +39,12 @@ export async function createWasteEntries(
     }
 
     const productIds = [...new Set(rows.map((r) => r.productId))];
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, organizationId: user.organizationId },
-    });
+    const [products, productCosts] = await Promise.all([
+      prisma.product.findMany({
+        where: { id: { in: productIds }, organizationId: user.organizationId },
+      }),
+      getSucursalProductCosts(user.sucursalId, productIds),
+    ]);
     const productById = new Map(products.map((p) => [p.id, p]));
 
     const wasteDate = new Date(wasteDateRaw);
@@ -63,14 +67,16 @@ export async function createWasteEntries(
 
       const costBasis = row.costBasis === "gross" ? "gross" : "net";
       const yieldPercentage = Number(product.yieldPercentage);
+      const netCost = productCosts.get(product.id) ?? new Decimal(0);
       const baseUnitCost =
         costBasis === "gross" && yieldPercentage !== 100
-          ? removeYieldFactor(product.currentUnitCost, product.yieldPercentage)
-          : new Decimal(product.currentUnitCost);
+          ? removeYieldFactor(netCost, product.yieldPercentage)
+          : netCost;
       const unitCost = convertQty(1, unit, product.baseUnit as UnitValue).times(baseUnitCost);
 
       return {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         productId: product.id,
         date: wasteDate,
         quantity: quantity.toString(),

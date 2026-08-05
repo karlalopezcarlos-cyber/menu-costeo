@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 
 type OrderRowInput = {
   productId: string;
@@ -18,7 +18,7 @@ export async function createPurchaseOrder(
 ): Promise<{ error?: string }> {
   let orderId: string;
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
 
     const rowsRaw = String(formData.get("rows") ?? "[]");
     const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
@@ -76,6 +76,7 @@ export async function createPurchaseOrder(
       return tx.purchaseOrder.create({
         data: {
           organizationId: user.organizationId,
+          sucursalId: user.sucursalId,
           folio,
           createdByUserId: user.id,
           supplierId,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { computeInventoryAudit } from "@/lib/audit";
 import AuditTable from "./AuditTable";
 
@@ -13,10 +13,10 @@ export default async function AuditPage({
   searchParams: Promise<{ initial?: string; final?: string }>;
 }) {
   const params = await searchParams;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const counts = await prisma.inventoryCount.findMany({
-    where: { organizationId: user.organizationId },
+    where: { sucursalId: user.sucursalId },
     orderBy: { date: "asc" },
     select: { id: true, date: true },
   });
@@ -48,6 +48,7 @@ export default async function AuditPage({
 
   const result = await computeInventoryAudit(
     user.organizationId,
+    user.sucursalId,
     initialCountId,
     finalCountId || null,
   );

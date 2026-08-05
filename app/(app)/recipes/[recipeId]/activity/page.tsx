@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { getRecipeTimeline } from "@/lib/recipe-activity";
 import ActivityTimeline from "./ActivityTimeline";
 
@@ -11,10 +11,10 @@ export default async function RecipeActivityPage({
   params: Promise<{ recipeId: string }>;
 }) {
   const { recipeId } = await params;
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, organizationId: user.organizationId },
+    where: { id: recipeId, sucursalId: user.sucursalId },
     select: { id: true, name: true },
   });
   if (!recipe) notFound();

@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { buildOrderPdf, type OrderPdfItem } from "@/lib/pdf/export-order";
 import { formatOrderItemQuantityLabel } from "@/lib/orders/quantity-label";
 import { formatOrderFolio } from "@/lib/orders/folio";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ orderId: string }> }) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const { orderId } = await params;
 
   const order = await prisma.purchaseOrder.findFirst({
-    where: { id: orderId, organizationId: user.organizationId },
+    where: { id: orderId, sucursalId: user.sucursalId },
     include: {
       items: { include: { product: { include: { presentations: true } } }, orderBy: { createdAt: "asc" } },
       supplier: true,

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { formatMoney } from "@/lib/format";
 
 async function requireSupplier(organizationId: string, supplierId: string) {
@@ -19,14 +19,14 @@ function parseFolios(raw: string): number[] {
     .filter((n) => Number.isInteger(n));
 }
 
-async function folioTotals(organizationId: string, supplierId: string, folio: number) {
+async function folioTotals(sucursalId: string, supplierId: string, folio: number) {
   const [purchaseAgg, paymentAgg] = await Promise.all([
     prisma.purchase.aggregate({
-      where: { organizationId, supplierId, folio },
+      where: { sucursalId, supplierId, folio },
       _sum: { totalPrice: true },
     }),
     prisma.supplierPayment.aggregate({
-      where: { organizationId, supplierId, folio },
+      where: { sucursalId, supplierId, folio },
       _sum: { amount: true },
     }),
   ]);
@@ -36,16 +36,16 @@ async function folioTotals(organizationId: string, supplierId: string, folio: nu
 }
 
 /** Total y saldo pendiente de varios folios a la vez (para liquidar en bloque sin N+1). */
-async function folioTotalsMany(organizationId: string, supplierId: string, folios: number[]) {
+async function folioTotalsMany(sucursalId: string, supplierId: string, folios: number[]) {
   const [purchaseGroups, paymentGroups] = await Promise.all([
     prisma.purchase.groupBy({
       by: ["folio"],
-      where: { organizationId, supplierId, folio: { in: folios } },
+      where: { sucursalId, supplierId, folio: { in: folios } },
       _sum: { totalPrice: true },
     }),
     prisma.supplierPayment.groupBy({
       by: ["folio"],
-      where: { organizationId, supplierId, folio: { in: folios } },
+      where: { sucursalId, supplierId, folio: { in: folios } },
       _sum: { amount: true },
     }),
   ]);
@@ -66,7 +66,7 @@ export async function addFolioPayment(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireOrgSession();
+    const user = await requireSucursalContext();
     const supplierId = String(formData.get("supplierId") ?? "");
     const folio = Number(formData.get("folio"));
     const amountRaw = String(formData.get("amount") ?? "");
@@ -79,7 +79,7 @@ export async function addFolioPayment(
     const amount = new Decimal(amountRaw || "0");
     if (amount.lte(0)) throw new Error("El abono debe ser mayor a cero.");
 
-    const { remaining } = await folioTotals(user.organizationId, supplierId, folio);
+    const { remaining } = await folioTotals(user.sucursalId, supplierId, folio);
     if (remaining.lte(0)) throw new Error("Ese folio ya esta completamente pagado.");
     if (amount.gt(remaining)) {
       throw new Error(`El abono no puede ser mayor al saldo pendiente de este folio (${formatMoney(remaining.toNumber())}).`);
@@ -88,6 +88,7 @@ export async function addFolioPayment(
     await prisma.supplierPayment.create({
       data: {
         organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
         supplierId,
         folio,
         amount: amount.toString(),
@@ -109,14 +110,14 @@ export async function addFolioPayment(
  * Se usa tanto para el checkbox individual como para "Pagar todo lo seleccionado".
  */
 export async function settleFolios(formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const supplierId = String(formData.get("supplierId") ?? "");
   const folios = parseFolios(String(formData.get("folios") ?? ""));
   const paidDateRaw = String(formData.get("paidDate") ?? "");
   if (!supplierId || folios.length === 0 || !paidDateRaw) throw new Error("Datos invalidos.");
   await requireSupplier(user.organizationId, supplierId);
 
-  const totals = await folioTotalsMany(user.organizationId, supplierId, folios);
+  const totals = await folioTotalsMany(user.sucursalId, supplierId, folios);
   const paidDate = new Date(`${paidDateRaw}T00:00:00.000Z`);
   const toCreate = totals.filter((t) => t.remaining.gt(0));
   if (toCreate.length > 0) {
@@ -125,6 +126,7 @@ export async function settleFolios(formData: FormData) {
         prisma.supplierPayment.create({
           data: {
             organizationId: user.organizationId,
+            sucursalId: user.sucursalId,
             supplierId,
             folio: t.folio,
             amount: t.remaining.toString(),
@@ -142,14 +144,14 @@ export async function settleFolios(formData: FormData) {
 
 /** Deshace todos los abonos de uno o varios folios (equivalente a desmarcar "Pagado"). */
 export async function resetFolios(formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const supplierId = String(formData.get("supplierId") ?? "");
   const folios = parseFolios(String(formData.get("folios") ?? ""));
   if (!supplierId || folios.length === 0) throw new Error("Datos invalidos.");
   await requireSupplier(user.organizationId, supplierId);
 
   await prisma.supplierPayment.deleteMany({
-    where: { organizationId: user.organizationId, supplierId, folio: { in: folios } },
+    where: { sucursalId: user.sucursalId, supplierId, folio: { in: folios } },
   });
 
   revalidatePath(`/payments/${supplierId}`);
@@ -158,13 +160,13 @@ export async function resetFolios(formData: FormData) {
 
 /** Elimina un abono antiguo sin folio asociado (ya no se pueden crear nuevos asi). */
 export async function deleteAdvancePayment(formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
   const id = String(formData.get("id") ?? "");
   const supplierId = String(formData.get("supplierId") ?? "");
   if (!id || !supplierId) throw new Error("Datos invalidos.");
 
   await prisma.supplierPayment.deleteMany({
-    where: { id, organizationId: user.organizationId, supplierId, folio: null },
+    where: { id, sucursalId: user.sucursalId, supplierId, folio: null },
   });
 
   revalidatePath(`/payments/${supplierId}`);

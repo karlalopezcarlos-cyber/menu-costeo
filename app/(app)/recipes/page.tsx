@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import RecipesTable, { type RecipeRow } from "./RecipesTable";
 
 export default async function RecipesPage() {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const [graph, recipes] = await Promise.all([
-    loadOrgRecipeGraph(user.organizationId),
+    loadOrgRecipeGraph(user.sucursalId),
     prisma.recipe.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: {
         id: true,

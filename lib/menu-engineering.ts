@@ -33,13 +33,13 @@ export type MenuEngineeringRow = {
 const POPULARITY_THRESHOLD_FACTOR = 0.7;
 
 export async function computeMenuEngineeringReport(
-  organizationId: string,
+  sucursalId: string,
   fromDate: Date,
   toDate: Date,
   ivaMode: IvaMode = "con",
 ): Promise<MenuEngineeringRow[]> {
   const sales = await prisma.dailySale.findMany({
-    where: { organizationId, date: { gte: fromDate, lte: toDate } },
+    where: { sucursalId, date: { gte: fromDate, lte: toDate } },
     include: { recipe: true },
   });
 
@@ -63,7 +63,7 @@ export async function computeMenuEngineeringReport(
     }
   }
 
-  const graph = await loadOrgRecipeGraph(organizationId);
+  const graph = await loadOrgRecipeGraph(sucursalId);
   const memo = new Map<string, Decimal>();
 
   const totalQty = [...byRecipe.values()].reduce((sum, r) => sum.plus(r.quantitySold), new Decimal(0));

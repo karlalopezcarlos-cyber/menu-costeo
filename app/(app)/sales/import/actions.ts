@@ -3,12 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireOrgSession } from "@/lib/tenant";
+import { requireSucursalContext } from "@/lib/tenant";
 import { parseWorkbook } from "@/lib/excel/parse-sales-import";
 import { processBatchRows } from "@/lib/import-processing";
 
 export async function createImportBatch(formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const file = formData.get("file");
 
@@ -22,6 +22,7 @@ export async function createImportBatch(formData: FormData) {
   const batch = await prisma.importBatch.create({
     data: {
       organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
       fileName: file.name,
       headers,
       rawRows: rows,
@@ -33,7 +34,7 @@ export async function createImportBatch(formData: FormData) {
 }
 
 export async function processImportBatch(batchId: string, formData: FormData) {
-  const user = await requireOrgSession();
+  const user = await requireSucursalContext();
 
   const dateHeader = String(formData.get("dateHeader") ?? "");
   const nameHeader = String(formData.get("nameHeader") ?? "");
@@ -41,7 +42,7 @@ export async function processImportBatch(batchId: string, formData: FormData) {
   const priceHeader = String(formData.get("priceHeader") ?? "");
 
   const batch = await prisma.importBatch.findFirst({
-    where: { id: batchId, organizationId: user.organizationId },
+    where: { id: batchId, sucursalId: user.sucursalId },
   });
   if (!batch) throw new Error("Lote de importacion no encontrado.");
 
@@ -50,6 +51,7 @@ export async function processImportBatch(batchId: string, formData: FormData) {
 
   const { rowsMatched, rowsPending } = await processBatchRows(
     user.organizationId,
+    user.sucursalId,
     batch.id,
     headers,
     rawRows,

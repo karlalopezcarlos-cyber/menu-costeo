@@ -32,11 +32,11 @@ export function todayDateInputValue(): string {
  * el conjunto de productos con saldo pendiente (consulta aparte a PurchaseOrderItem).
  */
 export function buildPurchaseWhere(
-  organizationId: string,
+  sucursalId: string,
   filters: PurchaseListFilters,
   pendingProductIds: string[] | null,
 ): Prisma.PurchaseWhereInput {
-  const where: Prisma.PurchaseWhereInput = { organizationId };
+  const where: Prisma.PurchaseWhereInput = { sucursalId };
 
   if (filters.search.trim()) {
     where.product = { name: { contains: filters.search.trim(), mode: "insensitive" } };
@@ -71,10 +71,10 @@ export function buildPurchaseWhere(
   return where;
 }
 
-/** Productos que todavia tienen saldo pendiente en algun pedido abierto de la organizacion. */
-export async function resolvePendingProductIds(organizationId: string): Promise<string[]> {
+/** Productos que todavia tienen saldo pendiente en algun pedido abierto de la sucursal. */
+export async function resolvePendingProductIds(sucursalId: string): Promise<string[]> {
   const openOrderItems = await prisma.purchaseOrderItem.findMany({
-    where: { purchaseOrder: { organizationId, status: "OPEN" } },
+    where: { purchaseOrder: { sucursalId, status: "OPEN" } },
     select: { productId: true, quantity: true, receivedQuantity: true },
   });
   return openOrderItems
