@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { toggleOrganizationActive } from "./actions";
+import DeleteOrganizationButton from "./DeleteOrganizationButton";
 
 export default async function OrganizationsPage() {
   const organizations = await prisma.organization.findMany({
@@ -51,16 +52,19 @@ export default async function OrganizationsPage() {
                   )}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <form
-                    action={async () => {
-                      "use server";
-                      await toggleOrganizationActive(org.id, !org.isActive);
-                    }}
-                  >
-                    <button type="submit" className="text-neutral-400 hover:text-neutral-900">
-                      {org.isActive ? "Desactivar" : "Activar"}
-                    </button>
-                  </form>
+                  <div className="flex items-center justify-end gap-3">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await toggleOrganizationActive(org.id, !org.isActive);
+                      }}
+                    >
+                      <button type="submit" className="text-neutral-400 hover:text-neutral-900">
+                        {org.isActive ? "Desactivar" : "Activar"}
+                      </button>
+                    </form>
+                    <DeleteOrganizationButton organizationId={org.id} organizationName={org.name} />
+                  </div>
                 </td>
               </tr>
             ))}

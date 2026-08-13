@@ -13,8 +13,9 @@ declare module "next-auth" {
       role: Role;
       organizationId: string | null;
       allowedPanels: Panel[];
-      /// Sucursal fija del usuario (STAFF). null = OWNER/SUPERADMIN, ve/cambia entre todas.
-      sucursalId: string | null;
+      /// Sucursales a las que este STAFF tiene acceso (puede cambiar entre ellas). Ignorado para
+      /// OWNER/SUPERADMIN, que siempre ven todas las de su organizacion sin importar esta lista.
+      sucursalIds: string[];
     };
   }
 }
@@ -25,7 +26,7 @@ declare module "@auth/core/jwt" {
     role: Role;
     organizationId: string | null;
     allowedPanels: Panel[];
-    sucursalId: string | null;
+    sucursalIds: string[];
   }
 }
 
@@ -43,7 +44,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials?.password;
         if (typeof email !== "string" || typeof password !== "string") return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: { sucursales: { select: { sucursalId: true } } },
+        });
         if (!user || !user.isActive) return null;
 
         if (user.organizationId) {
@@ -61,7 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           organizationId: user.organizationId,
           allowedPanels: user.allowedPanels,
-          sucursalId: user.sucursalId,
+          sucursalIds: user.sucursales.map((s) => s.sucursalId),
         };
       },
     }),
@@ -73,7 +77,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (user as { role: Role }).role;
         token.organizationId = (user as { organizationId: string | null }).organizationId;
         token.allowedPanels = (user as { allowedPanels: Panel[] }).allowedPanels;
-        token.sucursalId = (user as { sucursalId: string | null }).sucursalId;
+        token.sucursalIds = (user as { sucursalIds: string[] }).sucursalIds;
       }
       return token;
     },
@@ -82,7 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = token.role;
       session.user.organizationId = token.organizationId;
       session.user.allowedPanels = token.allowedPanels ?? [];
-      session.user.sucursalId = token.sucursalId ?? null;
+      session.user.sucursalIds = token.sucursalIds ?? [];
       return session;
     },
   },

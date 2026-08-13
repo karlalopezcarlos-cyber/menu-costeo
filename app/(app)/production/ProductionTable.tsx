@@ -9,10 +9,12 @@ import {
   type SortDir,
 } from "./production-rows";
 import { formatMoney } from "@/lib/format";
+import { deleteProductionEntry } from "./actions";
 
 export type { ProductionRow };
 
 const COLUMNS: { key: ProductionSortKey; label: string }[] = [
+  { key: "folio", label: "Folio" },
   { key: "date", label: "Fecha" },
   { key: "subRecipe", label: "Subreceta" },
   { key: "category", label: "Categoria" },
@@ -34,6 +36,7 @@ export default function ProductionTable({
   const [sortKey, setSortKey] = useState<ProductionSortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
+  const [folioSearch, setFolioSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -50,8 +53,8 @@ export default function ProductionTable({
   }
 
   const filteredRows = useMemo(
-    () => filterProductionRows(rows, { search, categoryFilter, dateFrom, dateTo }),
-    [rows, search, categoryFilter, dateFrom, dateTo],
+    () => filterProductionRows(rows, { search, folioSearch, categoryFilter, dateFrom, dateTo }),
+    [rows, search, folioSearch, categoryFilter, dateFrom, dateTo],
   );
 
   const sortedRows = useMemo(
@@ -61,7 +64,7 @@ export default function ProductionTable({
 
   const totalCost = useMemo(() => filteredRows.reduce((sum, row) => sum + row.total, 0), [filteredRows]);
 
-  const hasFilters = !!search || categoryFilter !== "all" || !!dateFrom || !!dateTo;
+  const hasFilters = !!search || !!folioSearch || categoryFilter !== "all" || !!dateFrom || !!dateTo;
 
   return (
     <div className="space-y-3">
@@ -72,6 +75,13 @@ export default function ProductionTable({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar subreceta..."
           className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        />
+        <input
+          type="text"
+          value={folioSearch}
+          onChange={(e) => setFolioSearch(e.target.value)}
+          placeholder="Buscar folio..."
+          className="w-full max-w-[10rem] rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
@@ -115,6 +125,7 @@ export default function ProductionTable({
             type="button"
             onClick={() => {
               setSearch("");
+              setFolioSearch("");
               setCategoryFilter("all");
               setDateFrom("");
               setDateTo("");
@@ -161,12 +172,13 @@ export default function ProductionTable({
                 </th>
               ))}
               <th className="px-4 py-2 font-medium">Comentario</th>
+              <th className="px-4 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                   {rows.length === 0
                     ? "Todavia no hay producciones registradas."
                     : "Ninguna produccion coincide con los filtros."}
@@ -175,7 +187,8 @@ export default function ProductionTable({
             )}
             {sortedRows.map((row) => (
               <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
+                <td className="px-4 py-2 text-neutral-500 whitespace-nowrap">{row.folioLabel}</td>
+                <td className="px-4 py-2 text-neutral-500 whitespace-nowrap">{row.dateLabel}</td>
                 <td className="px-4 py-2">{row.subRecipeName}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.quantityLabel}</td>
@@ -183,6 +196,19 @@ export default function ProductionTable({
                 <td className="px-4 py-2 text-neutral-500">{row.unitCostLabel}</td>
                 <td className="px-4 py-2">{formatMoney(row.total)}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.comment ?? "-"}</td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("¿Eliminar esta produccion? Esta accion no se puede deshacer.")) {
+                        deleteProductionEntry(row.id);
+                      }
+                    }}
+                    className="text-neutral-400 hover:text-red-600"
+                  >
+                    Eliminar
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

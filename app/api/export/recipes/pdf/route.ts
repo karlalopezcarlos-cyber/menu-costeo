@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost, type RecipeGraph } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { buildRecipesPdf, type RecipePdfData, type RecipePdfItem } from "@/lib/pdf/export-recipe";
+import { getOrganizationLogo } from "@/lib/pdf/get-organization-logo";
 import { formatMoney } from "@/lib/format";
+import { parseRecipeTypeFilter, recipeTypeFilterToIsMenuItem } from "@/lib/recipes-filter";
 
 type ItemLike = { productId: string | null; subRecipeId: string | null; quantity: Decimal; unit: string };
 type ProductLike = { baseUnit: string; currentUnitCost: Decimal } | null;
@@ -37,14 +39,20 @@ function computeUnitCost(
   return null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireSucursalContext();
+  const isMenuItem = recipeTypeFilterToIsMenuItem(
+    parseRecipeTypeFilter(new URL(request.url).searchParams.get("type")),
+  );
 
   const recipes = await prisma.recipe.findMany({
-    where: { sucursalId: user.sucursalId, archivedAt: null },
+    where: { sucursalId: user.sucursalId, archivedAt: null, ...(isMenuItem !== undefined && { isMenuItem }) },
     orderBy: { name: "asc" },
     include: {
-      items: { orderBy: { sortOrder: "asc" }, include: { product: true, subRecipe: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { product: { include: { category: true } }, subRecipe: true },
+      },
       category: true,
     },
   });
@@ -67,6 +75,7 @@ export async function GET() {
       return {
         label: item.product?.name ?? item.subRecipe?.name ?? "?",
         isSubRecipe: !!item.subRecipeId,
+        categoryName: item.product?.category?.name ?? null,
         quantity: item.quantity.toString(),
         unitLabel: UNIT_LABELS[item.unit as UnitValue],
         unitCost: unitCost ? formatMoney(unitCost.toNumber(), 4) : null,
@@ -101,7 +110,8 @@ export async function GET() {
     };
   });
 
-  const buffer = await buildRecipesPdf(recipesData);
+  const logo = await getOrganizationLogo(user.organizationId);
+  const buffer = await buildRecipesPdf(recipesData, logo);
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { listSuppliersForCapture } from "@/lib/suppliers";
 import OrderItemsForm, { type OrderItemRow } from "./OrderItemsForm";
 import AddProductToOrder, { type CandidateProduct } from "./AddProductToOrder";
 import OrderSendActions from "./OrderSendActions";
@@ -22,19 +23,16 @@ export default async function OrderDetailPage({
   const { orderId } = await params;
   const user = await requireSucursalContext();
 
-  const [order, suppliers, allProducts, latestCount] = await Promise.all([
-    prisma.purchaseOrder.findFirst({
-      where: { id: orderId, sucursalId: user.sucursalId },
-      include: {
-        items: { include: { product: { include: { presentations: true } } }, orderBy: { createdAt: "asc" } },
-        supplier: { select: { name: true, phone: true, email: true } },
-      },
-    }),
-    prisma.supplier.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { id: orderId, sucursalId: user.sucursalId },
+    include: {
+      items: { include: { product: { include: { presentations: true } } }, orderBy: { createdAt: "asc" } },
+      supplier: { select: { name: true, phone: true, email: true } },
+    },
+  });
+
+  const [suppliers, allProducts, latestCount, organization] = await Promise.all([
+    listSuppliersForCapture(user.organizationId, order?.supplierId),
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
@@ -45,6 +43,7 @@ export default async function OrderDetailPage({
       orderBy: { date: "desc" },
       include: { items: true },
     }),
+    prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
   ]);
   if (!order) notFound();
 
@@ -141,10 +140,10 @@ export default async function OrderDetailPage({
   const dateLabel = order.createdAt.toLocaleDateString("es-MX", { timeZone: "UTC" });
   const folioLabel = formatOrderFolio(order.folio);
   const messageLines = [
-    `Pedido ${folioLabel} - ${dateLabel}`,
+    `Pedido para ${organization?.name ?? ""} - ${dateLabel}`,
     order.supplier ? `Proveedor: ${order.supplier.name}` : null,
     "",
-    ...rows.map((r) => `- ${r.productName}: ${r.quantity} ${r.unitLabel} (${r.presentationLabel})`),
+    ...rows.map((r) => `- ${r.productName}: ${r.quantity} ${r.unitLabel}`),
     order.comment ? `\nComentarios: ${order.comment}` : null,
   ].filter((line): line is string => line !== null);
   const whatsappMessage = messageLines.join("\n");

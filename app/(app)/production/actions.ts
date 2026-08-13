@@ -78,7 +78,17 @@ export async function createProductionEntries(
       };
     });
 
-    await prisma.productionEntry.createMany({ data: toCreate });
+    await prisma.$transaction(async (tx) => {
+      // Todas las subrecetas capturadas en este envio del formulario comparten un solo folio, sin
+      // importar cuantos renglones tenga, igual que Compras/Pedidos/Requisiciones.
+      const org = await tx.organization.update({
+        where: { id: user.organizationId },
+        data: { nextProductionFolio: { increment: 1 } },
+        select: { nextProductionFolio: true },
+      });
+      const folio = org.nextProductionFolio - 1;
+      await tx.productionEntry.createMany({ data: toCreate.map((entry) => ({ ...entry, folio })) });
+    });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo registrar la produccion." };
   }
@@ -86,4 +96,16 @@ export async function createProductionEntries(
   revalidatePath("/production");
   revalidatePath("/audit");
   redirect("/production");
+}
+
+export async function deleteProductionEntry(id: string): Promise<void> {
+  const user = await requireSucursalContext();
+
+  const entry = await prisma.productionEntry.findFirst({ where: { id, sucursalId: user.sucursalId } });
+  if (!entry) throw new Error("Produccion no encontrada.");
+
+  await prisma.productionEntry.delete({ where: { id: entry.id } });
+
+  revalidatePath("/production");
+  revalidatePath("/audit");
 }

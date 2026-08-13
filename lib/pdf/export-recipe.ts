@@ -3,6 +3,7 @@ import PDFDocument from "pdfkit";
 export type RecipePdfItem = {
   label: string;
   isSubRecipe: boolean;
+  categoryName: string | null;
   quantity: string;
   unitLabel: string;
   unitCost: string | null;
@@ -27,34 +28,67 @@ export type RecipePdfData = {
 
 const PHOTO_SIZE = 110;
 
-function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
+function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData, logo: Buffer | null) {
   const left = doc.page.margins.left;
   const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const headerTop = doc.y;
-  const titleWidth = data.photo ? usableWidth - PHOTO_SIZE - 16 : usableWidth;
 
-  if (data.photo) {
-    doc.image(data.photo, left + usableWidth - PHOTO_SIZE, headerTop, {
-      width: PHOTO_SIZE,
-      height: PHOTO_SIZE,
-    });
+  // El logo va a la izquierda (a la misma altura que la foto de la receta a la derecha), a
+  // opacidad normal -- no es una marca de agua, es parte del encabezado. El titulo/categoria/
+  // rendimiento quedan centrados en la franja que sobra entre el logo y la foto.
+  let logoDrawn = false;
+  if (logo) {
+    try {
+      doc.image(logo, left, headerTop, { fit: [PHOTO_SIZE, PHOTO_SIZE], align: "center", valign: "center" });
+      logoDrawn = true;
+    } catch {
+      // pdfkit solo soporta JPEG/PNG; si el logo quedara en un formato no soportado, se omite en
+      // vez de tumbar el PDF completo.
+    }
   }
 
-  doc.font("Helvetica-Bold").fontSize(20).text(data.name, left, doc.y, { width: titleWidth });
-  doc.moveDown(0.3);
+  let photoDrawn = false;
+  if (data.photo) {
+    try {
+      doc.image(data.photo, left + usableWidth - PHOTO_SIZE, headerTop, {
+        width: PHOTO_SIZE,
+        height: PHOTO_SIZE,
+      });
+      photoDrawn = true;
+    } catch {
+      // pdfkit solo soporta JPEG/PNG; una foto guardada en otro formato (de antes de normalizar
+      // al subir) no debe tumbar el PDF completo, solo se omite del encabezado.
+    }
+  }
+
+  const titleAreaX = logoDrawn ? left + PHOTO_SIZE + 16 : left;
+  const titleAreaWidth = usableWidth - (logoDrawn ? PHOTO_SIZE + 16 : 0) - (photoDrawn ? PHOTO_SIZE + 16 : 0);
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(20)
+    .text(data.name, titleAreaX, headerTop, { width: titleAreaWidth, align: "center" });
+  doc.moveDown(0.4);
 
   doc.font("Helvetica").fontSize(10).fillColor("#555555");
-  const metaParts = [
-    data.categoryName ? `Categoria: ${data.categoryName}` : null,
-    `Rendimiento: ${data.yieldQty} ${data.yieldUnitLabel}`,
+  if (data.categoryName) {
+    doc.text(`Categoria: ${data.categoryName}`, titleAreaX, doc.y, { width: titleAreaWidth, align: "center" });
+  }
+  doc.text(`Rendimiento: ${data.yieldQty} ${data.yieldUnitLabel}`, titleAreaX, doc.y, {
+    width: titleAreaWidth,
+    align: "center",
+  });
+  const extraMetaParts = [
     data.isMenuItem ? "Platillo de menu" : "Subreceta",
     data.sellingPrice ? `Precio de venta: ${data.sellingPrice}` : null,
   ].filter(Boolean);
-  doc.text(metaParts.join("   -   "), left, doc.y, { width: titleWidth });
+  if (extraMetaParts.length > 0) {
+    doc.text(extraMetaParts.join("   -   "), titleAreaX, doc.y, { width: titleAreaWidth, align: "center" });
+  }
   doc.fillColor("#000000");
   doc.moveDown(1);
 
-  if (data.photo) {
+  if (logoDrawn || photoDrawn) {
     doc.y = Math.max(doc.y, headerTop + PHOTO_SIZE + 10);
   }
 
@@ -83,14 +117,16 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
   const GAP = 8;
   const colX = {
     name: left,
-    qty: left + usableWidth * 0.42,
-    unit: left + usableWidth * 0.58,
-    unitCost: left + usableWidth * 0.7,
+    type: left + usableWidth * 0.3,
+    qty: left + usableWidth * 0.47,
+    unit: left + usableWidth * 0.59,
+    unitCost: left + usableWidth * 0.71,
     lineCost: left + usableWidth * 0.86,
   };
   const headerY = doc.y;
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#555555");
-  doc.text("Ingrediente", colX.name, headerY, { width: colX.qty - colX.name - GAP });
+  doc.text("Ingrediente", colX.name, headerY, { width: colX.type - colX.name - GAP });
+  doc.text("Subcategoria", colX.type, headerY, { width: colX.qty - colX.type - GAP });
   doc.text("Cantidad", colX.qty, headerY, { width: colX.unit - colX.qty - GAP, align: "right" });
   doc.text("Unidad", colX.unit, headerY, { width: colX.unitCost - colX.unit - GAP });
   doc.text("Costo unit.", colX.unitCost, headerY, {
@@ -112,10 +148,21 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
     doc.fillColor("#888888").text("Esta receta todavia no tiene ingredientes.", left, doc.y);
     doc.fillColor("#000000");
   } else {
-    for (const item of data.items) {
+    const nameWidth = colX.type - colX.name - GAP;
+    const typeWidth = colX.qty - colX.type - GAP;
+    const sortedItems = [...data.items].sort((a, b) => a.label.localeCompare(b.label, "es"));
+    for (const item of sortedItems) {
       const rowY = doc.y;
-      const label = item.isSubRecipe ? `${item.label} (subreceta)` : item.label;
-      doc.text(label, colX.name, rowY, { width: colX.qty - colX.name - GAP });
+      const subcategoryLabel = item.isSubRecipe ? "SUBRECETA" : (item.categoryName ?? "-");
+      // El nombre del ingrediente o la subcategoria pueden envolver a dos o mas lineas; la altura
+      // de la fila debe seguir a la celda mas alta, o la siguiente fila queda encimada encima.
+      const rowHeight = Math.max(
+        doc.heightOfString(item.label, { width: nameWidth }),
+        doc.heightOfString(subcategoryLabel, { width: typeWidth }),
+        doc.currentLineHeight(),
+      );
+      doc.text(item.label, colX.name, rowY, { width: nameWidth });
+      doc.text(subcategoryLabel, colX.type, rowY, { width: typeWidth });
       doc.text(item.quantity, colX.qty, rowY, { width: colX.unit - colX.qty - GAP, align: "right" });
       doc.text(item.unitLabel, colX.unit, rowY, { width: colX.unitCost - colX.unit - GAP });
       doc.text(item.unitCost ? item.unitCost : "-", colX.unitCost, rowY, {
@@ -126,7 +173,25 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
         width: left + usableWidth - colX.lineCost,
         align: "right",
       });
-      doc.moveDown(0.4);
+      doc.y = rowY + rowHeight + 4;
+    }
+
+    if (data.totalCost) {
+      doc.moveDown(0.2);
+      doc
+        .moveTo(colX.unitCost, doc.y)
+        .lineTo(left + usableWidth, doc.y)
+        .strokeColor("#dddddd")
+        .stroke();
+      doc.moveDown(0.2);
+      const totalY = doc.y;
+      doc.font("Helvetica-Bold").fontSize(10);
+      doc.text("Total", colX.unitCost, totalY, { width: colX.lineCost - colX.unitCost - GAP, align: "right" });
+      doc.text(data.totalCost, colX.lineCost, totalY, {
+        width: left + usableWidth - colX.lineCost,
+        align: "right",
+      });
+      doc.font("Helvetica").fontSize(10);
     }
   }
 
@@ -145,7 +210,7 @@ function drawRecipe(doc: PDFKit.PDFDocument, data: RecipePdfData) {
   }
 }
 
-export async function buildRecipePdf(data: RecipePdfData): Promise<Buffer> {
+export async function buildRecipePdf(data: RecipePdfData, logo: Buffer | null = null): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "letter" });
     const chunks: Buffer[] = [];
@@ -153,14 +218,14 @@ export async function buildRecipePdf(data: RecipePdfData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    drawRecipe(doc, data);
+    drawRecipe(doc, data, logo);
 
     doc.end();
   });
 }
 
 /** Un PDF con todas las recetas, cada una en su propia pagina (mismo formato que la receta individual). */
-export async function buildRecipesPdf(recipes: RecipePdfData[]): Promise<Buffer> {
+export async function buildRecipesPdf(recipes: RecipePdfData[], logo: Buffer | null = null): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "letter" });
     const chunks: Buffer[] = [];
@@ -177,7 +242,7 @@ export async function buildRecipesPdf(recipes: RecipePdfData[]): Promise<Buffer>
     } else {
       recipes.forEach((data, index) => {
         if (index > 0) doc.addPage();
-        drawRecipe(doc, data);
+        drawRecipe(doc, data, logo);
       });
     }
 

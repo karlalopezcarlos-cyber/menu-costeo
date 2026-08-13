@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 
@@ -31,4 +32,19 @@ export async function createInventoryCount(formData: FormData) {
   });
 
   redirect(`/inventory/${count.id}`);
+}
+
+export async function deleteInventoryCount(id: string): Promise<void> {
+  const user = await requireSucursalContext();
+
+  const count = await prisma.inventoryCount.findFirst({ where: { id, sucursalId: user.sucursalId } });
+  if (!count) throw new Error("Conteo no encontrado.");
+
+  // Las filas de InventoryCountItem, InventoryCountItemChange (bitacora) y AuditComment quedan
+  // borradas en cascada por el schema -- no hace falta borrarlas a mano.
+  await prisma.inventoryCount.delete({ where: { id: count.id } });
+
+  revalidatePath("/inventory");
+  revalidatePath("/audit");
+  revalidatePath("/dashboard");
 }

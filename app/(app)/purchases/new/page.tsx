@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { computeUnitCost, type UnitValue } from "@/lib/units";
 import { formatOrderFolio } from "@/lib/orders/folio";
+import { listSuppliersForCapture } from "@/lib/suppliers";
 import PurchaseForm, { type PendingOrderOption } from "./PurchaseForm";
 
 export default async function NewPurchasePage({
@@ -26,11 +27,7 @@ export default async function NewPurchasePage({
         presentations: true,
       },
     }),
-    prisma.supplier.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
+    listSuppliersForCapture(user.organizationId),
     prisma.purchase.findMany({
       where: { sucursalId: user.sucursalId },
       orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],

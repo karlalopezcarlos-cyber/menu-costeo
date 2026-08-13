@@ -9,7 +9,7 @@ export default async function SucursalesPage() {
   const sucursales = await prisma.sucursal.findMany({
     where: { organizationId: user.organizationId },
     orderBy: [{ isCentral: "desc" }, { name: "asc" }],
-    include: { _count: { select: { users: true } } },
+    include: { _count: { select: { userAccess: true } } },
   });
 
   const rows: SucursalRow[] = sucursales.map((s) => ({
@@ -17,7 +17,7 @@ export default async function SucursalesPage() {
     name: s.name,
     isCentral: s.isCentral,
     isActive: s.isActive,
-    userCount: s._count.users,
+    userCount: s._count.userAccess,
   }));
 
   return (

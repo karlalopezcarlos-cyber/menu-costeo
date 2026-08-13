@@ -32,12 +32,12 @@ export async function updateOrgUser(
     const password = String(formData.get("password") ?? "");
     const allowedPanels = target.role === "OWNER" ? target.allowedPanels : parseAllowedPanels(formData);
 
-    let sucursalId = target.sucursalId;
+    let sucursalIds: string[] = [];
     if (target.role !== "OWNER") {
-      sucursalId = String(formData.get("sucursalId") ?? "").trim() || null;
-      if (!sucursalId) throw new Error("Asigna una sucursal al usuario.");
-      const sucursal = await prisma.sucursal.findFirst({ where: { id: sucursalId, organizationId } });
-      if (!sucursal) throw new Error("Sucursal invalida.");
+      sucursalIds = [...new Set(formData.getAll("sucursalIds").map((v) => String(v)))];
+      if (sucursalIds.length === 0) throw new Error("Asigna al menos una sucursal al usuario.");
+      const count = await prisma.sucursal.count({ where: { id: { in: sucursalIds }, organizationId } });
+      if (count !== sucursalIds.length) throw new Error("Una o mas sucursales seleccionadas son invalidas.");
     }
 
     if (!email) throw new Error("El correo es obligatorio.");
@@ -49,16 +49,25 @@ export async function updateOrgUser(
       throw new Error("La contrasena debe tener al menos 8 caracteres.");
     }
 
-    await prisma.user.update({
-      where: { id: target.id },
-      data: {
-        email,
-        name: name || null,
-        allowedPanels,
-        sucursalId,
-        ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
-      },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: target.id },
+        data: {
+          email,
+          name: name || null,
+          allowedPanels,
+          ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
+        },
+      }),
+      ...(target.role !== "OWNER"
+        ? [
+            prisma.userSucursal.deleteMany({ where: { userId: target.id } }),
+            prisma.userSucursal.createMany({
+              data: sucursalIds.map((sucursalId) => ({ userId: target.id, sucursalId })),
+            }),
+          ]
+        : []),
+    ]);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar el usuario." };
   }

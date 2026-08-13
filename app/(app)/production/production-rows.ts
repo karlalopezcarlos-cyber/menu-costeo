@@ -1,5 +1,7 @@
 export type ProductionRow = {
   id: string;
+  folioLabel: string;
+  folioValue: number;
   dateLabel: string;
   dateValue: number;
   subRecipeName: string;
@@ -13,11 +15,13 @@ export type ProductionRow = {
   comment: string | null;
 };
 
-export type ProductionSortKey = "date" | "subRecipe" | "category" | "quantity" | "unitCost" | "total";
+export type ProductionSortKey = "folio" | "date" | "subRecipe" | "category" | "quantity" | "unitCost" | "total";
 export type SortDir = "asc" | "desc";
 
 export function productionSortValue(row: ProductionRow, key: ProductionSortKey): string | number | null {
   switch (key) {
+    case "folio":
+      return row.folioValue;
     case "date":
       return row.dateValue;
     case "subRecipe":
@@ -35,13 +39,15 @@ export function productionSortValue(row: ProductionRow, key: ProductionSortKey):
 
 export function filterProductionRows(
   rows: ProductionRow[],
-  params: { search: string; categoryFilter: string; dateFrom: string; dateTo: string },
+  params: { search: string; folioSearch: string; categoryFilter: string; dateFrom: string; dateTo: string },
 ): ProductionRow[] {
   const q = params.search.trim().toLowerCase();
+  const folioQ = params.folioSearch.trim().toLowerCase();
   const fromValue = params.dateFrom ? new Date(`${params.dateFrom}T00:00:00`).getTime() : null;
   const toValue = params.dateTo ? new Date(`${params.dateTo}T23:59:59.999`).getTime() : null;
   return rows.filter((row) => {
     if (q && !row.subRecipeName.toLowerCase().includes(q)) return false;
+    if (folioQ && !row.folioLabel.toLowerCase().includes(folioQ)) return false;
     if (params.categoryFilter === "none" && row.categoryName !== null) return false;
     if (
       params.categoryFilter !== "all" &&

@@ -14,16 +14,47 @@ export async function requireOrgSession() {
 }
 
 /**
- * Sucursal activa para leer/escribir datos operativos. STAFF siempre usa su sucursal fija
- * (user.sucursalId). OWNER/SUPERADMIN (sucursalId null) usan la cookie "activeSucursalId" que
- * pone el selector del layout; si no hay cookie o apunta a una sucursal que ya no existe/esta
- * inactiva, se cae a la sucursal central de la organizacion.
+ * Sucursal activa para leer/escribir datos operativos.
+ *
+ * OWNER/SUPERADMIN ven/cambian entre TODAS las sucursales de su organizacion (sin importar
+ * sucursalIds) usando la cookie "activeSucursalId" que pone el selector del layout; si no hay
+ * cookie o apunta a una que ya no existe/esta inactiva, se cae a la sucursal central.
+ *
+ * STAFF esta restringido a las sucursales listadas en user.sucursalIds (puede tener una o
+ * varias). Con una sola, se usa directo sin necesitar cookie. Con varias, usa la misma cookie
+ * "activeSucursalId" pero validada contra SU PROPIA lista (nunca contra todas las de la
+ * organizacion) para que no pueda acceder a una sucursal ajena manipulando la cookie a mano.
  */
 export async function requireSucursalContext() {
   const user = await requireOrgSession();
 
-  if (user.sucursalId) {
-    return { ...user, sucursalId: user.sucursalId };
+  if (user.role === "STAFF") {
+    if (user.sucursalIds.length === 0) {
+      throw new Error("Tu usuario no tiene ninguna sucursal asignada. Contacta al dueno de la cuenta.");
+    }
+
+    if (user.sucursalIds.length === 1) {
+      return { ...user, sucursalId: user.sucursalIds[0] };
+    }
+
+    const cookieStore = await cookies();
+    const activeId = cookieStore.get("activeSucursalId")?.value;
+
+    if (activeId && user.sucursalIds.includes(activeId)) {
+      const active = await prisma.sucursal.findFirst({
+        where: { id: activeId, isActive: true },
+        select: { id: true },
+      });
+      if (active) return { ...user, sucursalId: active.id };
+    }
+
+    const fallback = await prisma.sucursal.findFirst({
+      where: { id: { in: user.sucursalIds }, isActive: true },
+      orderBy: [{ isCentral: "desc" }, { name: "asc" }],
+      select: { id: true },
+    });
+    if (!fallback) throw new Error("Ninguna de tus sucursales asignadas esta activa.");
+    return { ...user, sucursalId: fallback.id };
   }
 
   const cookieStore = await cookies();

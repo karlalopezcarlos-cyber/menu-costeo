@@ -24,22 +24,27 @@ type SortKey =
   | "previousVarianceQty";
 type SortDir = "asc" | "desc";
 
-const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "category", label: "Categoria" },
-  { key: "type", label: "Tipo" },
-  { key: "name", label: "Nombre" },
-  { key: "initial", label: "Inicial" },
-  { key: "purchases", label: "+ Compras" },
-  { key: "produced", label: "+ Produccion" },
-  { key: "waste", label: "- Mermas" },
-  { key: "productionConsumed", label: "- Produccion" },
-  { key: "sales", label: "- Ventas" },
-  { key: "theoretical", label: "= Teorico" },
-  { key: "actual", label: "Real (final)" },
-  { key: "variance", label: "Variacion" },
-  { key: "previousVarianceQty", label: "Variacion anterior" },
-  { key: "varianceAmount", label: "Variacion $" },
+/** Ancho de cada columna en % del ancho total de la tabla; junto con VARIANCE_PCT_WIDTH y
+ * COMMENT_WIDTH deben sumar 100, para que la tabla (table-fixed) siempre quepa en el ancho
+ * disponible sin necesitar scroll horizontal. */
+const COLUMNS: { key: SortKey; label: string; width: number }[] = [
+  { key: "category", label: "Categoria", width: 6 },
+  { key: "type", label: "Tipo", width: 5 },
+  { key: "name", label: "Nombre", width: 12 },
+  { key: "initial", label: "Inicial", width: 6 },
+  { key: "purchases", label: "+ Compras", width: 6 },
+  { key: "produced", label: "+ Produccion", width: 6 },
+  { key: "waste", label: "- Mermas", width: 6 },
+  { key: "productionConsumed", label: "- Produccion", width: 6 },
+  { key: "sales", label: "- Ventas", width: 6 },
+  { key: "theoretical", label: "= Teorico", width: 6 },
+  { key: "actual", label: "Real (final)", width: 6 },
+  { key: "variance", label: "Variacion", width: 6 },
+  { key: "previousVarianceQty", label: "Variacion anterior", width: 6 },
+  { key: "varianceAmount", label: "Variacion $", width: 6 },
 ];
+const VARIANCE_PCT_WIDTH = 4;
+const COMMENT_WIDTH = 7;
 
 function fmt(n: number): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -240,24 +245,31 @@ export default function AuditTable({
   );
 
   const table = (
-    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+    <div className="rounded-lg border border-neutral-200 bg-white">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          {COLUMNS.map((col) => (
+            <col key={col.key} style={{ width: `${col.width}%` }} />
+          ))}
+          <col style={{ width: `${VARIANCE_PCT_WIDTH}%` }} />
+          <col style={{ width: `${COMMENT_WIDTH}%` }} />
+        </colgroup>
+        <thead className="sticky top-0 z-10 bg-neutral-800 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="whitespace-nowrap px-4 py-2 font-medium">
+              <th key={col.key} className="px-2 py-2 font-medium">
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
-                  className="flex items-center gap-1 hover:text-neutral-900"
+                  className="flex w-full min-w-0 items-center gap-1 text-left hover:text-neutral-200"
                 >
-                  {col.label}
+                  <span className="break-words">{col.label}</span>
                   {sortKey === col.key && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
             ))}
-            <th className="whitespace-nowrap px-4 py-2 font-medium">Variacion %</th>
-            <th className="whitespace-nowrap px-4 py-2 font-medium">Comentario</th>
+            <th className="px-2 py-2 font-medium">Variacion %</th>
+            <th className="px-2 py-2 font-medium">Comentario</th>
           </tr>
         </thead>
         <tbody>
@@ -284,8 +296,8 @@ export default function AuditTable({
             const inputName = `comment:${row.itemType}:${row.itemId}`;
             return (
               <tr key={`${row.itemType}-${row.itemId}`} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
+                <td className="px-2 py-2">
                   <span
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
                       row.itemType === "product" ? "bg-neutral-100 text-neutral-600" : "bg-blue-100 text-blue-800"
@@ -294,47 +306,47 @@ export default function AuditTable({
                     {row.itemType === "product" ? "Producto" : "Subreceta"}
                   </span>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-2">
                   <Link href={kardexHref} target="_blank" className="hover:underline" title="Ver kardex de movimientos">
                     {row.name}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-2 py-2 text-neutral-500">
                   {fmt(row.initialQty)} {row.unitLabel}
                   {presentationSuffix(row, row.initialQty)}
                 </td>
-                <td className="px-4 py-2 text-emerald-700">
+                <td className="px-2 py-2 text-emerald-700">
                   {row.purchasesQty !== 0
                     ? `+${fmt(row.purchasesQty)}${presentationSuffix(row, row.purchasesQty)}`
                     : "-"}
                 </td>
-                <td className="px-4 py-2 text-emerald-700">
+                <td className="px-2 py-2 text-emerald-700">
                   {row.producedQty !== 0
                     ? `+${fmt(row.producedQty)}${presentationSuffix(row, row.producedQty)}`
                     : "-"}
                 </td>
-                <td className="px-4 py-2 text-red-600">
+                <td className="px-2 py-2 text-red-600">
                   {row.wasteQty !== 0 ? `-${fmt(row.wasteQty)}${presentationSuffix(row, row.wasteQty)}` : "-"}
                 </td>
-                <td className="px-4 py-2 text-red-600">
+                <td className="px-2 py-2 text-red-600">
                   {row.productionConsumedQty !== 0
                     ? `-${fmt(row.productionConsumedQty)}${presentationSuffix(row, row.productionConsumedQty)}`
                     : "-"}
                 </td>
-                <td className="px-4 py-2 text-red-600">
+                <td className="px-2 py-2 text-red-600">
                   {row.salesQty !== 0 ? `-${fmt(row.salesQty)}${presentationSuffix(row, row.salesQty)}` : "-"}
                 </td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-2 py-2 font-medium">
                   {fmt(row.theoreticalFinalQty)} {row.unitLabel}
                   {presentationSuffix(row, row.theoreticalFinalQty)}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-2 py-2 text-neutral-500">
                   {row.actualFinalQty !== null
                     ? `${fmt(row.actualFinalQty)} ${row.unitLabel}${presentationSuffix(row, row.actualFinalQty)}`
                     : "-"}
                 </td>
                 <td
-                  className={`px-4 py-2 font-medium ${
+                  className={`px-2 py-2 font-medium ${
                     !hasVariance
                       ? "text-neutral-300"
                       : !varianceIsSignificant
@@ -349,7 +361,7 @@ export default function AuditTable({
                     : "-"}
                 </td>
                 <td
-                  className={`px-4 py-2 ${
+                  className={`px-2 py-2 ${
                     row.previousVarianceQty === null
                       ? "text-neutral-300"
                       : Math.abs(row.previousVarianceQty) <= 0.001
@@ -365,7 +377,7 @@ export default function AuditTable({
                     : "-"}
                 </td>
                 <td
-                  className={`px-4 py-2 font-medium ${
+                  className={`px-2 py-2 font-medium ${
                     row.varianceAmount === null
                       ? "text-neutral-300"
                       : !varianceIsSignificant
@@ -377,16 +389,16 @@ export default function AuditTable({
                 >
                   {row.varianceAmount !== null ? fmtMoney(row.varianceAmount) : "-"}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-2 py-2 text-neutral-500">
                   {row.variancePct !== null ? `${row.variancePct > 0 ? "+" : ""}${row.variancePct.toFixed(1)}%` : "-"}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-2">
                   {finalCountId ? (
                     <input
                       name={inputName}
                       defaultValue={row.comment ?? ""}
                       placeholder="Explica la variacion..."
-                      className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="w-full min-w-0 rounded-md border border-neutral-300 px-2 py-1 text-sm"
                     />
                   ) : (
                     <span className="text-xs text-neutral-300">Sin conteo final</span>

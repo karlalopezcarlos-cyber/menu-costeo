@@ -8,6 +8,7 @@ import { removeYieldFactor, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import InventoryCaptureTable, { type CaptureRow } from "./InventoryCaptureTable";
 import InventoryCountTabs from "./InventoryCountTabs";
 import InventoryChangeLogTable, { type ChangeLogRow } from "./InventoryChangeLogTable";
+import DeleteCountButton from "../DeleteCountButton";
 
 export default async function InventoryCountPage({
   params,
@@ -180,6 +181,7 @@ export default async function InventoryCountPage({
           <Link href="/inventory" className="text-sm text-neutral-500 hover:underline">
             Volver a inventario
           </Link>
+          <DeleteCountButton countId={count.id} redirectAfter="/inventory" />
         </div>
       </div>
 

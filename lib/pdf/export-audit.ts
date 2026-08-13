@@ -32,16 +32,18 @@ function money(n: number): string {
 
 const COLUMNS = [
   { key: "category", label: "Categoria", frac: 0.1 },
-  { key: "type", label: "Tipo", frac: 0.07 },
-  { key: "name", label: "Nombre", frac: 0.17 },
-  { key: "theoretical", label: "Teorico", frac: 0.11 },
+  { key: "type", label: "Tipo", frac: 0.06 },
+  { key: "name", label: "Nombre", frac: 0.16 },
+  { key: "theoretical", label: "Teorico", frac: 0.1 },
   { key: "actual", label: "Real", frac: 0.09 },
-  { key: "variance", label: "Variacion", frac: 0.11 },
-  { key: "previousVariance", label: "Variacion anterior", frac: 0.11 },
-  { key: "varianceAmount", label: "Variacion $", frac: 0.08 },
-  { key: "variancePct", label: "Variacion %", frac: 0.08 },
-  { key: "comment", label: "Comentario", frac: 0.08 },
+  { key: "variance", label: "Variacion", frac: 0.1 },
+  { key: "previousVariance", label: "Var. anterior", frac: 0.1 },
+  { key: "varianceAmount", label: "Variacion $", frac: 0.09 },
+  { key: "variancePct", label: "Variacion %", frac: 0.09 },
+  { key: "comment", label: "Comentario", frac: 0.11 },
 ] as const;
+
+const LOGO_SIZE = 100;
 
 const RIGHT_ALIGNED_COLUMNS = [
   "theoretical",
@@ -52,7 +54,7 @@ const RIGHT_ALIGNED_COLUMNS = [
   "variancePct",
 ];
 
-export async function buildAuditPdf(data: AuditPdfData): Promise<Buffer> {
+export async function buildAuditPdf(data: AuditPdfData, logo: Buffer | null = null): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40, size: "letter", layout: "landscape" });
     const chunks: Buffer[] = [];
@@ -62,6 +64,16 @@ export async function buildAuditPdf(data: AuditPdfData): Promise<Buffer> {
 
     const left = doc.page.margins.left;
     const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+    // El logo va a opacidad normal en la esquina superior izquierda de la portada (no es marca de
+    // agua), en el espacio en blanco que ya existe arriba del titulo -- no mueve nada mas del layout.
+    if (logo) {
+      try {
+        doc.image(logo, left, 40, { fit: [LOGO_SIZE, LOGO_SIZE], align: "center", valign: "center" });
+      } catch {
+        // pdfkit solo soporta JPEG/PNG; si el logo no es compatible se omite de la portada.
+      }
+    }
 
     // Portada
     doc
@@ -139,11 +151,20 @@ export async function buildAuditPdf(data: AuditPdfData): Promise<Buffer> {
     function drawHeader() {
       doc.font("Helvetica-Bold").fontSize(9).fillColor("#555555");
       const y = doc.y;
+      // Algunos encabezados (ej. "Var. anterior") se envuelven a 2 lineas en su columna angosta;
+      // hay que medir la altura de TODOS antes de avanzar doc.y, o la linea separadora y la
+      // primera fila de datos quedan encimadas con la segunda linea del encabezado mas alto.
+      let headerHeight = 0;
+      COLUMNS.forEach((col, i) => {
+        const align = RIGHT_ALIGNED_COLUMNS.includes(col.key) ? "right" : "left";
+        headerHeight = Math.max(headerHeight, doc.heightOfString(col.label, { width: colW[i] - GAP, align }));
+      });
       COLUMNS.forEach((col, i) => {
         const align = RIGHT_ALIGNED_COLUMNS.includes(col.key) ? "right" : "left";
         doc.text(col.label, colX[i], y, { width: colW[i] - GAP, align });
       });
       doc.fillColor("#000000");
+      doc.y = y + headerHeight;
       doc.moveDown(0.3);
       doc
         .moveTo(left, doc.y)

@@ -9,6 +9,8 @@ export const PANEL_DEFS: { key: Panel; section: string; href: string; label: str
   { key: "INVENTORY", section: "inventory", href: "/inventory", label: "Inventario" },
   { key: "AUDIT", section: "audit", href: "/audit", label: "Auditoria" },
   { key: "ORDERS", section: "orders", href: "/orders", label: "Pedidos" },
+  { key: "PLANNING", section: "planning", href: "/planning", label: "Proyeccion" },
+  { key: "STORE_ORDERS", section: "store-orders", href: "/store-orders", label: "Pedidos en linea" },
   { key: "PURCHASES", section: "purchases", href: "/purchases", label: "Compras" },
   { key: "REQUISITIONS", section: "requisitions", href: "/requisitions", label: "Requisiciones" },
   { key: "PAYMENTS", section: "payments", href: "/payments", label: "Pagos" },

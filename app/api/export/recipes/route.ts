@@ -5,14 +5,18 @@ import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { buildRecipesWorkbook, type RecipeExportRow } from "@/lib/excel/export-recipes";
 import type { UnitValue } from "@/lib/units";
+import { parseRecipeTypeFilter, recipeTypeFilterToIsMenuItem } from "@/lib/recipes-filter";
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireSucursalContext();
+  const isMenuItem = recipeTypeFilterToIsMenuItem(
+    parseRecipeTypeFilter(new URL(request.url).searchParams.get("type")),
+  );
 
   const [graph, recipes] = await Promise.all([
     loadOrgRecipeGraph(user.sucursalId),
     prisma.recipe.findMany({
-      where: { sucursalId: user.sucursalId, archivedAt: null },
+      where: { sucursalId: user.sucursalId, archivedAt: null, ...(isMenuItem !== undefined && { isMenuItem }) },
       orderBy: { name: "asc" },
       include: { category: true },
     }),

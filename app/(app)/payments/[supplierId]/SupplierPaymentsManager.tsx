@@ -23,6 +23,13 @@ export type LegacyAdvanceRow = {
   note: string | null;
 };
 
+export type OrphanedFolioRow = {
+  folio: number;
+  folioLabel: string;
+  amount: number;
+  paidDateLabel: string | null;
+};
+
 function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -193,6 +200,7 @@ export default function SupplierPaymentsManager({
   supplier,
   allSuppliers,
   folioRows,
+  orphanedFolioRows,
   legacyAdvanceRows,
   totalPurchased,
   totalPaid,
@@ -201,6 +209,7 @@ export default function SupplierPaymentsManager({
   supplier: { id: string; name: string };
   allSuppliers: { id: string; name: string }[];
   folioRows: FolioRow[];
+  orphanedFolioRows: OrphanedFolioRow[];
   legacyAdvanceRows: LegacyAdvanceRow[];
   totalPurchased: number;
   totalPaid: number;
@@ -437,6 +446,47 @@ export default function SupplierPaymentsManager({
           </table>
         </div>
       </div>
+
+      {orphanedFolioRows.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-neutral-900">⚠️ Pagos sin compra asociada</h2>
+          <p className="text-sm text-neutral-500">
+            Estos folios tienen un pago registrado, pero la compra correspondiente ya no existe (se
+            elimino despues de haberse pagado). Esto desajusta el saldo del proveedor -- quita el
+            pago para corregirlo, o vuelve a capturar la compra si el pago si es valido.
+          </p>
+          <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
+            <table className="w-full text-sm">
+              <thead className="bg-amber-100/60 text-left text-amber-800">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Folio</th>
+                  <th className="px-4 py-2 font-medium text-right">Pagado</th>
+                  <th className="px-4 py-2 font-medium">Fecha de pago</th>
+                  <th className="px-4 py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {orphanedFolioRows.map((row) => (
+                  <tr key={row.folio} className="border-t border-amber-200">
+                    <td className="px-4 py-2 text-amber-900">{row.folioLabel}</td>
+                    <td className="px-4 py-2 text-right text-amber-900">{money(row.amount)}</td>
+                    <td className="px-4 py-2 text-amber-900">{row.paidDateLabel ?? "-"}</td>
+                    <td className="px-4 py-2 text-right">
+                      <form action={resetFolios}>
+                        <input type="hidden" name="supplierId" value={supplier.id} />
+                        <input type="hidden" name="folios" value={row.folio} />
+                        <button type="submit" className="text-sm text-red-600 hover:underline">
+                          Quitar pago
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {legacyAdvanceRows.length > 0 && (
         <div className="space-y-3">

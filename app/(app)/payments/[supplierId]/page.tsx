@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
-import SupplierPaymentsManager, { type LegacyAdvanceRow, type FolioRow } from "./SupplierPaymentsManager";
+import SupplierPaymentsManager, {
+  type LegacyAdvanceRow,
+  type FolioRow,
+  type OrphanedFolioRow,
+} from "./SupplierPaymentsManager";
 
 export default async function SupplierPaymentsPage({
   params,
@@ -75,6 +79,22 @@ export default async function SupplierPaymentsPage({
     })
     .sort((a, b) => b.folio - a.folio);
 
+  // Pagos "huerfanos": tienen folio pero ese folio ya no tiene ninguna compra (se elimino la
+  // compra sin quitar antes el pago -- ya no se puede prevenir esto para datos viejos, pero se
+  // muestran aqui para que se puedan quitar y el saldo del proveedor vuelva a cuadrar).
+  const orphanedFolioRows: OrphanedFolioRow[] = [...abonadoByFolio.entries()]
+    .filter(([folio]) => !byFolio.has(folio))
+    .map(([folio, amount]) => {
+      const lastPaidDate = lastPaidDateByFolio.get(folio) ?? null;
+      return {
+        folio,
+        folioLabel: formatPurchaseFolio(folio),
+        amount,
+        paidDateLabel: lastPaidDate ? lastPaidDate.toLocaleDateString("es-MX", { timeZone: "UTC" }) : null,
+      };
+    })
+    .sort((a, b) => b.folio - a.folio);
+
   // Abonos antiguos sin folio (de antes de este cambio): ya no se pueden crear nuevos asi, pero
   // se muestran para no esconder dinero que ya se resto del saldo.
   const legacyAdvanceRows: LegacyAdvanceRow[] = payments
@@ -96,6 +116,7 @@ export default async function SupplierPaymentsPage({
       supplier={{ id: supplier.id, name: supplier.name }}
       allSuppliers={allSuppliers}
       folioRows={folioRows}
+      orphanedFolioRows={orphanedFolioRows}
       legacyAdvanceRows={legacyAdvanceRows}
       totalPurchased={totalPurchased}
       totalPaid={totalPaid}

@@ -1,8 +1,12 @@
+export type WasteItemType = "product" | "subrecipe" | "plu";
+
 export type WasteRow = {
   id: string;
   dateLabel: string;
   dateValue: number;
-  productName: string;
+  itemName: string;
+  itemType: WasteItemType;
+  itemTypeLabel: string;
   categoryName: string | null;
   quantityLabel: string;
   quantityValue: number;
@@ -12,7 +16,7 @@ export type WasteRow = {
   costBasisLabel: string | null;
 };
 
-export type WasteSortKey = "date" | "product" | "category" | "quantity" | "cost";
+export type WasteSortKey = "date" | "product" | "type" | "category" | "quantity" | "cost";
 export type SortDir = "asc" | "desc";
 
 export function wasteSortValue(row: WasteRow, key: WasteSortKey): string | number | null {
@@ -20,7 +24,9 @@ export function wasteSortValue(row: WasteRow, key: WasteSortKey): string | numbe
     case "date":
       return row.dateValue;
     case "product":
-      return row.productName.toLowerCase();
+      return row.itemName.toLowerCase();
+    case "type":
+      return row.itemTypeLabel;
     case "category":
       return row.categoryName ? row.categoryName.toLowerCase() : null;
     case "quantity":
@@ -38,7 +44,7 @@ export function filterWasteRows(
   const fromValue = params.dateFrom ? new Date(`${params.dateFrom}T00:00:00`).getTime() : null;
   const toValue = params.dateTo ? new Date(`${params.dateTo}T23:59:59.999`).getTime() : null;
   return rows.filter((row) => {
-    if (q && !row.productName.toLowerCase().includes(q)) return false;
+    if (q && !row.itemName.toLowerCase().includes(q)) return false;
     if (params.categoryFilter === "none" && row.categoryName !== null) return false;
     if (
       params.categoryFilter !== "all" &&

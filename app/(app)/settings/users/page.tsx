@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import SettingsNav from "../SettingsNav";
 import OrgNameForm from "./OrgNameForm";
+import OrgLogoForm from "./OrgLogoForm";
 import UsersManager, { type UserRow } from "./UsersManager";
 
 export default async function UsersPage() {
@@ -12,7 +13,7 @@ export default async function UsersPage() {
     prisma.user.findMany({
       where: { organizationId: user.organizationId },
       orderBy: [{ role: "asc" }, { email: "asc" }],
-      include: { sucursal: { select: { name: true } } },
+      include: { sucursales: { include: { sucursal: { select: { id: true, name: true } } } } },
     }),
     prisma.sucursal.findMany({
       where: { organizationId: user.organizationId, isActive: true },
@@ -30,8 +31,8 @@ export default async function UsersPage() {
     role: u.role === "OWNER" ? "OWNER" : "STAFF",
     isActive: u.isActive,
     allowedPanels: u.allowedPanels,
-    sucursalId: u.sucursalId,
-    sucursalName: u.sucursal?.name ?? null,
+    sucursalIds: u.sucursales.map((s) => s.sucursal.id),
+    sucursalNames: u.sucursales.map((s) => s.sucursal.name),
   }));
 
   return (
@@ -52,6 +53,7 @@ export default async function UsersPage() {
       ) : (
         <>
           <OrgNameForm name={organization.name} />
+          <OrgLogoForm hasLogo={!!organization.logo} updatedAt={organization.updatedAt.getTime()} />
           <UsersManager users={rows} sucursales={sucursales} />
         </>
       )}

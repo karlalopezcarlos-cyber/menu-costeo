@@ -23,6 +23,7 @@ export default function PurchaseEditForm({
   supplierId,
   suppliers,
   note,
+  comment,
   recipeId,
   backHref,
 }: {
@@ -37,6 +38,7 @@ export default function PurchaseEditForm({
   supplierId: string;
   suppliers: SupplierOption[];
   note: string | null;
+  comment: string | null;
   recipeId: string | null;
   backHref: string;
 }) {
@@ -44,6 +46,7 @@ export default function PurchaseEditForm({
   const [qty, setQty] = useState(presentationQty);
   const [unit, setUnit] = useState<UnitValue>(presentationUnit);
   const [price, setPrice] = useState(totalPrice);
+  const [blockedDelete, setBlockedDelete] = useState<{ message: string; paymentHref: string } | null>(null);
 
   let preview: Decimal | null = null;
   if (UNIT_META[unit].type === UNIT_META[baseUnit].type) {
@@ -171,6 +174,20 @@ export default function PurchaseEditForm({
           <strong>{preview ? `${formatMoney(preview.toNumber(), 4)} / ${UNIT_LABELS[baseUnit]}` : "-"}</strong>
         </p>
 
+        <div className="space-y-1">
+          <label htmlFor="comment" className="text-sm font-medium text-neutral-700">
+            Comentario
+          </label>
+          <textarea
+            id="comment"
+            name="comment"
+            rows={2}
+            defaultValue={comment ?? ""}
+            placeholder="Opcional"
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+        </div>
+
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 
         <div className="flex items-center gap-3 pt-2">
@@ -187,11 +204,28 @@ export default function PurchaseEditForm({
         </div>
       </form>
 
+      {blockedDelete && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p>{blockedDelete.message}</p>
+          <Link
+            href={blockedDelete.paymentHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium text-amber-800 hover:bg-amber-100"
+          >
+            Ir a Pagos
+          </Link>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={() => {
-          if (confirm("¿Eliminar esta compra? Esta accion no se puede deshacer.")) {
-            deletePurchase(purchaseId);
+        onClick={async () => {
+          if (!confirm("¿Eliminar esta compra? Esta accion no se puede deshacer.")) return;
+          setBlockedDelete(null);
+          const result = await deletePurchase(purchaseId, recipeId);
+          if (result?.error) {
+            setBlockedDelete({ message: result.error, paymentHref: result.paymentHref ?? "/payments" });
           }
         }}
         className="text-sm text-red-600 hover:underline"

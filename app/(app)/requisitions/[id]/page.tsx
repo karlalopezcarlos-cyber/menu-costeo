@@ -24,7 +24,9 @@ export default async function RequisicionDetailPage({
       fromSucursal: { select: { name: true } },
       toSucursal: { select: { name: true } },
       createdBy: { select: { name: true, email: true } },
-      items: { include: { product: { select: { name: true } } } },
+      items: {
+        include: { product: { select: { name: true } }, subRecipe: { select: { name: true } } },
+      },
     },
   });
   if (!requisicion) notFound();
@@ -60,7 +62,7 @@ export default async function RequisicionDetailPage({
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Producto</th>
+              <th className="px-4 py-2 font-medium">Producto / Subreceta</th>
               <th className="px-4 py-2 font-medium">Cantidad</th>
               <th className="px-4 py-2 font-medium">Costo unitario</th>
               <th className="px-4 py-2 font-medium">Costo total</th>
@@ -69,7 +71,14 @@ export default async function RequisicionDetailPage({
           <tbody>
             {requisicion.items.map((item) => (
               <tr key={item.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">{item.product.name}</td>
+                <td className="px-4 py-2">
+                  {item.product?.name ?? item.subRecipe?.name}
+                  {item.subRecipeId && (
+                    <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+                      Subreceta
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-neutral-500">
                   {item.quantity.toString()} {UNIT_LABELS[item.unit as UnitValue]}
                 </td>

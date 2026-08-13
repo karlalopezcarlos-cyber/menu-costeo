@@ -15,7 +15,10 @@ export default async function OrganizationDetailPage({
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
     include: {
-      users: { orderBy: [{ role: "asc" }, { email: "asc" }], include: { sucursal: { select: { name: true } } } },
+      users: {
+        orderBy: [{ role: "asc" }, { email: "asc" }],
+        include: { sucursales: { include: { sucursal: { select: { id: true, name: true } } } } },
+      },
       sucursales: { where: { isActive: true }, orderBy: [{ isCentral: "desc" }, { name: "asc" }] },
     },
   });
@@ -28,8 +31,8 @@ export default async function OrganizationDetailPage({
     role: u.role === "OWNER" ? "OWNER" : "STAFF",
     isActive: u.isActive,
     allowedPanels: u.allowedPanels,
-    sucursalId: u.sucursalId,
-    sucursalName: u.sucursal?.name ?? null,
+    sucursalIds: u.sucursales.map((s) => s.sucursal.id),
+    sucursalNames: u.sucursales.map((s) => s.sucursal.name),
   }));
   const sucursales = organization.sucursales.map((s) => ({ id: s.id, name: s.name }));
 

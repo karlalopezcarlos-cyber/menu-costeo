@@ -1,14 +1,8 @@
 import Link from "next/link";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeMenuEngineeringReport, CLASSIFICATION_LABELS, type IvaMode } from "@/lib/menu-engineering";
-import { formatMoney } from "@/lib/format";
-
-const BADGE_CLASSES: Record<string, string> = {
-  STAR: "bg-green-100 text-green-800",
-  PLOWHORSE: "bg-blue-100 text-blue-800",
-  PUZZLE: "bg-amber-100 text-amber-800",
-  DOG: "bg-red-100 text-red-800",
-};
+import { computeMenuEngineeringReport, type IvaMode } from "@/lib/menu-engineering";
+import MenuEngineeringTable, { type MenuEngineeringRowView } from "./MenuEngineeringTable";
+import MenuEngineeringChatDialog from "./MenuEngineeringChatDialog";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -31,6 +25,18 @@ export default async function MenuEngineeringPage({
   const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
   const rows = await computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode);
+  const rowViews: MenuEngineeringRowView[] = rows.map((row) => ({
+    recipeId: row.recipeId,
+    recipeName: row.recipeName,
+    quantitySold: row.quantitySold.toNumber(),
+    unitPrice: row.unitPrice.toNumber(),
+    cost: row.cost.toNumber(),
+    margin: row.margin.toNumber(),
+    costPct: row.costPct !== null ? row.costPct.toNumber() : null,
+    popularity: row.popularity.toNumber(),
+    classification: row.classification,
+    costUnreliable: row.costUnreliable,
+  }));
 
   const baseQuery = `from=${toDateInputValue(fromDate)}&to=${toDateInputValue(toDate)}`;
 
@@ -38,12 +44,21 @@ export default async function MenuEngineeringPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-neutral-900">Ingenieria de menu</h1>
-        <a
-          href={`/api/export/menu-engineering?${baseQuery}&iva=${ivaMode}`}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-        >
-          Exportar a Excel
-        </a>
+        <div className="flex items-center gap-3">
+          {rowViews.length > 0 && (
+            <MenuEngineeringChatDialog
+              from={toDateInputValue(fromDate)}
+              to={toDateInputValue(toDate)}
+              iva={ivaMode}
+            />
+          )}
+          <a
+            href={`/api/export/menu-engineering?${baseQuery}&iva=${ivaMode}`}
+            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            Exportar a Excel
+          </a>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -108,75 +123,12 @@ export default async function MenuEngineeringPage({
         </p>
       )}
 
-      {rows.length === 0 ? (
+      {rowViews.length === 0 ? (
         <p className="text-sm text-neutral-500">
           No hay ventas capturadas para este periodo todavia.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-neutral-500">
-              <tr>
-                <th className="px-4 py-2 font-medium">Platillo</th>
-                <th className="px-4 py-2 font-medium">Cantidad vendida</th>
-                <th className="px-4 py-2 font-medium">
-                  Precio{ivaMode === "sin" ? " (sin IVA)" : ""}
-                </th>
-                <th className="px-4 py-2 font-medium">Costo</th>
-                <th className="px-4 py-2 font-medium">Margen</th>
-                <th className="px-4 py-2 font-medium">Costo %</th>
-                <th className="px-4 py-2 font-medium">% Popularidad</th>
-                <th className="px-4 py-2 font-medium">Clasificacion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.recipeId} className="border-t border-neutral-100">
-                  <td className="px-4 py-2">
-                    {row.recipeName}
-                    {row.costUnreliable && (
-                      <span
-                        title="Este platillo tiene costo $0 o no confiable; probablemente falte capturar compras del insumo."
-                        className="ml-2 text-amber-500"
-                      >
-                        ⚠
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{row.quantitySold.toString()}</td>
-                  <td className="px-4 py-2">{formatMoney(row.unitPrice.toNumber())}</td>
-                  <td className="px-4 py-2">{formatMoney(row.cost.toNumber())}</td>
-                  <td className="px-4 py-2">{formatMoney(row.margin.toNumber())}</td>
-                  <td className="px-4 py-2">
-                    {row.costPct ? (
-                      <span
-                        className={
-                          row.costPct.gt(35)
-                            ? "font-medium text-red-600"
-                            : row.costPct.gt(25)
-                              ? "font-medium text-amber-600"
-                              : "font-medium text-green-700"
-                        }
-                      >
-                        {row.costPct.toFixed(1)}%
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="px-4 py-2">{row.popularity.times(100).toFixed(1)}%</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${BADGE_CLASSES[row.classification]}`}
-                    >
-                      {CLASSIFICATION_LABELS[row.classification]}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MenuEngineeringTable rows={rowViews} ivaMode={ivaMode} />
       )}
     </div>
   );

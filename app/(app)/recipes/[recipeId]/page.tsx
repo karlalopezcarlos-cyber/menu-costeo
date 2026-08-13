@@ -4,11 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
-import { updateRecipeInstructions } from "../actions";
+import { updateRecipeInstructions, updateRecipeStoreDescription } from "../actions";
 import AddRecipeItemForm from "./AddRecipeItemForm";
 import EditRecipeDetailsForm from "./EditRecipeDetailsForm";
 import RecipePhotoForm from "./RecipePhotoForm";
 import RecipeIngredientsTable, { type IngredientRow } from "./RecipeIngredientsTable";
+import CopyIngredientsButton from "./CopyIngredientsButton";
 import type { RecipeGraph } from "@/lib/costing";
 import Decimal from "decimal.js";
 import { formatMoney } from "@/lib/format";
@@ -162,6 +163,8 @@ export default async function RecipeDetailPage({
       };
     }
 
+    const unitCostNumber = unitCost ? unitCost.toNumber() : null;
+
     return {
       id: item.id,
       label,
@@ -171,7 +174,9 @@ export default async function RecipeDetailPage({
       quantity: item.quantity.toString(),
       unitLabel: UNIT_LABELS[item.unit as UnitValue],
       unitCost: unitCost ? formatMoney(unitCost.toNumber(), 4) : null,
+      unitCostValue: unitCostNumber,
       lineCost,
+      lineCostValue: unitCostNumber !== null ? unitCostNumber * item.quantity.toNumber() : null,
       latestPurchaseFolio: item.productId ? latestFolioByProduct.get(item.productId) ?? null : null,
       breakdown,
     };
@@ -238,6 +243,10 @@ export default async function RecipeDetailPage({
         )}
       </div>
 
+      {recipe.sourceRecipeId && recipe.items.length === 0 && (
+        <CopyIngredientsButton recipeId={recipe.id} />
+      )}
+
       <RecipeIngredientsTable recipeId={recipe.id} rows={rows} />
 
       <AddRecipeItemForm
@@ -272,6 +281,34 @@ export default async function RecipeDetailPage({
             className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
           >
             Guardar procedimientos
+          </button>
+        </form>
+      </div>
+
+      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            await updateRecipeStoreDescription(recipe.id, formData);
+          }}
+          className="space-y-2"
+        >
+          <label htmlFor="storeDescription" className="text-sm font-medium text-neutral-700">
+            Descripcion para clientes (tienda en linea)
+          </label>
+          <textarea
+            id="storeDescription"
+            name="storeDescription"
+            rows={3}
+            defaultValue={recipe.storeDescription ?? ""}
+            placeholder="Como se ve este platillo en tu menu publico -- ej. ingredientes destacados, que lo hace especial..."
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          >
+            Guardar descripcion
           </button>
         </form>
       </div>

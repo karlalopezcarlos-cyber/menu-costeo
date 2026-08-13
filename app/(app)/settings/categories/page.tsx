@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
-import { deleteCategory } from "./actions";
+import { deleteCategory, updateCategoryGroup, updateCategoryName } from "./actions";
 import NewCategoryForm from "./NewCategoryForm";
 import SettingsNav from "../SettingsNav";
+import CategoryGroupSelect from "../CategoryGroupSelect";
+import InlineNameEditor from "../InlineNameEditor";
 
 export default async function ProductCategoriesPage() {
   const user = await requireOrgSession();
@@ -31,21 +33,31 @@ export default async function ProductCategoriesPage() {
             <tr>
               <th className="px-4 py-2 font-medium">Nombre</th>
               <th className="px-4 py-2 font-medium">Productos</th>
+              <th className="px-4 py-2 font-medium">Grupo (Estado de Resultados)</th>
               <th className="px-4 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-neutral-400">
                   Todavia no hay categorias.
                 </td>
               </tr>
             )}
             {categories.map((category) => (
               <tr key={category.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">{category.name}</td>
+                <td className="px-4 py-2">
+                  <InlineNameEditor id={category.id} initialName={category.name} action={updateCategoryName} />
+                </td>
                 <td className="px-4 py-2 text-neutral-500">{category._count.products}</td>
+                <td className="px-4 py-2">
+                  <CategoryGroupSelect
+                    categoryId={category.id}
+                    initialGroup={category.group}
+                    action={updateCategoryGroup}
+                  />
+                </td>
                 <td className="px-4 py-2 text-right">
                   <form
                     action={async () => {

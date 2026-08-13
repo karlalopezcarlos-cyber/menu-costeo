@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
+import { updateRecipeType, restoreRecipe } from "./actions";
 
 export type RecipeRow = {
   id: string;
@@ -54,7 +55,8 @@ function sortValue(row: RecipeRow, key: SortKey): string | number | null {
   }
 }
 
-export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
+export default function RecipesTable({ rows, showArchived = false }: { rows: RecipeRow[]; showArchived?: boolean }) {
+  const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -68,9 +70,16 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
   }
 
   const sortedRows = useMemo(() => {
-    if (!sortKey) return rows;
+    const term = search.trim().toLowerCase();
+    const filtered = term
+      ? rows.filter(
+          (r) => r.name.toLowerCase().includes(term) || (r.categoryName?.toLowerCase().includes(term) ?? false),
+        )
+      : rows;
+
+    if (!sortKey) return filtered;
     const dirMultiplier = sortDir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const va = sortValue(a, sortKey);
       const vb = sortValue(b, sortKey);
       if (va === null && vb === null) return 0;
@@ -81,10 +90,21 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
       }
       return ((va as number) - (vb as number)) * dirMultiplier;
     });
-  }, [rows, sortKey, sortDir]);
+  }, [rows, search, sortKey, sortDir]);
 
   return (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      {rows.length > 0 && (
+        <div className="border-b border-neutral-100 px-4 py-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar receta o categoria..."
+            className="w-full max-w-xs rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
+          />
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead className="bg-neutral-50 text-left text-neutral-500">
           <tr>
@@ -100,22 +120,34 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
                 </button>
               </th>
             ))}
+            <th className="px-4 py-2 font-medium"></th>
           </tr>
         </thead>
         <tbody>
-          {sortedRows.length === 0 && (
+          {rows.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
-                Todavia no hay recetas.
+              <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
+                {showArchived ? "No hay recetas archivadas." : "Todavia no hay recetas."}
+              </td>
+            </tr>
+          )}
+          {rows.length > 0 && sortedRows.length === 0 && (
+            <tr>
+              <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
+                Ninguna receta coincide con la busqueda.
               </td>
             </tr>
           )}
           {sortedRows.map((recipe) => (
             <tr key={recipe.id} className="border-t border-neutral-100">
               <td className="px-4 py-2">
-                <Link href={`/recipes/${recipe.id}`} className="hover:underline">
-                  {recipe.name}
-                </Link>
+                {showArchived ? (
+                  recipe.name
+                ) : (
+                  <Link href={`/recipes/${recipe.id}`} className="hover:underline">
+                    {recipe.name}
+                  </Link>
+                )}
                 {recipe.itemCount === 0 && (
                   <span
                     title="Esta receta todavia no tiene ingredientes capturados."
@@ -127,13 +159,16 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
               </td>
               <td className="px-4 py-2 text-neutral-500">{recipe.categoryName ?? "-"}</td>
               <td className="px-4 py-2">
-                <span
-                  className={`rounded px-2 py-0.5 text-xs font-medium ${
+                <button
+                  type="button"
+                  title="Click para cambiar el tipo de receta"
+                  onClick={() => updateRecipeType(recipe.id, !recipe.isMenuItem)}
+                  className={`rounded px-2 py-0.5 text-xs font-medium hover:opacity-75 ${
                     recipe.isMenuItem ? "bg-blue-100 text-blue-800" : "bg-neutral-100 text-neutral-600"
                   }`}
                 >
                   {recipe.isMenuItem ? "PLU" : "Subreceta"}
-                </span>
+                </button>
               </td>
               <td className="px-4 py-2 text-neutral-500">
                 {recipe.yieldQty} {recipe.yieldUnitLabel}
@@ -166,6 +201,15 @@ export default function RecipesTable({ rows }: { rows: RecipeRow[] }) {
                   >
                     {recipe.costPct.toFixed(1)}%
                   </span>
+                )}
+              </td>
+              <td className="px-4 py-2 text-right">
+                {showArchived && (
+                  <form action={restoreRecipe.bind(null, recipe.id)}>
+                    <button type="submit" className="text-neutral-500 hover:text-neutral-900">
+                      Activar de nuevo
+                    </button>
+                  </form>
                 )}
               </td>
             </tr>

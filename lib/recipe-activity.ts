@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 
-type RecipeActivityType = "CREATED" | "ITEM_ADDED" | "ITEM_REMOVED" | "ARCHIVED" | "UPDATED";
+type RecipeActivityType = "CREATED" | "ITEM_ADDED" | "ITEM_REMOVED" | "ARCHIVED" | "UNARCHIVED" | "UPDATED";
 
 export async function logRecipeActivity(params: {
   organizationId: string;

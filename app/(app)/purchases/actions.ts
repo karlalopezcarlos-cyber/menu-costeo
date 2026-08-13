@@ -128,9 +128,9 @@ export async function createPurchase(
       };
     });
 
-    // Si la compra viene de un pedido, comparamos lo capturado contra lo que faltaba de cada
-    // producto en ese pedido (antes de esta compra) y dejamos una nota cuando no coinciden, para
-    // que quede registro de que llego menos o mas de lo esperado.
+    // Si la compra viene de un pedido, siempre dejamos una nota con el folio de origen (para poder
+    // rastrear el pedido desde Compras una vez que ya no aparece en el modulo de Pedidos), y le
+    // agregamos el detalle de la diferencia cuando lo recibido no coincide con lo esperado.
     const noteByProduct = new Map<string, string>();
     if (purchaseOrder) {
       const folioLabel = formatOrderFolio(purchaseOrder.folio);
@@ -144,7 +144,10 @@ export async function createPurchase(
         const baseUnit = product.baseUnit as UnitValue;
         const priorReceived = new Decimal(item.receivedQuantity ?? 0);
         const expected = Decimal.max(new Decimal(item.quantity).minus(priorReceived), 0);
-        if (actual.equals(expected)) continue;
+        if (actual.equals(expected)) {
+          noteByProduct.set(item.productId, `Pedido ${folioLabel}.`);
+          continue;
+        }
         const diff = actual.minus(expected);
         const note = diff.isNegative()
           ? `Pedido ${folioLabel}: se esperaban ${fmt(expected, baseUnit)}, llegaron ${fmt(actual, baseUnit)} (faltan ${fmt(diff.abs(), baseUnit)}).`

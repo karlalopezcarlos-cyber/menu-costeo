@@ -139,7 +139,7 @@ export async function computeInventoryAudit(
     }),
     prisma.wasteEntry.findMany({
       where: { sucursalId, date: dateFilter },
-      select: { productId: true, quantity: true, unit: true },
+      select: { productId: true, subRecipeId: true, quantity: true, unit: true },
     }),
     prisma.productionEntry.findMany({
       where: { sucursalId, date: dateFilter },
@@ -151,11 +151,11 @@ export async function computeInventoryAudit(
     }),
     prisma.requisicionItem.findMany({
       where: { requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
-      select: { productId: true, quantity: true, unit: true },
+      select: { productId: true, subRecipeId: true, quantity: true, unit: true },
     }),
     prisma.requisicionItem.findMany({
       where: { requisicion: { toSucursalId: sucursalId, date: dateFilter } },
-      select: { productId: true, quantity: true, unit: true },
+      select: { productId: true, destSubRecipeId: true, quantity: true, unit: true },
     }),
     loadOrgRecipeGraph(sucursalId),
     finalCountId
@@ -168,6 +168,7 @@ export async function computeInventoryAudit(
     products.map((p) => p.id),
   );
   const baseUnitByProductId = new Map(products.map((p) => [p.id, p.baseUnit as UnitValue]));
+  const baseUnitBySubRecipeId = new Map(subRecipes.map((r) => [r.id, r.yieldUnit as UnitValue]));
 
   const commentByKey = new Map(comments.map((c) => [c.productId ?? c.subRecipeId ?? "", c.comment]));
   const costMemo = new Map<string, Decimal>();
@@ -205,46 +206,73 @@ export async function computeInventoryAudit(
     );
   }
   const wasteByProductId = new Map<string, Decimal>();
+  const wasteBySubRecipeId = new Map<string, Decimal>();
   for (const entry of wasteEntries) {
-    const baseUnit = baseUnitByProductId.get(entry.productId);
-    if (!baseUnit) continue;
-    let qtyInBase: Decimal;
-    try {
-      qtyInBase = convertQty(entry.quantity, entry.unit as UnitValue, baseUnit);
-    } catch {
-      continue;
+    // Un PLU (platillo de menu) mermado no tiene fila propia en este reporte (nunca se cuenta
+    // como inventario, igual que sus ventas), asi que su merma se descarta aqui silenciosamente:
+    // baseUnitBySubRecipeId solo contiene subrecetas (isMenuItem=false).
+    if (entry.productId) {
+      const baseUnit = baseUnitByProductId.get(entry.productId);
+      if (!baseUnit) continue;
+      let qtyInBase: Decimal;
+      try {
+        qtyInBase = convertQty(entry.quantity, entry.unit as UnitValue, baseUnit);
+      } catch {
+        continue;
+      }
+      wasteByProductId.set(entry.productId, (wasteByProductId.get(entry.productId) ?? new Decimal(0)).plus(qtyInBase));
+    } else if (entry.subRecipeId) {
+      const baseUnit = baseUnitBySubRecipeId.get(entry.subRecipeId);
+      if (!baseUnit) continue;
+      let qtyInBase: Decimal;
+      try {
+        qtyInBase = convertQty(entry.quantity, entry.unit as UnitValue, baseUnit);
+      } catch {
+        continue;
+      }
+      wasteBySubRecipeId.set(
+        entry.subRecipeId,
+        (wasteBySubRecipeId.get(entry.subRecipeId) ?? new Decimal(0)).plus(qtyInBase),
+      );
     }
-    wasteByProductId.set(entry.productId, (wasteByProductId.get(entry.productId) ?? new Decimal(0)).plus(qtyInBase));
   }
   const requisicionesOutByProductId = new Map<string, Decimal>();
+  const requisicionesOutBySubRecipeId = new Map<string, Decimal>();
   for (const item of requisicionesOut) {
-    const baseUnit = baseUnitByProductId.get(item.productId);
-    if (!baseUnit) continue;
+    const key = item.productId ?? item.subRecipeId;
+    const baseUnit = item.productId
+      ? baseUnitByProductId.get(item.productId)
+      : item.subRecipeId
+        ? baseUnitBySubRecipeId.get(item.subRecipeId)
+        : undefined;
+    if (!key || !baseUnit) continue;
     let qtyInBase: Decimal;
     try {
       qtyInBase = convertQty(item.quantity, item.unit as UnitValue, baseUnit);
     } catch {
       continue;
     }
-    requisicionesOutByProductId.set(
-      item.productId,
-      (requisicionesOutByProductId.get(item.productId) ?? new Decimal(0)).plus(qtyInBase),
-    );
+    const target = item.productId ? requisicionesOutByProductId : requisicionesOutBySubRecipeId;
+    target.set(key, (target.get(key) ?? new Decimal(0)).plus(qtyInBase));
   }
   const requisicionesInByProductId = new Map<string, Decimal>();
+  const requisicionesInBySubRecipeId = new Map<string, Decimal>();
   for (const item of requisicionesIn) {
-    const baseUnit = baseUnitByProductId.get(item.productId);
-    if (!baseUnit) continue;
+    const key = item.productId ?? item.destSubRecipeId;
+    const baseUnit = item.productId
+      ? baseUnitByProductId.get(item.productId)
+      : item.destSubRecipeId
+        ? baseUnitBySubRecipeId.get(item.destSubRecipeId)
+        : undefined;
+    if (!key || !baseUnit) continue;
     let qtyInBase: Decimal;
     try {
       qtyInBase = convertQty(item.quantity, item.unit as UnitValue, baseUnit);
     } catch {
       continue;
     }
-    requisicionesInByProductId.set(
-      item.productId,
-      (requisicionesInByProductId.get(item.productId) ?? new Decimal(0)).plus(qtyInBase),
-    );
+    const target = item.productId ? requisicionesInByProductId : requisicionesInBySubRecipeId;
+    target.set(key, (target.get(key) ?? new Decimal(0)).plus(qtyInBase));
   }
   const producedBySubRecipeId = toDecimalMap(
     productionEntries.map((i) => ({ key: i.subRecipeId, quantity: i.quantity })),
@@ -323,9 +351,18 @@ export async function computeInventoryAudit(
   const subRecipeRows: AuditRow[] = subRecipes.map((recipe) => {
     const initialQty = initialByKey.get(recipe.id) ?? new Decimal(0);
     const producedQty = producedBySubRecipeId.get(recipe.id) ?? new Decimal(0);
+    const wasteQty = wasteBySubRecipeId.get(recipe.id) ?? new Decimal(0);
     const productionConsumedQty = productionConsumedBySubRecipeId.get(recipe.id) ?? new Decimal(0);
     const salesQty = salesConsumedBySubRecipeId.get(recipe.id) ?? new Decimal(0);
-    const theoreticalFinalQty = initialQty.plus(producedQty).minus(productionConsumedQty).minus(salesQty);
+    const requisicionesInQty = requisicionesInBySubRecipeId.get(recipe.id) ?? new Decimal(0);
+    const requisicionesOutQty = requisicionesOutBySubRecipeId.get(recipe.id) ?? new Decimal(0);
+    const theoreticalFinalQty = initialQty
+      .plus(producedQty)
+      .plus(requisicionesInQty)
+      .minus(wasteQty)
+      .minus(productionConsumedQty)
+      .minus(salesQty)
+      .minus(requisicionesOutQty);
     const actualFinalQty = finalByKey ? finalByKey.get(recipe.id) ?? new Decimal(0) : null;
     const varianceQty = actualFinalQty !== null ? actualFinalQty.minus(theoreticalFinalQty) : null;
     const variancePct =
@@ -354,11 +391,11 @@ export async function computeInventoryAudit(
       initialQty: initialQty.toNumber(),
       purchasesQty: 0,
       producedQty: producedQty.toNumber(),
-      wasteQty: 0,
+      wasteQty: wasteQty.toNumber(),
       productionConsumedQty: productionConsumedQty.toNumber(),
       salesQty: salesQty.toNumber(),
-      requisicionesInQty: 0,
-      requisicionesOutQty: 0,
+      requisicionesInQty: requisicionesInQty.toNumber(),
+      requisicionesOutQty: requisicionesOutQty.toNumber(),
       theoreticalFinalQty: theoreticalFinalQty.toNumber(),
       actualFinalQty: actualFinalQty !== null ? actualFinalQty.toNumber() : null,
       varianceQty: varianceQty !== null ? varianceQty.toNumber() : null,
@@ -401,6 +438,66 @@ export async function computeInventoryAudit(
     rows,
     totalShortageAmount,
     totalSurplusAmount,
+  };
+}
+
+export type TheoreticalStock = {
+  /** false si la sucursal todavia no tiene ningun conteo de inventario (no hay de donde partir). */
+  hasBaseline: boolean;
+  initialCountId: string | null;
+  asOfLabel: string | null;
+  /** productId -> cantidad teorica a hoy, en la unidad base del producto. */
+  productQty: Map<string, Decimal>;
+  /** subRecipeId -> cantidad teorica a hoy, en la unidad de rendimiento de la subreceta. */
+  subRecipeQty: Map<string, Decimal>;
+};
+
+/**
+ * Existencia teorica a HOY (no a la fecha del ultimo conteo): toma el conteo mas reciente de la
+ * sucursal como punto de partida y lo rueda hacia adelante con todos los movimientos desde
+ * entonces (compras, mermas, produccion, ventas, requisiciones), usando la misma logica que
+ * computeInventoryAudit con finalCountId=null ("proyeccion a hoy"). Pensado para cualquier modulo
+ * que necesite "cuanto tengo ahorita" sin pedirle al usuario que elija un conteo -- ej. Pedido
+ * sugerido y Proyeccion de compras -- en vez de cada quien mantener su propia nocion de inventario
+ * actual (el bug original de /orders/new: usaba la cantidad cruda del ultimo conteo, ignorando todo
+ * lo que paso despues).
+ */
+export async function getTheoreticalStock(
+  organizationId: string,
+  sucursalId: string,
+): Promise<TheoreticalStock> {
+  const latestCount = await prisma.inventoryCount.findFirst({
+    where: { sucursalId },
+    orderBy: { date: "desc" },
+    select: { id: true },
+  });
+  if (!latestCount) {
+    return {
+      hasBaseline: false,
+      initialCountId: null,
+      asOfLabel: null,
+      productQty: new Map(),
+      subRecipeQty: new Map(),
+    };
+  }
+
+  const result = await computeInventoryAudit(organizationId, sucursalId, latestCount.id, null, {
+    includePreviousVariance: false,
+  });
+
+  const productQty = new Map<string, Decimal>();
+  const subRecipeQty = new Map<string, Decimal>();
+  for (const row of result.rows) {
+    const target = row.itemType === "product" ? productQty : subRecipeQty;
+    target.set(row.itemId, new Decimal(row.theoreticalFinalQty));
+  }
+
+  return {
+    hasBaseline: true,
+    initialCountId: latestCount.id,
+    asOfLabel: result.initialDateLabel,
+    productQty,
+    subRecipeQty,
   };
 }
 
@@ -511,7 +608,7 @@ export async function computeItemKardex(
       : Promise.resolve([]),
     itemType === "product"
       ? prisma.wasteEntry.findMany({ where: { sucursalId, productId: itemId, date: dateFilter } })
-      : Promise.resolve([]),
+      : prisma.wasteEntry.findMany({ where: { sucursalId, subRecipeId: itemId, date: dateFilter } }),
     itemType === "subrecipe"
       ? prisma.productionEntry.findMany({ where: { sucursalId, subRecipeId: itemId, date: dateFilter } })
       : Promise.resolve([]),
@@ -528,15 +625,26 @@ export async function computeItemKardex(
           where: { productId: itemId, requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
           include: { requisicion: { include: { toSucursal: { select: { name: true } } } } },
         })
-      : Promise.resolve([]),
+      : prisma.requisicionItem.findMany({
+          where: { subRecipeId: itemId, requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
+          include: { requisicion: { include: { toSucursal: { select: { name: true } } } } },
+        }),
     itemType === "product"
       ? prisma.requisicionItem.findMany({
           where: { productId: itemId, requisicion: { toSucursalId: sucursalId, date: dateFilter } },
           include: { requisicion: { include: { fromSucursal: { select: { name: true } } } } },
         })
-      : Promise.resolve([]),
+      : prisma.requisicionItem.findMany({
+          where: { destSubRecipeId: itemId, requisicion: { toSucursalId: sucursalId, date: dateFilter } },
+          include: { requisicion: { include: { fromSucursal: { select: { name: true } } } } },
+        }),
     loadOrgRecipeGraph(sucursalId),
   ]);
+
+  const itemBaseUnit =
+    itemType === "product"
+      ? (item as { baseUnit: UnitValue }).baseUnit
+      : (item as { yieldUnit: UnitValue }).yieldUnit;
 
   const movements: (KardexMovement & { sortIndex: number })[] = [];
 
@@ -580,7 +688,7 @@ export async function computeItemKardex(
   wasteEntries.forEach((entry, index) => {
     let qtyInBase: Decimal;
     try {
-      qtyInBase = convertQty(entry.quantity, entry.unit as UnitValue, (item as { baseUnit: UnitValue }).baseUnit);
+      qtyInBase = convertQty(entry.quantity, entry.unit as UnitValue, itemBaseUnit);
     } catch {
       return;
     }
@@ -649,7 +757,7 @@ export async function computeItemKardex(
   requisicionesOut.forEach((reqItem, index) => {
     let qtyInBase: Decimal;
     try {
-      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, (item as { baseUnit: UnitValue }).baseUnit);
+      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, itemBaseUnit);
     } catch {
       return;
     }
@@ -668,7 +776,7 @@ export async function computeItemKardex(
   requisicionesIn.forEach((reqItem, index) => {
     let qtyInBase: Decimal;
     try {
-      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, (item as { baseUnit: UnitValue }).baseUnit);
+      qtyInBase = convertQty(reqItem.quantity, reqItem.unit as UnitValue, itemBaseUnit);
     } catch {
       return;
     }

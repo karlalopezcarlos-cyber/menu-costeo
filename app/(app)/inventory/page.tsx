@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { createInventoryCount } from "./actions";
 import { formatMoney } from "@/lib/format";
+import DeleteCountButton from "./DeleteCountButton";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -71,12 +72,13 @@ export default async function InventoryPage() {
               <th className="px-4 py-2 font-medium">Fecha</th>
               <th className="px-4 py-2 font-medium">Productos contados</th>
               <th className="px-4 py-2 font-medium">Valor de inventario</th>
+              <th className="px-4 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-neutral-400">
                   Todavia no hay conteos de inventario.
                 </td>
               </tr>
@@ -90,6 +92,9 @@ export default async function InventoryPage() {
                 </td>
                 <td className="px-4 py-2 text-neutral-500">{row.itemCount}</td>
                 <td className="px-4 py-2 font-medium">{formatMoney(row.totalValue)}</td>
+                <td className="px-4 py-2 text-right">
+                  <DeleteCountButton countId={row.id} />
+                </td>
               </tr>
             ))}
           </tbody>

@@ -30,6 +30,16 @@ enum Panel {
   SETTINGS
   PAYMENTS
   REQUISITIONS
+  PLANNING
+  STORE_ORDERS
+}
+
+/// Agrupador usado en el Estado de Resultados para desglosar ventas/costos en 3 columnas.
+/// Categorias sin grupo asignado (null) se consolidan bajo Miscelaneos en ese reporte.
+enum CategoryGroup {
+  ALIMENTO
+  BEBIDAS
+  MISCELANEOS
 }
 
 enum Unit {
@@ -63,6 +73,7 @@ enum RecipeActivityType {
   ITEM_ADDED
   ITEM_REMOVED
   ARCHIVED
+  UNARCHIVED
   UPDATED
 }
 
@@ -78,6 +89,17 @@ model Organization {
   nextPurchaseFolio Int @default(1)
   /// Siguiente folio a asignar a una requisicion nueva (contador consecutivo por organizacion).
   nextRequisicionFolio Int @default(1)
+  /// Siguiente folio a asignar a una produccion nueva (contador consecutivo por organizacion).
+  nextProductionFolio Int @default(1)
+  /// Siguiente folio a asignar a un ticket de venta nuevo (contador consecutivo por organizacion).
+  nextSaleFolio Int @default(1)
+  /// Siguiente folio a asignar a un pedido nuevo de la tienda en linea (contador consecutivo).
+  nextStoreOrderFolio Int @default(1)
+  /// Logo de la empresa, usado como marca de agua de fondo en todos los PDFs exportados. Se
+  /// normaliza siempre a PNG (preserva transparencia) al subirlo, nunca JPEG como las fotos de
+  /// receta, porque un fondo solido detras del logo se veria mal encima del contenido del PDF.
+  logo             Bytes?
+  logoMimeType     String?
 
   users             User[]
   products          Product[]
@@ -100,16 +122,20 @@ model Organization {
   supplierPayments  SupplierPayment[]
   sucursales        Sucursal[]
   requisiciones     Requisicion[]
+  saleTickets       SaleTicket[]
+  planningRuns      PlanningRun[]
+  storeOrders       StoreOrder[]
 
   @@map("organizations")
 }
 
 model ProductCategory {
-  id             String       @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization   @relation(fields: [organizationId], references: [id])
   name           String
-  createdAt      DateTime     @default(now())
+  group          CategoryGroup?
+  createdAt      DateTime       @default(now())
 
   products Product[]
 
@@ -119,11 +145,12 @@ model ProductCategory {
 }
 
 model RecipeCategory {
-  id             String       @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization   @relation(fields: [organizationId], references: [id])
   name           String
-  createdAt      DateTime     @default(now())
+  group          CategoryGroup?
+  createdAt      DateTime       @default(now())
 
   recipes Recipe[]
 
@@ -145,9 +172,37 @@ model Sucursal {
   /// organizacion existente al migrar; sirve como destino por default y para el backfill.
   isCentral      Boolean      @default(false)
   isActive       Boolean      @default(true)
+  /// Slug unico (global, no solo por organizacion) para la URL publica de la tienda en linea de
+  /// esta sucursal (ej. /store/mi-dark-kitchen). Nulo mientras no se configure.
+  storeSlug      String?      @unique
+  /// Si la tienda en linea esta habilitada para recibir pedidos publicos ahorita mismo.
+  storeEnabled   Boolean      @default(false)
+  /// Direccion de origen para calcular km de envio a domicilio (geocodificada a lat/lng al
+  /// guardarse en Configuracion).
+  businessAddress String?
+  businessLat     Decimal?     @db.Decimal(10, 6)
+  businessLng     Decimal?     @db.Decimal(10, 6)
+  /// Cuota fija de envio, independiente de la distancia.
+  deliveryBaseFee     Decimal  @default(0) @db.Decimal(10, 2)
+  /// Precio por km recorrido (ruta real, no linea recta) que se suma a deliveryBaseFee.
+  deliveryPricePerKm  Decimal  @default(0) @db.Decimal(10, 2)
+  /// Pedido minimo (subtotal de platillos, sin contar el envio) para poder pedir a domicilio.
+  deliveryMinOrder    Decimal  @default(0) @db.Decimal(12, 2)
+  /// Distancia maxima (km, ruta real) a la que se acepta enviar a domicilio. 0 = sin limite.
+  deliveryMaxKm       Decimal  @default(0) @db.Decimal(6, 2)
+  /// Horarios de entrega (opcional): si deliverySlotsCount > 0, el cliente debe elegir uno de los
+  /// horarios generados a partir de deliveryStartTime + deliverySlotMinutes x deliverySlotsCount
+  /// (ej. inicio "14:00", cada 30 min, 4 horarios -> 14:00, 14:30, 15:00, 15:30). Cada horario
+  /// admite hasta deliverySlotCapacity pedidos antes de bloquearse para nuevos clientes.
+  deliveryStartTime    String?
+  deliverySlotMinutes  Int      @default(30)
+  deliverySlotsCount   Int      @default(0)
+  deliverySlotCapacity Int      @default(1)
+  /// Dias minimos de anticipacion que debe tener una fecha de StoreDeliveryDate para que el
+  /// cliente la pueda elegir (ej. 7 = solo se puede pedir con una semana de anticipacion).
+  deliveryLeadDays     Int      @default(0)
   createdAt      DateTime     @default(now())
 
-  users User[]
   purchases         Purchase[]
   purchaseOrders    PurchaseOrder[]
   dailySales        DailySale[]
@@ -163,6 +218,11 @@ model Sucursal {
   inventoryCountItemChanges InventoryCountItemChange[]
   requisicionesEnviadas   Requisicion[] @relation("RequisicionFrom")
   requisicionesRecibidas  Requisicion[] @relation("RequisicionTo")
+  userAccess        UserSucursal[]
+  saleTickets       SaleTicket[]
+  planningRuns      PlanningRun[]
+  storeOrders       StoreOrder[]
+  storeDeliveryDates StoreDeliveryDate[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -180,10 +240,6 @@ model User {
   allowedPanels  Panel[]       @default([])
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
-  /// Sucursal fija asignada a un STAFF (siempre ve solo esa). null = OWNER, que ve/cambia entre
-  /// todas las sucursales de su organizacion mediante un selector.
-  sucursalId     String?
-  sucursal       Sucursal?     @relation(fields: [sucursalId], references: [id])
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -199,9 +255,31 @@ model User {
   inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
   supplierPayments  SupplierPayment[] @relation("SupplierPaymentCreatedBy")
   requisiciones     Requisicion[] @relation("RequisicionCreatedBy")
+  saleTickets       SaleTicket[]  @relation("SaleTicketCreatedBy")
+  /// Sucursales a las que este usuario tiene acceso cuando role = STAFF (puede entrar y cambiar
+  /// entre ellas con el mismo selector que usa OWNER). Un OWNER ignora esta lista: siempre ve
+  /// todas las sucursales de su organizacion sin importar que haya filas aqui.
+  sucursales        UserSucursal[]
 
   @@index([organizationId])
   @@map("users")
+}
+
+/// Acceso de un usuario STAFF a una sucursal especifica. Un mismo usuario puede tener varias filas
+/// (acceso a varias sucursales) y cambiar entre ellas con el selector del layout, igual que ya
+/// podia hacer un OWNER entre todas las de su organizacion.
+model UserSucursal {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, sucursalId])
+  @@index([userId])
+  @@index([sucursalId])
+  @@map("user_sucursales")
 }
 
 model Product {
@@ -239,6 +317,7 @@ model Product {
   presentations       ProductPresentation[]
   inventoryCountItemChanges InventoryCountItemChange[]
   requisicionItems    RequisicionItem[]
+  planningRunItems    PlanningRunItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -289,6 +368,8 @@ model Purchase {
   /// Nota auto-generada cuando esta compra viene de un pedido y lo recibido no coincide con lo
   /// que se esperaba en esa entrega (ej. "Pedido PED-0005: se esperaban 50 KG, llegaron 45 KG").
   note              String?
+  /// Comentario libre capturado por el usuario para este renglon de la compra (ej. "llego danado").
+  comment           String?
 
   /// El folio ya no es unico por renglon: todos los productos capturados en una misma compra
   /// (un solo envio del formulario) comparten el mismo folio.
@@ -306,17 +387,60 @@ model Supplier {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
+  /// Telefono y correo principales (se usan para enviar el pedido por WhatsApp/email). Telefonos
+  /// y correos adicionales se guardan por separado en SupplierPhone/SupplierEmail.
   phone          String?
   email          String?
+  /// Campos informativos, ninguno obligatorio: no afectan costeo ni calculos, solo se muestran
+  /// en la ficha del proveedor y en el Excel de exportacion.
+  rfc            String?
+  businessName   String?
+  address        String?
+  paymentMethod  String?
+  contactName    String?
+  bankInfo       String?
+  creditDays     Int?
+  notes          String?
+  /// Un proveedor inactivo deja de aparecer como opcion al capturar Compras o Pedidos nuevos,
+  /// pero su historial (compras, pedidos, pagos ya registrados) no se toca ni se oculta.
+  isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
 
   purchases        Purchase[]
   purchaseOrders   PurchaseOrder[]
   supplierPayments SupplierPayment[]
+  phones           SupplierPhone[]
+  emails           SupplierEmail[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("suppliers")
+}
+
+/// Numero adicional de contacto de un proveedor (el principal vive en Supplier.phone).
+model SupplierPhone {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  phone      String
+  label      String?
+  createdAt  DateTime @default(now())
+
+  @@index([supplierId])
+  @@map("supplier_phones")
+}
+
+/// Correo adicional de contacto de un proveedor (el principal vive en Supplier.email).
+model SupplierEmail {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  email      String
+  label      String?
+  createdAt  DateTime @default(now())
+
+  @@index([supplierId])
+  @@map("supplier_emails")
 }
 
 /// Un abono (pago parcial o total) a un folio de compra de un proveedor. Un folio puede recibir
@@ -365,6 +489,9 @@ model Recipe {
   isMenuItem     Boolean      @default(false)
   sellingPrice   Decimal?     @db.Decimal(12, 2)
   instructions   String?
+  /// Descripcion para clientes en la tienda en linea (que es el platillo), distinta de
+  /// `instructions` (que es el procedimiento interno de cocina).
+  storeDescription String?
   photo          Bytes?
   photoMimeType  String?
   archivedAt     DateTime?
@@ -380,6 +507,12 @@ model Recipe {
   productionEntries   ProductionEntry[]
   auditComments       AuditComment[]
   inventoryCountItemChanges InventoryCountItemChange[]
+  requisicionItemsAsOrigin RequisicionItem[] @relation("RequisicionItemSubRecipe")
+  requisicionItemsAsDest   RequisicionItem[] @relation("RequisicionItemDestSubRecipe")
+  wasteEntries             WasteEntry[]
+  saleTicketItems          SaleTicketItem[]
+  planningRunItems         PlanningRunItem[]
+  storeOrderItems          StoreOrderItem[]
 
   @@unique([sucursalId, name])
   @@index([organizationId])
@@ -470,6 +603,182 @@ model DailySale {
   @@index([organizationId, date])
   @@index([sucursalId, date])
   @@map("daily_sales")
+}
+
+/// Un ticket de venta (mini punto de venta): un solo evento de cobro que puede incluir varios
+/// platillos, con folio consecutivo y descargable como PDF. Al guardarse, cada renglon tambien se
+/// suma al agregado diario en DailySale (recipe+fecha), para que Ingenieria de menu y Estado de
+/// Resultados sigan funcionando sin cambios sobre ese mismo dato ya existente.
+model SaleTicket {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  folio           Int
+  date            DateTime     @db.Date
+  createdByUserId String?
+  createdBy       User?        @relation("SaleTicketCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+  /// Link de cobro generado en Mercado Pago (Checkout Pro) para mandarle al cliente. Se genera bajo
+  /// demanda (boton "Generar link de pago" en el detalle del ticket) y se guarda aqui para no crear
+  /// una preferencia nueva cada vez que se vuelve a abrir el ticket.
+  paymentLink         String?
+  paymentPreferenceId String?
+
+  items SaleTicketItem[]
+
+  @@index([organizationId, folio])
+  @@index([sucursalId, date])
+  @@map("sale_tickets")
+}
+
+model SaleTicketItem {
+  id        String     @id @default(cuid())
+  ticketId  String
+  ticket    SaleTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  recipeId  String
+  recipe    Recipe     @relation(fields: [recipeId], references: [id])
+  quantity  Decimal    @db.Decimal(12, 2)
+  unitPrice Decimal    @db.Decimal(12, 2)
+
+  @@index([ticketId])
+  @@index([recipeId])
+  @@map("sale_ticket_items")
+}
+
+/// Un calculo de Proyeccion por PLU (lib/planning.ts), guardado para que la lista de "que producir /
+/// que comprar" persista entre sesiones (ej. celular en mano en el super) hasta que el usuario
+/// vuelva a calcular. Siempre se muestra el mas reciente de la sucursal; uno nuevo simplemente
+/// vuelve el mas reciente, sin borrar los anteriores (mismo patron de snapshot que Purchase,
+/// WasteEntry, ProductionEntry, etc.).
+model PlanningRun {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  sucursalId     String
+  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id])
+  /// JSON de [{recipeId, quantity}] capturado al calcular, para poder re-desplegar el mismo
+  /// formulario de origen si se quiere ajustar y recalcular.
+  targetsJson    String
+  createdAt      DateTime     @default(now())
+
+  items PlanningRunItem[]
+
+  @@index([sucursalId, createdAt])
+  @@map("planning_runs")
+}
+
+model PlanningRunItem {
+  id            String      @id @default(cuid())
+  planningRunId String
+  planningRun   PlanningRun @relation(fields: [planningRunId], references: [id], onDelete: Cascade)
+  /// "production" (subreceta a producir) o "purchase" (producto a comprar).
+  itemType      String
+  productId     String?
+  product       Product?    @relation(fields: [productId], references: [id])
+  subRecipeId   String?
+  subRecipe     Recipe?     @relation(fields: [subRecipeId], references: [id])
+  /// Necesario total (bruto, antes de descontar existencia) al momento de calcular, para poder
+  /// seguir mostrando "Necesario total" / "Existencia" aunque el inventario real siga cambiando
+  /// despues -- es una fotografia del calculo, no un valor que se recalcule solo.
+  grossQty      Decimal     @db.Decimal(14, 4)
+  onHandQty     Decimal     @db.Decimal(14, 4)
+  netQty        Decimal     @db.Decimal(14, 4)
+  unit          Unit
+  comment       String?
+  /// Marcado como "ya lo hice" mientras se usa como lista de super/produccion; tambien funciona
+  /// como la seleccion para "Crear pedido" / "Registrar produccion" desde la proyeccion.
+  completed     Boolean     @default(false)
+  sortOrder     Int         @default(0)
+
+  @@index([planningRunId])
+  @@map("planning_run_items")
+}
+
+/// Un pedido hecho por un cliente externo desde la tienda en linea publica (Fase 1: solo recoger
+/// en tienda, sin pago en linea todavia -- eso llega en una fase posterior). Aparece en el panel
+/// interno "Pedidos en linea" para que el staff lo vaya marcando como atendido, y sus renglones se
+/// pueden cargar como punto de partida en la Proyeccion por PLU.
+model StoreOrder {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  folio           Int
+  customerName    String
+  customerPhone   String?
+  /// "pickup" (unico disponible en Fase 1) o "delivery" (fase posterior, con costo por km).
+  fulfillmentType String       @default("pickup")
+  /// "pending" (recien llegado) | "fulfilled" (ya se atendio) | "cancelled".
+  status          String       @default("pending")
+  /// "pickup_cash" (paga al recoger) o "card_online" (pago con tarjeta en linea via Mercado Pago).
+  paymentMethod   String       @default("pickup_cash")
+  /// "unpaid" (paga al recoger, no aplica) | "pending" (link generado, esperando confirmacion del
+  /// webhook) | "paid" (Mercado Pago confirmo el cobro) | "failed".
+  paymentStatus   String       @default("unpaid")
+  paymentPreferenceId String?
+  paymentLink     String?
+  /// Solo cuando fulfillmentType = "delivery": direccion capturada por el cliente, geocodificada,
+  /// distancia real por calles desde el negocio, y la cuota de envio ya calculada (incluida en
+  /// total). requestedDeliveryDate es la fecha que el cliente eligio de las disponibles.
+  deliveryAddress     String?
+  deliveryLat         Decimal?  @db.Decimal(10, 6)
+  deliveryLng         Decimal?  @db.Decimal(10, 6)
+  deliveryDistanceKm  Decimal?  @db.Decimal(8, 2)
+  deliveryFee         Decimal   @default(0) @db.Decimal(10, 2)
+  requestedDeliveryDate DateTime? @db.Date
+  /// Horario elegido dentro de los generados por la config de la sucursal (ej. "14:30"), si esa
+  /// sucursal tiene horarios de entrega configurados.
+  requestedDeliveryTime String?
+  total           Decimal      @db.Decimal(12, 2)
+  createdAt       DateTime     @default(now())
+  /// Cuando el staff le dio click a "Confirmar pedido" (envia WhatsApp al cliente avisando que se
+  /// recibio su pedido). Distinto de status="fulfilled", que es cuando el pedido ya se completo.
+  confirmedAt     DateTime?
+  /// Comentarios generales del cliente (instrucciones especiales, alergias, etc).
+  comment         String?
+  /// Como se reparte el pedido si es para varias personas, ej. "MARIANA: 2 de camaron + 1 de
+  /// pollo\nJORGE: 5 de camaron". Texto libre, se muestra aparte de comment para que el staff lo
+  /// vea claro al armar los paquetes.
+  packagingNotes  String?
+
+  items StoreOrderItem[]
+
+  @@index([organizationId, folio])
+  @@index([sucursalId, status])
+  @@map("store_orders")
+}
+
+/// Fecha especifica en la que el dueno marco que SI hay entregas a domicilio disponibles (calendario
+/// que el va capturando el mismo, no un patron recurrente de dias de la semana).
+model StoreDeliveryDate {
+  id         String   @id @default(cuid())
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  createdAt  DateTime @default(now())
+
+  @@unique([sucursalId, date])
+  @@index([sucursalId, date])
+  @@map("store_delivery_dates")
+}
+
+model StoreOrderItem {
+  id           String     @id @default(cuid())
+  storeOrderId String
+  storeOrder   StoreOrder @relation(fields: [storeOrderId], references: [id], onDelete: Cascade)
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id])
+  quantity     Decimal    @db.Decimal(12, 2)
+  /// Precio de venta al momento del pedido (snapshot; si el precio del platillo cambia despues, el
+  /// pedido ya hecho no se mueve).
+  unitPrice    Decimal    @db.Decimal(12, 2)
+
+  @@index([storeOrderId])
+  @@index([recipeId])
+  @@map("store_order_items")
 }
 
 model ImportBatch {
@@ -625,8 +934,12 @@ model WasteEntry {
   organization    Organization @relation(fields: [organizationId], references: [id])
   sucursalId      String
   sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
-  productId       String
-  product         Product      @relation(fields: [productId], references: [id])
+  productId       String?
+  product         Product?     @relation(fields: [productId], references: [id])
+  /// Subreceta o PLU (platillo de menu) mermado completo, mutuamente excluyente con productId.
+  /// Un PLU permite registrar la perdida de un platillo ya preparado (ej. se cayo, se quemo).
+  subRecipeId     String?
+  subRecipe       Recipe?      @relation(fields: [subRecipeId], references: [id])
   date            DateTime     @db.Date
   quantity        Decimal      @db.Decimal(14, 4)
   unit            Unit
@@ -641,6 +954,7 @@ model WasteEntry {
 
   @@index([organizationId, date])
   @@index([organizationId, productId])
+  @@index([subRecipeId])
   @@index([sucursalId, date])
   @@map("waste_entries")
 }
@@ -707,6 +1021,9 @@ model ProductionEntry {
   organization    Organization @relation(fields: [organizationId], references: [id])
   sucursalId      String
   sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  /// Folio unico consecutivo por organizacion (ej. PROD-0001): todas las filas capturadas en un
+  /// mismo envio del formulario de "Registrar produccion" comparten el mismo folio.
+  folio           Int
   subRecipeId     String
   subRecipe       Recipe       @relation(fields: [subRecipeId], references: [id])
   date            DateTime     @db.Date
@@ -720,6 +1037,7 @@ model ProductionEntry {
 
   @@index([organizationId, date])
   @@index([organizationId, subRecipeId])
+  @@index([organizationId, folio])
   @@index([sucursalId, date])
   @@map("production_entries")
 }
@@ -756,8 +1074,18 @@ model RequisicionItem {
   id            String      @id @default(cuid())
   requisicionId String
   requisicion   Requisicion @relation(fields: [requisicionId], references: [id], onDelete: Cascade)
-  productId     String
-  product       Product     @relation(fields: [productId], references: [id])
+  productId     String?
+  product       Product?    @relation(fields: [productId], references: [id])
+  /// Subreceta de la sucursal ORIGEN cuyo inventario se descuenta (mutuamente excluyente con
+  /// productId). Cada sucursal tiene su propia copia independiente de cada subreceta, por eso
+  /// tambien se guarda `destSubRecipeId` con la copia equivalente en la sucursal destino.
+  subRecipeId     String?
+  subRecipe       Recipe?     @relation("RequisicionItemSubRecipe", fields: [subRecipeId], references: [id])
+  /// Copia de esta subreceta en la sucursal DESTINO (resuelta al crear la requisicion via
+  /// clonado/nombre), usada para acreditar el inventario/kardex del lado que recibe. Null si el
+  /// renglon es un producto (el catalogo de productos ya es compartido entre sucursales).
+  destSubRecipeId String?
+  destSubRecipe   Recipe?     @relation("RequisicionItemDestSubRecipe", fields: [destSubRecipeId], references: [id])
   quantity      Decimal     @db.Decimal(14, 4)
   unit          Unit
   /// Costo unitario congelado al momento de enviar (de la sucursal de origen), mismo patron que
@@ -766,5 +1094,7 @@ model RequisicionItem {
 
   @@index([requisicionId])
   @@index([productId])
+  @@index([subRecipeId])
+  @@index([destSubRecipeId])
   @@map("requisicion_items")
 }

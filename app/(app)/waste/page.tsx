@@ -11,27 +11,51 @@ export default async function WastePage() {
     where: { sucursalId: user.sucursalId },
     orderBy: { date: "desc" },
     take: 200,
-    include: { product: { include: { category: true } } },
+    include: {
+      product: { include: { category: true } },
+      subRecipe: { include: { category: true } },
+    },
   });
 
-  const rows: WasteRow[] = entries.map((entry) => ({
-    id: entry.id,
-    dateLabel: entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
-    dateValue: entry.date.getTime(),
-    productName: entry.product.name,
-    categoryName: entry.product.category?.name ?? null,
-    quantityLabel: Number(entry.quantity).toLocaleString("es-MX", { maximumFractionDigits: 4 }),
-    quantityValue: Number(entry.quantity),
-    unitLabel: UNIT_LABELS[entry.unit as UnitValue],
-    comment: entry.comment,
-    cost: Number(entry.quantity) * Number(entry.unitCost),
-    costBasisLabel:
-      Number(entry.product.yieldPercentage) !== 100
-        ? entry.costBasis === "gross"
-          ? "De compra"
-          : "Con rendimiento"
-        : null,
-  }));
+  const rows: WasteRow[] = entries.map((entry) => {
+    if (entry.subRecipe) {
+      return {
+        id: entry.id,
+        dateLabel: entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+        dateValue: entry.date.getTime(),
+        itemName: entry.subRecipe.name,
+        itemType: entry.subRecipe.isMenuItem ? "plu" : "subrecipe",
+        itemTypeLabel: entry.subRecipe.isMenuItem ? "PLU" : "Subreceta",
+        categoryName: entry.subRecipe.category?.name ?? null,
+        quantityLabel: Number(entry.quantity).toLocaleString("es-MX", { maximumFractionDigits: 4 }),
+        quantityValue: Number(entry.quantity),
+        unitLabel: UNIT_LABELS[entry.unit as UnitValue],
+        comment: entry.comment,
+        cost: Number(entry.quantity) * Number(entry.unitCost),
+        costBasisLabel: null,
+      };
+    }
+    return {
+      id: entry.id,
+      dateLabel: entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+      dateValue: entry.date.getTime(),
+      itemName: entry.product!.name,
+      itemType: "product",
+      itemTypeLabel: "Producto",
+      categoryName: entry.product!.category?.name ?? null,
+      quantityLabel: Number(entry.quantity).toLocaleString("es-MX", { maximumFractionDigits: 4 }),
+      quantityValue: Number(entry.quantity),
+      unitLabel: UNIT_LABELS[entry.unit as UnitValue],
+      comment: entry.comment,
+      cost: Number(entry.quantity) * Number(entry.unitCost),
+      costBasisLabel:
+        Number(entry.product!.yieldPercentage) !== 100
+          ? entry.costBasis === "gross"
+            ? "De compra"
+            : "Con rendimiento"
+          : null,
+    };
+  });
 
   const categoryNames = [...new Set(rows.map((r) => r.categoryName).filter((n): n is string => !!n))].sort(
     (a, b) => a.localeCompare(b),

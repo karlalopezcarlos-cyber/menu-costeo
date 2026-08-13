@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { formatMoney } from "@/lib/format";
+import { formatProductionFolio } from "@/lib/production/folio";
 import ProductionTable, { type ProductionRow } from "./ProductionTable";
 
 export default async function ProductionPage() {
@@ -17,7 +18,9 @@ export default async function ProductionPage() {
 
   const rows: ProductionRow[] = entries.map((entry) => ({
     id: entry.id,
-    dateLabel: entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+    folioLabel: formatProductionFolio(entry.folio),
+    folioValue: entry.folio,
+    dateLabel: `${entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" })} ${entry.createdAt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
     dateValue: entry.date.getTime(),
     subRecipeName: entry.subRecipe.name,
     categoryName: entry.subRecipe.category?.name ?? null,

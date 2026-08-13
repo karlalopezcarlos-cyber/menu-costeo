@@ -5,11 +5,13 @@ import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { getSucursalProductCosts } from "@/lib/costing";
+import { getSucursalProductCosts, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { convertQty, removeYieldFactor, UNIT_META, UNITS, type UnitValue } from "@/lib/units";
 
 type WasteRowInput = {
-  productId: string;
+  itemType?: "product" | "subrecipe";
+  productId?: string;
+  subRecipeId?: string;
   quantity: string;
   unit?: string;
   comment: string;
@@ -35,22 +37,33 @@ export async function createWasteEntries(
       throw new Error("Datos de merma invalidos.");
     }
     if (!Array.isArray(rows) || rows.length === 0) {
-      throw new Error("Agrega al menos un producto.");
+      throw new Error("Agrega al menos un producto, subreceta o PLU.");
     }
 
-    const productIds = [...new Set(rows.map((r) => r.productId))];
-    const [products, productCosts] = await Promise.all([
+    const productRows = rows.filter((r) => (r.itemType ?? "product") === "product");
+    const subRecipeRows = rows.filter((r) => r.itemType === "subrecipe");
+
+    const productIds = [...new Set(productRows.map((r) => r.productId!))];
+    const subRecipeIds = [...new Set(subRecipeRows.map((r) => r.subRecipeId!))];
+
+    const [products, productCosts, subRecipes, graph] = await Promise.all([
       prisma.product.findMany({
         where: { id: { in: productIds }, organizationId: user.organizationId },
       }),
       getSucursalProductCosts(user.sucursalId, productIds),
+      prisma.recipe.findMany({
+        where: { id: { in: subRecipeIds }, sucursalId: user.sucursalId, archivedAt: null },
+      }),
+      subRecipeIds.length > 0 ? loadOrgRecipeGraph(user.sucursalId) : Promise.resolve(null),
     ]);
     const productById = new Map(products.map((p) => [p.id, p]));
+    const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
+    const costMemo = new Map<string, Decimal>();
 
     const wasteDate = new Date(wasteDateRaw);
 
-    const toCreate = rows.map((row, index) => {
-      const product = productById.get(row.productId);
+    const productItems = productRows.map((row, index) => {
+      const product = productById.get(row.productId!);
       if (!product) throw new Error(`Selecciona un producto valido (fila ${index + 1}).`);
 
       const quantity = new Decimal(row.quantity || "0");
@@ -88,12 +101,60 @@ export async function createWasteEntries(
       };
     });
 
+    const subRecipeItems = subRecipeRows.map((row, index) => {
+      const subRecipe = subRecipeById.get(row.subRecipeId!);
+      if (!subRecipe) throw new Error(`Selecciona una subreceta o PLU valido (fila ${index + 1}).`);
+
+      const quantity = new Decimal(row.quantity || "0");
+      if (quantity.lte(0)) {
+        throw new Error(`La cantidad mermada de "${subRecipe.name}" debe ser mayor a cero.`);
+      }
+
+      let unitCost = new Decimal(0);
+      if (graph && !subRecipe.yieldQty.isZero()) {
+        try {
+          unitCost = getRecipeCost(subRecipe.id, graph, costMemo).dividedBy(subRecipe.yieldQty);
+        } catch {
+          unitCost = new Decimal(0);
+        }
+      }
+
+      return {
+        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
+        subRecipeId: subRecipe.id,
+        date: wasteDate,
+        quantity: quantity.toString(),
+        unit: subRecipe.yieldUnit,
+        unitCost: unitCost.toString(),
+        comment: row.comment.trim() || null,
+        createdByUserId: user.id,
+      };
+    });
+
+    const toCreate = [...productItems, ...subRecipeItems];
+    if (toCreate.length === 0) throw new Error("Agrega al menos un producto, subreceta o PLU.");
+
     await prisma.wasteEntry.createMany({ data: toCreate });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo registrar la merma." };
   }
 
   revalidatePath("/waste");
+  revalidatePath("/audit");
   revalidatePath("/dashboard");
   redirect("/waste");
+}
+
+export async function deleteWasteEntry(id: string): Promise<void> {
+  const user = await requireSucursalContext();
+
+  const entry = await prisma.wasteEntry.findFirst({ where: { id, sucursalId: user.sucursalId } });
+  if (!entry) throw new Error("Merma no encontrada.");
+
+  await prisma.wasteEntry.delete({ where: { id: entry.id } });
+
+  revalidatePath("/waste");
+  revalidatePath("/audit");
+  revalidatePath("/dashboard");
 }

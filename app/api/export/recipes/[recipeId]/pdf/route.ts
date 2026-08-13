@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { loadOrgRecipeGraph, getRecipeCost, type RecipeGraph } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { buildRecipePdf, type RecipePdfItem } from "@/lib/pdf/export-recipe";
+import { getOrganizationLogo } from "@/lib/pdf/get-organization-logo";
 import { formatMoney } from "@/lib/format";
 
 type ItemLike = { productId: string | null; subRecipeId: string | null; quantity: Decimal; unit: string };
@@ -44,7 +45,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
   const recipe = await prisma.recipe.findFirst({
     where: { id: recipeId, sucursalId: user.sucursalId },
     include: {
-      items: { orderBy: { sortOrder: "asc" }, include: { product: true, subRecipe: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { product: { include: { category: true } }, subRecipe: true },
+      },
       category: true,
     },
   });
@@ -69,6 +73,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
     return {
       label: item.product?.name ?? item.subRecipe?.name ?? "?",
       isSubRecipe: !!item.subRecipeId,
+      categoryName: item.product?.category?.name ?? null,
       quantity: item.quantity.toString(),
       unitLabel: UNIT_LABELS[item.unit as UnitValue],
       unitCost: unitCost ? formatMoney(unitCost.toNumber(), 4) : null,
@@ -86,6 +91,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
       ? formatMoney(totalCost.dividedBy(recipe.yieldQty).toNumber(), 4)
       : null;
 
+  const logo = await getOrganizationLogo(user.organizationId);
   const buffer = await buildRecipePdf({
     name: recipe.name,
     categoryName: recipe.category?.name ?? null,
@@ -100,7 +106,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
     costPct,
     items,
     photo: recipe.photo ? Buffer.from(recipe.photo) : null,
-  });
+  }, logo);
 
   const safeName = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 

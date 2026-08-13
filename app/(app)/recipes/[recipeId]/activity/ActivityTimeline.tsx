@@ -8,6 +8,7 @@ const TYPE_BADGE: Record<string, string> = {
   ITEM_ADDED: "bg-green-100 text-green-800",
   ITEM_REMOVED: "bg-red-100 text-red-800",
   ARCHIVED: "bg-neutral-200 text-neutral-700",
+  UNARCHIVED: "bg-emerald-100 text-emerald-800",
   UPDATED: "bg-purple-100 text-purple-800",
 };
 
@@ -16,6 +17,7 @@ const TYPE_LABEL: Record<string, string> = {
   ITEM_ADDED: "Ingrediente agregado",
   ITEM_REMOVED: "Ingrediente quitado",
   ARCHIVED: "Archivado",
+  UNARCHIVED: "Activada de nuevo",
   UPDATED: "Datos actualizados",
 };
 

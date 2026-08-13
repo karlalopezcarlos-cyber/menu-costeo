@@ -13,8 +13,8 @@ export type OrgUserRow = {
   role: "OWNER" | "STAFF";
   isActive: boolean;
   allowedPanels: Panel[];
-  sucursalId: string | null;
-  sucursalName: string | null;
+  sucursalIds: string[];
+  sucursalNames: string[];
 };
 
 const PANEL_LABELS = new Map(PANEL_DEFS.map((p) => [p.key, p.label]));
@@ -52,7 +52,7 @@ export default function OrgUsersManager({
                 <td className="px-4 py-2 text-neutral-500">{u.email}</td>
                 <td className="px-4 py-2 text-neutral-500">{u.role === "OWNER" ? "Dueno" : "Staff"}</td>
                 <td className="px-4 py-2 text-neutral-500">
-                  {u.role === "OWNER" ? "Todas" : (u.sucursalName ?? "-")}
+                  {u.role === "OWNER" ? "Todas" : u.sucursalNames.length > 0 ? u.sucursalNames.join(", ") : "-"}
                 </td>
                 <td className="px-4 py-2 text-neutral-500">
                   {u.role === "OWNER"

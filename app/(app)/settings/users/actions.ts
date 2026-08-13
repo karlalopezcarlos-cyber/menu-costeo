@@ -2,10 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { PANEL_DEFS } from "@/lib/permissions";
 import type { Panel } from "@/generated/prisma/client";
+
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_LOGO_SIZE = 4 * 1024 * 1024;
 
 async function requireOwner() {
   const user = await requireOrgSession();
@@ -42,12 +46,57 @@ export async function updateOrganizationName(
   return {};
 }
 
-async function resolveSucursalId(organizationId: string, formData: FormData): Promise<string | null> {
-  const sucursalId = String(formData.get("sucursalId") ?? "").trim();
-  if (!sucursalId) throw new Error("Asigna una sucursal al usuario.");
-  const sucursal = await prisma.sucursal.findFirst({ where: { id: sucursalId, organizationId } });
-  if (!sucursal) throw new Error("Sucursal invalida.");
-  return sucursal.id;
+export async function updateOrgLogo(
+  _prevState: { error?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireOwner();
+
+    const file = formData.get("logo");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Selecciona una imagen.");
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      throw new Error("La imagen debe ser JPG, PNG o WEBP.");
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      throw new Error("La imagen no debe pesar mas de 4MB.");
+    }
+
+    const original = Buffer.from(await file.arrayBuffer());
+    // A diferencia de las fotos de receta (normalizadas a JPEG), el logo se normaliza a PNG para
+    // conservar transparencia: se usa como marca de agua de fondo en los PDFs, y un fondo solido
+    // detras del logo se veria como un rectangulo encima del contenido.
+    const buffer = await sharp(original).rotate().png().toBuffer();
+
+    await prisma.organization.update({
+      where: { id: user.organizationId },
+      data: { logo: buffer, logoMimeType: "image/png" },
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo actualizar el logo." };
+  }
+
+  revalidatePath("/settings/users");
+  return {};
+}
+
+export async function removeOrgLogo(): Promise<void> {
+  const user = await requireOwner();
+
+  await prisma.organization.update({
+    where: { id: user.organizationId },
+    data: { logo: null, logoMimeType: null },
+  });
+
+  revalidatePath("/settings/users");
+}
+
+async function resolveSucursalIds(organizationId: string, formData: FormData): Promise<string[]> {
+  const ids = [...new Set(formData.getAll("sucursalIds").map((v) => String(v)))];
+  if (ids.length === 0) throw new Error("Asigna al menos una sucursal al usuario.");
+  const count = await prisma.sucursal.count({ where: { id: { in: ids }, organizationId } });
+  if (count !== ids.length) throw new Error("Una o mas sucursales seleccionadas son invalidas.");
+  return ids;
 }
 
 export async function createUser(
@@ -61,7 +110,7 @@ export async function createUser(
     const name = String(formData.get("name") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
-    const sucursalId = await resolveSucursalId(user.organizationId, formData);
+    const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
 
     if (!email) throw new Error("El correo es obligatorio.");
     if (password.length < 8) throw new Error("La contrasena debe tener al menos 8 caracteres.");
@@ -79,7 +128,7 @@ export async function createUser(
         role: "STAFF",
         organizationId: user.organizationId,
         allowedPanels,
-        sucursalId,
+        sucursales: { create: sucursalIds.map((sucursalId) => ({ sucursalId })) },
       },
     });
   } catch (error) {
@@ -108,7 +157,7 @@ export async function updateUser(
     const name = String(formData.get("name") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
-    const sucursalId = await resolveSucursalId(user.organizationId, formData);
+    const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
 
     if (!email) throw new Error("El correo es obligatorio.");
 
@@ -121,16 +170,21 @@ export async function updateUser(
       throw new Error("La contrasena debe tener al menos 8 caracteres.");
     }
 
-    await prisma.user.update({
-      where: { id: target.id },
-      data: {
-        email,
-        name: name || null,
-        allowedPanels,
-        sucursalId,
-        ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
-      },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: target.id },
+        data: {
+          email,
+          name: name || null,
+          allowedPanels,
+          ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
+        },
+      }),
+      prisma.userSucursal.deleteMany({ where: { userId: target.id } }),
+      prisma.userSucursal.createMany({
+        data: sucursalIds.map((sucursalId) => ({ userId: target.id, sucursalId })),
+      }),
+    ]);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar el usuario." };
   }

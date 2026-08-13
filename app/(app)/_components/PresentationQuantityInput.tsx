@@ -37,6 +37,30 @@ function lineLabel(line: Line, unitLabel: string, presentations: PresentationOpt
 }
 
 /**
+ * Reconstruye las lineas de presentacion (presentacion + cantidad de piezas) a partir de la
+ * etiqueta ya guardada de un renglon existente (ej. "1 Pieza" o "2 Costal + 1 Bolsa"), para que al
+ * editar un pedido ya creado se vea la presentacion original ("1 Pieza") en vez de caer siempre a
+ * cantidad libre con el numero ya convertido a la unidad base (ej. "0.4 KG").
+ */
+function parsePresentationLabel(
+  label: string,
+  fallbackQty: string,
+  presentations: PresentationOption[],
+): Line[] {
+  const fallback: Line[] = [{ presentationId: MANUAL, count: fallbackQty }];
+  if (!label) return fallback;
+  const parts = label.split(" + ").map((p) => p.trim()).filter(Boolean);
+  const lines: Line[] = [];
+  for (const part of parts) {
+    const match = part.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+    const presentation = match ? presentations.find((p) => p.label === match[2]) : undefined;
+    if (!match || !presentation) return fallback;
+    lines.push({ presentationId: presentation.id, count: match[1] });
+  }
+  return lines.length > 0 ? lines : fallback;
+}
+
+/**
  * Input de cantidad que, si el producto tiene presentaciones definidas (ej. "Lata 2.75kg" = 2.75
  * KG), deja elegir la presentacion + cuantas piezas, y calcula sola la cantidad equivalente en la
  * unidad base del producto. Si el producto no tiene presentaciones, es un input numerico normal.
@@ -50,6 +74,7 @@ export default function PresentationQuantityInput({
   onPresentationChange,
   disabled,
   multiPresentation,
+  initialPresentationLabel,
 }: {
   baseUnit: UnitValue;
   unitLabel: string;
@@ -64,11 +89,19 @@ export default function PresentationQuantityInput({
    * 1 bolsa"), sumando su equivalente en la unidad base. Pensado para Pedidos, donde se pide en
    * piezas completas de cada presentacion (sin sobrante suelto). */
   multiPresentation?: boolean;
+  /** Etiqueta ya guardada del renglon (ej. "1 Pieza"), solo para modo multiPresentation: si
+   * coincide con una presentacion conocida, el input arranca mostrando esa presentacion + cantidad
+   * de piezas en vez de caer a cantidad libre con el numero ya convertido a la unidad base. */
+  initialPresentationLabel?: string;
 }) {
   const [mode, setMode] = useState<string>(MANUAL);
   const [pieceCount, setPieceCount] = useState("");
   const [extraQty, setExtraQty] = useState("");
-  const [lines, setLines] = useState<Line[]>(() => [{ presentationId: MANUAL, count: value || "" }]);
+  const [lines, setLines] = useState<Line[]>(() =>
+    initialPresentationLabel !== undefined
+      ? parsePresentationLabel(initialPresentationLabel, value || "", presentations)
+      : [{ presentationId: MANUAL, count: value || "" }],
+  );
 
   if (presentations.length === 0) {
     return (
@@ -178,7 +211,7 @@ export default function PresentationQuantityInput({
             + Agregar presentacion
           </button>
         )}
-        {value && (
+        {value && lines.some((l) => l.presentationId !== MANUAL) && (
           <p className="inline-block rounded border border-neutral-300 bg-neutral-50 px-2 py-1 text-sm font-bold text-neutral-900">
             = {Number(value).toLocaleString("es-MX", { maximumFractionDigits: 2 })} {unitLabel}
           </p>

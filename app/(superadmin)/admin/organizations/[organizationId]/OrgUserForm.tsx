@@ -11,7 +11,7 @@ export type EditableOrgUser = {
   name: string | null;
   role: "OWNER" | "STAFF";
   allowedPanels: Panel[];
-  sucursalId: string | null;
+  sucursalIds: string[];
 };
 
 const initialState: { error?: string } = {};
@@ -32,6 +32,7 @@ export default function OrgUserForm({
   const action = updateOrgUser.bind(null, organizationId, user.id);
   const [state, formAction, pending] = useActionState(action, initialState);
   const [allowedPanels, setAllowedPanels] = useState<Set<Panel>>(new Set(user.allowedPanels));
+  const [selectedSucursales, setSelectedSucursales] = useState<Set<string>>(new Set(user.sucursalIds));
   const wasPending = useRef(false);
 
   useEffect(() => {
@@ -46,6 +47,15 @@ export default function OrgUserForm({
       const next = new Set(prev);
       if (next.has(panel)) next.delete(panel);
       else next.add(panel);
+      return next;
+    });
+  }
+
+  function toggleSucursal(sucursalId: string) {
+    setSelectedSucursales((prev) => {
+      const next = new Set(prev);
+      if (next.has(sucursalId)) next.delete(sucursalId);
+      else next.add(sucursalId);
       return next;
     });
   }
@@ -92,26 +102,23 @@ export default function OrgUserForm({
       </div>
 
       {user.role !== "OWNER" && (
-        <div className="max-w-xs space-y-1">
-          <label htmlFor={`sucursalId-${user.id}`} className="text-xs font-medium text-neutral-700">
-            Sucursal
-          </label>
-          <select
-            id={`sucursalId-${user.id}`}
-            name="sucursalId"
-            required
-            defaultValue={user.sucursalId ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          >
-            <option value="" disabled>
-              Selecciona una sucursal
-            </option>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-neutral-700">Sucursales a las que tiene acceso</p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
+              <label key={s.id} className="flex items-center gap-1.5 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  name="sucursalIds"
+                  value={s.id}
+                  checked={selectedSucursales.has(s.id)}
+                  onChange={() => toggleSucursal(s.id)}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
                 {s.name}
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
         </div>
       )}
 

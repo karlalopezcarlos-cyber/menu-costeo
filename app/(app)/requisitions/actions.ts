@@ -5,11 +5,14 @@ import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { getSucursalProductCosts } from "@/lib/costing";
+import { getSucursalProductCosts, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import { resolveDestRecipeIds } from "@/lib/requisitions/subrecipe-match";
 import { UNITS, type UnitValue } from "@/lib/units";
 
 type RequisicionRowInput = {
-  productId: string;
+  itemType?: "product" | "subrecipe";
+  productId?: string;
+  subRecipeId?: string;
   quantity: string;
   unit: string;
 };
@@ -55,19 +58,31 @@ export async function createRequisicion(
       throw new Error("Agrega al menos un producto.");
     }
 
-    const productIds = [...new Set(rows.map((r) => r.productId))];
-    const [products, productCosts] = await Promise.all([
+    const productRows = rows.filter((r) => (r.itemType ?? "product") === "product");
+    const subRecipeRows = rows.filter((r) => r.itemType === "subrecipe");
+
+    const productIds = [...new Set(productRows.map((r) => r.productId!))];
+    const subRecipeIds = [...new Set(subRecipeRows.map((r) => r.subRecipeId!))];
+
+    const [products, productCosts, subRecipes, graph, destRecipeIdByOrigin] = await Promise.all([
       prisma.product.findMany({
         where: { id: { in: productIds }, organizationId: user.organizationId },
       }),
       getSucursalProductCosts(user.sucursalId, productIds),
+      prisma.recipe.findMany({
+        where: { id: { in: subRecipeIds }, sucursalId: user.sucursalId, archivedAt: null },
+      }),
+      subRecipeIds.length > 0 ? loadOrgRecipeGraph(user.sucursalId) : Promise.resolve(null),
+      resolveDestRecipeIds(subRecipeIds, toSucursalId),
     ]);
     const productById = new Map(products.map((p) => [p.id, p]));
+    const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
+    const costMemo = new Map<string, Decimal>();
 
     const date = new Date(`${dateRaw}T00:00:00Z`);
 
-    const items = rows.map((row, index) => {
-      const product = productById.get(row.productId);
+    const productItems = productRows.map((row, index) => {
+      const product = productById.get(row.productId!);
       if (!product) throw new Error(`Selecciona un producto valido (fila ${index + 1}).`);
 
       const quantity = new Decimal(row.quantity || "0");
@@ -84,6 +99,43 @@ export async function createRequisicion(
         unitCost: unitCost.toString(),
       };
     });
+
+    const subRecipeItems = subRecipeRows.map((row, index) => {
+      const subRecipe = subRecipeById.get(row.subRecipeId!);
+      if (!subRecipe) throw new Error(`Selecciona una subreceta valida (fila ${index + 1}).`);
+
+      const quantity = new Decimal(row.quantity || "0");
+      if (quantity.lte(0)) {
+        throw new Error(`La cantidad de "${subRecipe.name}" debe ser mayor a cero.`);
+      }
+      const unit = parseUnit(row.unit);
+      let unitCost = new Decimal(0);
+      if (graph && !subRecipe.yieldQty.isZero()) {
+        try {
+          unitCost = getRecipeCost(subRecipe.id, graph, costMemo).dividedBy(subRecipe.yieldQty);
+        } catch {
+          unitCost = new Decimal(0);
+        }
+      }
+
+      const destSubRecipeId = destRecipeIdByOrigin.get(subRecipe.id);
+      if (!destSubRecipeId) {
+        throw new Error(
+          `La sucursal destino no tiene una subreceta equivalente a "${subRecipe.name}". Creala ahi primero (o creala desde la sucursal principal para que se clone automaticamente).`,
+        );
+      }
+
+      return {
+        subRecipeId: subRecipe.id,
+        destSubRecipeId,
+        quantity: quantity.toString(),
+        unit,
+        unitCost: unitCost.toString(),
+      };
+    });
+
+    const items = [...productItems, ...subRecipeItems];
+    if (items.length === 0) throw new Error("Agrega al menos un producto o subreceta.");
 
     const requisicion = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.update({

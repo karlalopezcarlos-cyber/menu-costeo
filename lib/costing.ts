@@ -40,8 +40,9 @@ const MAX_DEPTH = 20;
  * Costo unitario vigente de un producto para una sucursal especifica: el `computedUnitCost` de su
  * compra mas reciente EN ESA SUCURSAL (no el ultimo `Product.currentUnitCost` global, que se
  * actualiza con la compra mas reciente de cualquier sucursal y por lo tanto mezclaria precios entre
- * sucursales). Si esa sucursal nunca ha comprado el producto, no aparece en el mapa (costo 0 /
- * "no confiable" para quien lo consuma).
+ * sucursales si se usara como fuente principal). Si esa sucursal nunca ha comprado el producto (ej.
+ * lo recibe solo por requisicion, o todavia no lo compra directamente), se usa como respaldo el
+ * costo informativo del catalogo (`Product.currentUnitCost`) en vez de dejarlo en 0.
  */
 export async function getSucursalProductCosts(
   sucursalId: string,
@@ -58,6 +59,18 @@ export async function getSucursalProductCosts(
   for (const p of purchases) {
     if (!costByProduct.has(p.productId)) costByProduct.set(p.productId, new Decimal(p.computedUnitCost));
   }
+
+  const missingIds = productIds.filter((id) => !costByProduct.has(id));
+  if (missingIds.length > 0) {
+    const fallbackProducts = await prisma.product.findMany({
+      where: { id: { in: missingIds }, currentUnitCost: { gt: 0 } },
+      select: { id: true, currentUnitCost: true },
+    });
+    for (const p of fallbackProducts) {
+      costByProduct.set(p.id, new Decimal(p.currentUnitCost));
+    }
+  }
+
   return costByProduct;
 }
 

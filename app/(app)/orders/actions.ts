@@ -17,6 +17,10 @@ export async function createPurchaseOrder(
   formData: FormData,
 ): Promise<{ error?: string }> {
   let orderId: string;
+  // Cuando el pedido se crea desde Proyeccion con la intencion de comprar de inmediato (en vez de
+  // solo dejarlo abierto para despues), se manda directo a Registrar compra con este pedido ya
+  // precargado, en vez de aterrizar en el detalle del pedido.
+  const redirectTo = String(formData.get("redirectTo") ?? "").trim();
   try {
     const user = await requireSucursalContext();
 
@@ -92,5 +96,8 @@ export async function createPurchaseOrder(
 
   revalidatePath("/orders");
   revalidatePath("/orders/new");
+  if (redirectTo === "purchase") {
+    redirect(`/purchases/new?pedido=${orderId}`);
+  }
   redirect(`/orders/${orderId}`);
 }

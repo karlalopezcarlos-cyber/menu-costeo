@@ -129,6 +129,7 @@ export default function OrderItemsForm({
                       }}
                       disabled={isRemoved}
                       multiPresentation
+                      initialPresentationLabel={row.presentationLabel}
                     />
                   </td>
                   <td className="px-4 py-2">

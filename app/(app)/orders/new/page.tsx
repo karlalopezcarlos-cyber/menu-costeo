@@ -1,23 +1,21 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
+import { getTheoreticalStock } from "@/lib/audit";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { listSuppliersForCapture } from "@/lib/suppliers";
 import ShortfallTable, { type ShortfallRow } from "./ShortfallTable";
 
 export default async function NewOrderPage() {
   const user = await requireSucursalContext();
 
-  const [products, latestCount, openOrderItems, recentPurchases, suppliers] = await Promise.all([
+  const [products, stock, openOrderItems, recentPurchases, suppliers] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null, targetStock: { gt: 0 } },
       orderBy: { name: "asc" },
       include: { category: true, presentations: true },
     }),
-    prisma.inventoryCount.findFirst({
-      where: { sucursalId: user.sucursalId },
-      orderBy: { date: "desc" },
-      include: { items: true },
-    }),
+    getTheoreticalStock(user.organizationId, user.sucursalId),
     prisma.purchaseOrderItem.findMany({
       where: { purchaseOrder: { sucursalId: user.sucursalId, status: "OPEN" } },
       select: { productId: true },
@@ -27,18 +25,9 @@ export default async function NewOrderPage() {
       orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
       select: { productId: true, presentationLabel: true },
     }),
-    prisma.supplier.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
+    listSuppliersForCapture(user.organizationId),
   ]);
 
-  const currentQtyByProductId = new Map(
-    (latestCount?.items ?? [])
-      .filter((i) => i.productId)
-      .map((i) => [i.productId as string, Number(i.quantity)]),
-  );
   const productIdsInOpenOrder = new Set(openOrderItems.map((i) => i.productId));
   const lastPresentationByProductId = new Map<string, string>();
   for (const purchase of recentPurchases) {
@@ -48,7 +37,7 @@ export default async function NewOrderPage() {
 
   const rows: ShortfallRow[] = products
     .map((product) => {
-      const currentStock = currentQtyByProductId.get(product.id) ?? 0;
+      const currentStock = stock.productQty.get(product.id)?.toNumber() ?? 0;
       const targetStock = Number(product.targetStock);
       const shortfall = Math.max(targetStock - currentStock, 0);
       return {
@@ -91,8 +80,8 @@ export default async function NewOrderPage() {
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Pedido sugerido</h1>
           <p className="text-sm text-neutral-500">
-            Comparamos tu stock objetivo contra el ultimo conteo de inventario
-            {latestCount ? ` (${latestCount.date.toLocaleDateString("es-MX", { timeZone: "UTC" })})` : ""}.
+            Comparamos tu stock objetivo contra el inventario teorico a hoy
+            {stock.asOfLabel ? ` (a partir del conteo del ${stock.asOfLabel})` : ""}.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -105,7 +94,7 @@ export default async function NewOrderPage() {
         </div>
       </div>
 
-      {!latestCount && (
+      {!stock.hasBaseline && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
           Todavia no tienes ningun conteo de inventario: el stock actual se asume en 0 para todos
           los productos.

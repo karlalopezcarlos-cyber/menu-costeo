@@ -8,6 +8,7 @@ import {
   buildRecipeIngredientsWorkbook,
   type RecipeIngredientExportRow,
 } from "@/lib/excel/export-recipe-ingredients";
+import { parseRecipeTypeFilter, recipeTypeFilterToIsMenuItem } from "@/lib/recipes-filter";
 
 type ItemLike = { productId: string | null; subRecipeId: string | null; quantity: Decimal; unit: string };
 type ProductLike = { baseUnit: string; currentUnitCost: Decimal } | null;
@@ -39,11 +40,14 @@ function computeUnitCost(
   return null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireSucursalContext();
+  const isMenuItem = recipeTypeFilterToIsMenuItem(
+    parseRecipeTypeFilter(new URL(request.url).searchParams.get("type")),
+  );
 
   const recipes = await prisma.recipe.findMany({
-    where: { sucursalId: user.sucursalId, archivedAt: null },
+    where: { sucursalId: user.sucursalId, archivedAt: null, ...(isMenuItem !== undefined && { isMenuItem }) },
     orderBy: { name: "asc" },
     include: {
       items: { orderBy: { sortOrder: "asc" }, include: { product: true, subRecipe: true } },

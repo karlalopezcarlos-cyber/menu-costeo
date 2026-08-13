@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
+import Link from "next/link";
+import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { addRecipeItem } from "../actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 
@@ -51,6 +52,13 @@ export default function AddRecipeItemForm({
     if (subRecipe?.yieldUnit) setUnit(subRecipe.yieldUnit);
   }
 
+  // Restringe la unidad capturable al tipo (masa/volumen/pieza) de la unidad ya registrada en el
+  // producto o subreceta elegida, para evitar capturar ej. "PZA" de un producto medido en KG.
+  const registeredUnit =
+    componentType === "product"
+      ? products.find((p) => p.id === productId)?.baseUnit
+      : subRecipeOptions.find((r) => r.id === subRecipeId)?.yieldUnit;
+
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
       <div className="flex items-center justify-between">
@@ -86,13 +94,27 @@ export default function AddRecipeItemForm({
       </div>
 
       {componentType === "product" ? (
-        <SearchableSelect
-          name="productId"
-          options={products.map((p) => ({ id: p.id, label: p.name }))}
-          value={productId}
-          onChange={handleProductChange}
-          placeholder="Buscar ingrediente..."
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <SearchableSelect
+              name="productId"
+              options={products.map((p) => ({ id: p.id, label: p.name }))}
+              value={productId}
+              onChange={handleProductChange}
+              placeholder="Buscar ingrediente..."
+            />
+          </div>
+          {productId && (
+            <Link
+              href={`/products/${productId}/edit`}
+              target="_blank"
+              className="shrink-0 text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+              title="Editar este producto en el catalogo"
+            >
+              Editar producto ↗
+            </Link>
+          )}
+        </div>
       ) : (
         <SearchableSelect
           name="subRecipeId"
@@ -121,7 +143,11 @@ export default function AddRecipeItemForm({
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
         >
           {UNITS.map((u) => (
-            <option key={u} value={u}>
+            <option
+              key={u}
+              value={u}
+              disabled={!!registeredUnit && UNIT_META[u].type !== UNIT_META[registeredUnit].type}
+            >
               {UNIT_LABELS[u]}
             </option>
           ))}

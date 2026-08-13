@@ -9,12 +9,14 @@ import {
   type SortDir,
 } from "./waste-rows";
 import { formatMoney } from "@/lib/format";
+import { deleteWasteEntry } from "./actions";
 
 export type { WasteRow };
 
 const COLUMNS: { key: WasteSortKey; label: string }[] = [
   { key: "date", label: "Fecha" },
-  { key: "product", label: "Producto" },
+  { key: "product", label: "Producto / Subreceta / PLU" },
+  { key: "type", label: "Tipo" },
   { key: "category", label: "Categoria" },
   { key: "quantity", label: "Cantidad" },
 ];
@@ -65,7 +67,7 @@ export default function WasteTable({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
+          placeholder="Buscar producto, subreceta o PLU..."
           className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
         />
         <select
@@ -154,12 +156,13 @@ export default function WasteTable({
                 </button>
               </th>
               <th className="px-4 py-2 font-medium">Comentario</th>
+              <th className="px-4 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
                   {rows.length === 0
                     ? "Todavia no hay mermas registradas."
                     : "Ninguna merma coincide con los filtros."}
@@ -169,7 +172,20 @@ export default function WasteTable({
             {sortedRows.map((row) => (
               <tr key={row.id} className="border-t border-neutral-100">
                 <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
-                <td className="px-4 py-2">{row.productName}</td>
+                <td className="px-4 py-2">{row.itemName}</td>
+                <td className="px-4 py-2">
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                      row.itemType === "plu"
+                        ? "bg-blue-100 text-blue-800"
+                        : row.itemType === "subrecipe"
+                          ? "bg-neutral-100 text-neutral-600"
+                          : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {row.itemTypeLabel}
+                  </span>
+                </td>
                 <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.quantityLabel}</td>
                 <td className="px-4 py-2 text-neutral-500">{row.unitLabel}</td>
@@ -180,6 +196,19 @@ export default function WasteTable({
                   )}
                 </td>
                 <td className="px-4 py-2 text-neutral-500">{row.comment ?? "-"}</td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("¿Eliminar esta merma? Esta accion no se puede deshacer.")) {
+                        deleteWasteEntry(row.id);
+                      }
+                    }}
+                    className="text-neutral-400 hover:text-red-600"
+                  >
+                    Eliminar
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

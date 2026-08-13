@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
@@ -154,6 +155,64 @@ export async function createRecipe(
 
   revalidatePath("/recipes");
   redirect(`/recipes/${recipeId}`);
+}
+
+/**
+ * El clonado automatico (ver cloneRecipeToOtherSucursales) ocurre al crear la receta, antes de que
+ * existan ingredientes que copiar, asi que las copias siempre nacen vacias. Esta accion es el
+ * "boton de captura" manual: trae los ingredientes de tipo producto que la receta principal tenga
+ * EN ESE MOMENTO. Solo se permite mientras la copia siga sin ingredientes (evita pisar ediciones
+ * ya hechas en esta sucursal); no vuelve a sincronizar despues.
+ */
+export async function copyIngredientsFromSource(recipeId: string): Promise<{ error?: string }> {
+  try {
+    const user = await requireSucursalContext();
+
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, sucursalId: user.sucursalId },
+      include: { _count: { select: { items: true } } },
+    });
+    if (!recipe) throw new Error("Receta no encontrada.");
+    if (!recipe.sourceRecipeId) throw new Error("Esta receta no proviene de un clonado.");
+    if (recipe._count.items > 0) {
+      throw new Error("Esta receta ya tiene ingredientes capturados.");
+    }
+
+    const source = await prisma.recipe.findUnique({
+      where: { id: recipe.sourceRecipeId },
+      include: { items: true },
+    });
+    if (!source) throw new Error("La receta de la sucursal principal ya no existe.");
+
+    const productItems = source.items.filter((item) => item.productId);
+    if (productItems.length === 0) {
+      throw new Error("La receta de la sucursal principal todavia no tiene ingredientes de producto capturados.");
+    }
+
+    await prisma.recipeItem.createMany({
+      data: productItems.map((item) => ({
+        recipeId: recipe.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unit: item.unit,
+        sortOrder: item.sortOrder,
+      })),
+    });
+
+    await logRecipeActivity({
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      recipeId: recipe.id,
+      type: "UPDATED",
+      message: `Ingredientes copiados desde la sucursal principal (${productItems.length} producto${productItems.length === 1 ? "" : "s"})`,
+      createdByUserId: user.id,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudieron copiar los ingredientes." };
+  }
+
+  revalidatePath(`/recipes/${recipeId}`);
+  return {};
 }
 
 export async function addRecipeItem(
@@ -351,6 +410,32 @@ export async function updateRecipeDetails(
   return {};
 }
 
+/** Cambia el tipo de la receta entre Subreceta y PLU (platillo de menu vendible). */
+export async function updateRecipeType(recipeId: string, isMenuItem: boolean): Promise<void> {
+  const user = await requireSucursalContext();
+
+  const recipe = await prisma.recipe.findFirst({
+    where: { id: recipeId, sucursalId: user.sucursalId },
+  });
+  if (!recipe) throw new Error("Receta no encontrada.");
+
+  if (recipe.isMenuItem !== isMenuItem) {
+    await prisma.recipe.update({ where: { id: recipeId }, data: { isMenuItem } });
+    await logRecipeActivity({
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      recipeId,
+      type: "UPDATED",
+      message: `Se cambio el tipo de receta de ${recipe.isMenuItem ? "PLU" : "Subreceta"} a ${isMenuItem ? "PLU" : "Subreceta"}`,
+      createdByUserId: user.id,
+    });
+  }
+
+  revalidatePath("/recipes");
+  revalidatePath(`/recipes/${recipeId}`);
+  revalidatePath(`/recipes/${recipeId}/activity`);
+}
+
 export async function updateRecipeInstructions(recipeId: string, formData: FormData) {
   const user = await requireSucursalContext();
 
@@ -359,6 +444,19 @@ export async function updateRecipeInstructions(recipeId: string, formData: FormD
   await prisma.recipe.update({
     where: { id: recipeId, sucursalId: user.sucursalId },
     data: { instructions: instructions || null },
+  });
+
+  revalidatePath(`/recipes/${recipeId}`);
+}
+
+export async function updateRecipeStoreDescription(recipeId: string, formData: FormData) {
+  const user = await requireSucursalContext();
+
+  const storeDescription = String(formData.get("storeDescription") ?? "").trim();
+
+  await prisma.recipe.update({
+    where: { id: recipeId, sucursalId: user.sucursalId },
+    data: { storeDescription: storeDescription || null },
   });
 
   revalidatePath(`/recipes/${recipeId}`);
@@ -385,6 +483,26 @@ export async function archiveRecipe(recipeId: string) {
   redirect("/recipes");
 }
 
+export async function restoreRecipe(recipeId: string) {
+  const user = await requireSucursalContext();
+
+  await prisma.recipe.update({
+    where: { id: recipeId, sucursalId: user.sucursalId },
+    data: { archivedAt: null },
+  });
+
+  await logRecipeActivity({
+    organizationId: user.organizationId,
+    sucursalId: user.sucursalId,
+    recipeId,
+    type: "UNARCHIVED",
+    message: "Receta activada de nuevo",
+    createdByUserId: user.id,
+  });
+
+  revalidatePath("/recipes");
+}
+
 export async function updateRecipePhoto(
   recipeId: string,
   _prevState: { error?: string } | undefined,
@@ -407,11 +525,14 @@ export async function updateRecipePhoto(
       throw new Error("La imagen no debe pesar mas de 4MB.");
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const original = Buffer.from(await file.arrayBuffer());
+    // Se normaliza siempre a JPEG (y se corrige la rotacion segun EXIF): el exportador de PDF
+    // (pdfkit) solo sabe leer JPEG/PNG, asi que una foto WEBP guardada tal cual rompe ese export.
+    const buffer = await sharp(original).rotate().jpeg({ quality: 85 }).toBuffer();
 
     await prisma.recipe.update({
       where: { id: recipe.id },
-      data: { photo: buffer, photoMimeType: file.type },
+      data: { photo: buffer, photoMimeType: "image/jpeg" },
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo guardar la foto." };

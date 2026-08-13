@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { deleteDailySale } from "./actions";
 import { formatMoney } from "@/lib/format";
@@ -15,6 +16,14 @@ export type SaleRow = {
   quantitySold: number;
   unitPrice: number;
   source: string;
+  /** Ticket(s) de venta (mini POS) que aportaron a este renglon agregado del dia. */
+  tickets: { id: string; folioLabel: string }[];
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  import: "Importado",
+  pos: "Ticket POS",
+  manual: "Manual",
 };
 
 type SortKey = "date" | "recipe" | "quantity" | "price" | "total" | "source";
@@ -113,7 +122,20 @@ export default function SalesTable({
               <td className="px-4 py-2">{formatMoney(row.unitPrice)}</td>
               <td className="px-4 py-2">{formatMoney(row.quantitySold * row.unitPrice)}</td>
               <td className="px-4 py-2 text-neutral-400">
-                {row.source === "import" ? "Importado" : "Manual"}
+                <div>{SOURCE_LABELS[row.source] ?? row.source}</div>
+                {row.tickets.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {row.tickets.map((t) => (
+                      <Link
+                        key={t.id}
+                        href={`/sales/tickets/${t.id}`}
+                        className="text-xs text-neutral-500 hover:underline"
+                      >
+                        {t.folioLabel}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-2 text-right">
                 <div className="flex items-center justify-end gap-3">

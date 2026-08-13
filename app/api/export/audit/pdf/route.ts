@@ -3,6 +3,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { computeInventoryAudit, filterAuditRows, sumVarianceAmounts, type AuditRowFilters } from "@/lib/audit";
 import { buildAuditPdf, type AuditPdfRow } from "@/lib/pdf/export-audit";
+import { getOrganizationLogo } from "@/lib/pdf/get-organization-logo";
 
 function fmtQty(n: number): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: 2 });
@@ -26,9 +27,10 @@ export async function GET(request: NextRequest) {
     onlyWithComment: params.get("onlyWithComment") === "true",
   };
 
-  const [result, organization] = await Promise.all([
+  const [result, organization, logo] = await Promise.all([
     computeInventoryAudit(user.organizationId, user.sucursalId, initialCountId, finalCountId || null),
     prisma.organization.findUnique({ where: { id: user.organizationId }, select: { name: true } }),
+    getOrganizationLogo(user.organizationId),
   ]);
 
   const filteredRows = filterAuditRows(result.rows, filters);
@@ -63,15 +65,18 @@ export async function GET(request: NextRequest) {
     comment: row.comment,
   }));
 
-  const buffer = await buildAuditPdf({
-    organizationName: organization?.name ?? "",
-    initialDateLabel: result.initialDateLabel,
-    finalDateLabel: result.finalDateLabel,
-    filtersSummary,
-    totalShortageAmount,
-    totalSurplusAmount,
-    rows: pdfRows,
-  });
+  const buffer = await buildAuditPdf(
+    {
+      organizationName: organization?.name ?? "",
+      initialDateLabel: result.initialDateLabel,
+      finalDateLabel: result.finalDateLabel,
+      filtersSummary,
+      totalShortageAmount,
+      totalSurplusAmount,
+      rows: pdfRows,
+    },
+    logo,
+  );
 
   const fileLabel = `${result.initialDateLabel}${result.finalDateLabel ? `_${result.finalDateLabel}` : ""}`.replace(
     /\//g,

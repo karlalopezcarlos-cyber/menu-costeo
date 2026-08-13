@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { removeRecipeItem } from "../actions";
 
@@ -14,7 +14,9 @@ export type IngredientRow = {
   quantity: string;
   unitLabel: string;
   unitCost: string | null;
+  unitCostValue: number | null;
   lineCost: string | null;
+  lineCostValue: number | null;
   /** Folio de la ultima compra de este producto (la que determina su costo actual), si aplica. */
   latestPurchaseFolio: number | null;
   breakdown?: {
@@ -33,6 +35,35 @@ export type IngredientRow = {
   };
 };
 
+type SortKey = "label" | "categoryName" | "quantity" | "unitLabel" | "unitCostValue" | "lineCostValue";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] = [
+  { key: "label", label: "Ingrediente", align: "left" },
+  { key: "categoryName", label: "Categoria", align: "left" },
+  { key: "quantity", label: "Cantidad", align: "right" },
+  { key: "unitLabel", label: "Unidad", align: "right" },
+  { key: "unitCostValue", label: "Costo unitario", align: "right" },
+  { key: "lineCostValue", label: "Costo total", align: "right" },
+];
+
+function sortValue(row: IngredientRow, key: SortKey): string | number | null {
+  switch (key) {
+    case "label":
+      return row.label.toLowerCase();
+    case "categoryName":
+      return row.categoryName?.toLowerCase() ?? null;
+    case "quantity":
+      return Number(row.quantity);
+    case "unitLabel":
+      return row.unitLabel.toLowerCase();
+    case "unitCostValue":
+      return row.unitCostValue;
+    case "lineCostValue":
+      return row.lineCostValue;
+  }
+}
+
 export default function RecipeIngredientsTable({
   recipeId,
   rows,
@@ -41,6 +72,9 @@ export default function RecipeIngredientsTable({
   rows: IngredientRow[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("label");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -51,36 +85,96 @@ export default function RecipeIngredientsTable({
     });
   }
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = term
+      ? rows.filter(
+          (r) => r.label.toLowerCase().includes(term) || (r.categoryName?.toLowerCase().includes(term) ?? false),
+        )
+      : rows;
+
+    const dirMultiplier = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      if (typeof va === "string" && typeof vb === "string") {
+        return va.localeCompare(vb) * dirMultiplier;
+      }
+      return ((va as number) - (vb as number)) * dirMultiplier;
+    });
+  }, [rows, search, sortKey, sortDir]);
+
   return (
     <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      {rows.length > 0 && (
+        <div className="border-b border-neutral-100 px-3 py-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar ingrediente o categoria..."
+            className="w-full max-w-xs rounded-md border border-neutral-300 px-2.5 py-1.5 text-[13px]"
+          />
+        </div>
+      )}
       <table className="w-full table-fixed text-[13px]">
         <colgroup>
-          <col className="w-[23%]" />
-          <col className="w-[12%]" />
-          <col className="w-[17%]" />
-          <col className="w-[20%]" />
+          <col className="w-[22%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[11%]" />
+          <col className="w-[19%]" />
           <col className="w-[19%]" />
           <col className="w-8" />
         </colgroup>
         <thead className="bg-neutral-50 text-left text-neutral-500">
           <tr>
-            <th className="px-3 py-1.5 font-medium">Ingrediente</th>
-            <th className="px-2 py-1.5 font-medium">Categoria</th>
-            <th className="px-3 py-1.5 font-medium text-right">Cantidad</th>
-            <th className="px-3 py-1.5 font-medium text-right">Costo unitario</th>
-            <th className="px-3 py-1.5 font-medium text-right">Costo total</th>
+            {COLUMNS.map((col) => (
+              <th
+                key={col.key}
+                className={`px-3 py-1.5 font-medium ${col.align === "right" ? "text-right" : "text-left"}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSort(col.key)}
+                  className={`inline-flex items-center gap-1 hover:text-neutral-900 ${col.align === "right" ? "flex-row-reverse" : ""}`}
+                >
+                  {col.label}
+                  {sortKey === col.key && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                </button>
+              </th>
+            ))}
             <th className="px-2 py-1.5"></th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-3 py-5 text-center text-neutral-400">
+              <td colSpan={7} className="px-3 py-5 text-center text-neutral-400">
                 Esta receta todavia no tiene ingredientes.
               </td>
             </tr>
           )}
-          {rows.map((row) => {
+          {rows.length > 0 && visibleRows.length === 0 && (
+            <tr>
+              <td colSpan={7} className="px-3 py-5 text-center text-neutral-400">
+                Ningun ingrediente coincide con la busqueda.
+              </td>
+            </tr>
+          )}
+          {visibleRows.map((row) => {
             const isExpanded = expanded.has(row.id);
             const removeAction = removeRecipeItem.bind(null, recipeId, row.id);
             return (
@@ -120,9 +214,8 @@ export default function RecipeIngredientsTable({
                       )
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-sm font-semibold text-neutral-800">
-                    {row.quantity} {row.unitLabel}
-                  </td>
+                  <td className="px-3 py-1.5 text-right text-sm font-semibold text-neutral-800">{row.quantity}</td>
+                  <td className="px-3 py-1.5 text-right text-sm font-semibold text-neutral-800">{row.unitLabel}</td>
                   <td className="px-3 py-1.5 text-right text-sm font-semibold text-neutral-800">
                     {row.unitCost ? (
                       row.latestPurchaseFolio ? (
@@ -159,7 +252,7 @@ export default function RecipeIngredientsTable({
                 </tr>
                 {row.isSubRecipe && isExpanded && (
                   <tr className="border-t border-neutral-100 bg-neutral-50">
-                    <td colSpan={6} className="px-3 py-2">
+                    <td colSpan={7} className="px-3 py-2">
                       {!row.breakdown || row.breakdown.items.length === 0 ? (
                         <p className="text-xs text-neutral-400">Esta subreceta todavia no tiene ingredientes.</p>
                       ) : (
@@ -170,10 +263,11 @@ export default function RecipeIngredientsTable({
                           </p>
                           <table className="w-full table-fixed text-xs">
                             <colgroup>
-                              <col className="w-[27%]" />
-                              <col className="w-[14%]" />
-                              <col className="w-[18%]" />
-                              <col className="w-[21%]" />
+                              <col className="w-[24%]" />
+                              <col className="w-[13%]" />
+                              <col className="w-[12%]" />
+                              <col className="w-[11%]" />
+                              <col className="w-[20%]" />
                               <col className="w-[20%]" />
                             </colgroup>
                             <tbody>
@@ -194,7 +288,10 @@ export default function RecipeIngredientsTable({
                                     )}
                                   </td>
                                   <td className="py-1 pr-3 text-right font-medium text-neutral-700">
-                                    {sub.quantity} {sub.unitLabel}
+                                    {sub.quantity}
+                                  </td>
+                                  <td className="py-1 pr-3 text-right font-medium text-neutral-700">
+                                    {sub.unitLabel}
                                   </td>
                                   <td className="py-1 pr-3 text-right font-medium text-neutral-700">
                                     {sub.unitCost ? (

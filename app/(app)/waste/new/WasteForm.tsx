@@ -8,6 +8,7 @@ import SearchableSelect from "../../_components/SearchableSelect";
 import { formatMoney } from "@/lib/format";
 
 type CostBasis = "net" | "gross";
+type ItemType = "product" | "subrecipe";
 
 type ProductOption = {
   id: string;
@@ -17,37 +18,72 @@ type ProductOption = {
   yieldPercentage: string;
 };
 
+type SubRecipeOption = {
+  id: string;
+  name: string;
+  yieldUnit: UnitValue;
+  isMenuItem: boolean;
+  unitCost: number;
+};
+
 type Row = {
   key: string;
+  itemType: ItemType;
   productId: string;
+  subRecipeId: string;
   quantity: string;
   unit: UnitValue;
   comment: string;
   costBasis: CostBasis;
 };
 
-const GRID_COLS = "grid-cols-[1.5rem_minmax(0,2fr)_6rem_6rem_minmax(0,1.8fr)_minmax(0,1.9fr)_1.5rem]";
+const GRID_COLS = "grid-cols-[1.5rem_6.5rem_minmax(0,2fr)_6rem_6rem_minmax(0,1.8fr)_minmax(0,1.9fr)_1.5rem]";
 
 function emptyRow(key: string): Row {
-  return { key, productId: "", quantity: "", unit: "ML", comment: "", costBasis: "net" };
+  return {
+    key,
+    itemType: "product",
+    productId: "",
+    subRecipeId: "",
+    quantity: "",
+    unit: "ML",
+    comment: "",
+    costBasis: "net",
+  };
 }
 
 const initialState: { error?: string } = {};
 
-export default function WasteForm({ products }: { products: ProductOption[] }) {
+export default function WasteForm({
+  products,
+  subRecipes,
+}: {
+  products: ProductOption[];
+  subRecipes: SubRecipeOption[];
+}) {
   const [state, formAction, pending] = useActionState(createWasteEntries, initialState);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow("row-0")]);
   const nextKeyRef = useRef(1);
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const subRecipeById = useMemo(() => new Map(subRecipes.map((r) => [r.id, r])), [subRecipes]);
 
   function updateRow(key: string, patch: Partial<Row>) {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   }
 
+  function setRowType(key: string, itemType: ItemType) {
+    updateRow(key, { itemType, productId: "", subRecipeId: "", unit: "ML" });
+  }
+
   function handleProductChange(key: string, productId: string) {
     const product = productById.get(productId);
     updateRow(key, { productId, unit: product?.baseUnit ?? "ML" });
+  }
+
+  function handleSubRecipeChange(key: string, subRecipeId: string) {
+    const subRecipe = subRecipeById.get(subRecipeId);
+    updateRow(key, { subRecipeId, unit: subRecipe?.yieldUnit ?? "ML" });
   }
 
   function addRow() {
@@ -59,6 +95,7 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
   }
 
   function unitCostOf(row: Row): number | null {
+    if (row.itemType === "subrecipe") return subRecipeById.get(row.subRecipeId)?.unitCost ?? null;
     const product = productById.get(row.productId);
     if (!product) return null;
     const netUnitCost = Number(product.currentUnitCost);
@@ -70,18 +107,20 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
   }
 
   function isIncompatible(row: Row): boolean {
+    if (row.itemType === "subrecipe") return false;
     const product = productById.get(row.productId);
     if (!product) return false;
     return UNIT_META[row.unit].type !== UNIT_META[product.baseUnit].type;
   }
 
   function rowCost(row: Row): number | null {
-    const product = productById.get(row.productId);
-    if (!product) return null;
     const qty = Number(row.quantity);
     if (!qty || qty <= 0) return null;
     const unitCost = unitCostOf(row);
     if (unitCost === null || isIncompatible(row)) return null;
+    if (row.itemType === "subrecipe") return qty * unitCost;
+    const product = productById.get(row.productId);
+    if (!product) return null;
     try {
       const qtyInBase = convertQty(qty, row.unit, product.baseUnit);
       return qtyInBase.toNumber() * unitCost;
@@ -93,14 +132,16 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
   const grandTotal = useMemo(
     () => rows.reduce((sum, row) => sum + (rowCost(row) ?? 0), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, products],
+    [rows, products, subRecipes],
   );
 
   const rowsPayload = useMemo(
     () =>
       JSON.stringify(
         rows.map((row) => ({
-          productId: row.productId,
+          itemType: row.itemType,
+          productId: row.itemType === "product" ? row.productId : undefined,
+          subRecipeId: row.itemType === "subrecipe" ? row.subRecipeId : undefined,
           quantity: row.quantity,
           unit: row.unit,
           comment: row.comment,
@@ -134,7 +175,8 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
         <div className="space-y-2">
           <div className={`grid ${GRID_COLS} gap-2 px-1 text-xs font-medium text-neutral-500`}>
             <span></span>
-            <span>Producto</span>
+            <span>Tipo</span>
+            <span>Producto / Subreceta / PLU</span>
             <span>Cantidad</span>
             <span>Unidad</span>
             <span>Comentario</span>
@@ -144,20 +186,43 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
 
           {rows.map((row, index) => {
             const product = productById.get(row.productId);
+            const subRecipe = subRecipeById.get(row.subRecipeId);
             const cost = rowCost(row);
             const incompatible = isIncompatible(row);
-            const hasYield = !!product && Number(product.yieldPercentage) !== 100;
+            const hasYield = row.itemType === "product" && !!product && Number(product.yieldPercentage) !== 100;
             return (
               <div key={row.key} className={`grid ${GRID_COLS} items-center gap-2 rounded-md px-1 py-1`}>
                 <span className="text-xs text-neutral-400">{index + 1}</span>
 
-                <SearchableSelect
-                  name={`productId-${row.key}`}
-                  options={products.map((p) => ({ id: p.id, label: `${p.name} (${UNIT_LABELS[p.baseUnit]})` }))}
-                  value={row.productId}
-                  onChange={(id) => handleProductChange(row.key, id)}
-                  placeholder="Buscar producto..."
-                />
+                <select
+                  value={row.itemType}
+                  onChange={(e) => setRowType(row.key, e.target.value as ItemType)}
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                >
+                  <option value="product">Producto</option>
+                  <option value="subrecipe">Subreceta / PLU</option>
+                </select>
+
+                {row.itemType === "product" ? (
+                  <SearchableSelect
+                    name={`productId-${row.key}`}
+                    options={products.map((p) => ({ id: p.id, label: `${p.name} (${UNIT_LABELS[p.baseUnit]})` }))}
+                    value={row.productId}
+                    onChange={(id) => handleProductChange(row.key, id)}
+                    placeholder="Buscar producto..."
+                  />
+                ) : (
+                  <SearchableSelect
+                    name={`subRecipeId-${row.key}`}
+                    options={subRecipes.map((r) => ({
+                      id: r.id,
+                      label: `${r.name} (${r.isMenuItem ? "PLU" : "Subreceta"}, ${UNIT_LABELS[r.yieldUnit]})`,
+                    }))}
+                    value={row.subRecipeId}
+                    onChange={(id) => handleSubRecipeChange(row.key, id)}
+                    placeholder="Buscar subreceta o PLU..."
+                  />
+                )}
 
                 <input
                   type="number"
@@ -169,17 +234,25 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
                   className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
                 />
 
-                <select
-                  value={row.unit}
-                  onChange={(e) => updateRow(row.key, { unit: e.target.value as UnitValue })}
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
-                >
-                  {UNITS.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {UNIT_LABELS[unit]}
-                    </option>
-                  ))}
-                </select>
+                {row.itemType === "product" ? (
+                  <select
+                    value={row.unit}
+                    onChange={(e) => updateRow(row.key, { unit: e.target.value as UnitValue })}
+                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                  >
+                    {UNITS.map((unit) => (
+                      <option
+                        key={unit}
+                        value={unit}
+                        disabled={!!product && UNIT_META[unit].type !== UNIT_META[product.baseUnit].type}
+                      >
+                        {UNIT_LABELS[unit]}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-sm text-neutral-500">{subRecipe ? UNIT_LABELS[subRecipe.yieldUnit] : "-"}</span>
+                )}
 
                 <input
                   value={row.comment}
@@ -189,12 +262,10 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
                 />
 
                 <div className="text-sm leading-tight text-neutral-700">
-                  {!product ? (
-                    <span className="text-neutral-300">-</span>
-                  ) : incompatible ? (
+                  {incompatible ? (
                     <span
                       className="text-red-600"
-                      title={`La unidad no es compatible con la unidad base del producto (${UNIT_LABELS[product.baseUnit]}).`}
+                      title={`La unidad no es compatible con la unidad base del producto (${UNIT_LABELS[product!.baseUnit]}).`}
                     >
                       Unidad incompatible
                     </span>
@@ -221,7 +292,7 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
                     type="button"
                     onClick={() => removeRow(row.key)}
                     className="text-neutral-400 hover:text-red-600"
-                    title="Quitar producto"
+                    title="Quitar renglon"
                   >
                     ✕
                   </button>
@@ -245,7 +316,7 @@ export default function WasteForm({ products }: { products: ProductOption[] }) {
         onClick={addRow}
         className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
       >
-        + Agregar otro producto
+        + Agregar otro renglon
       </button>
 
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}

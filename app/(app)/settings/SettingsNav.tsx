@@ -5,6 +5,7 @@ const TABS = [
   { href: "/settings/recipe-categories", label: "Categorias de recetas" },
   { href: "/settings/suppliers", label: "Proveedores" },
   { href: "/settings/sucursales", label: "Sucursales" },
+  { href: "/settings/store", label: "Tienda en linea" },
   { href: "/settings/users", label: "Usuarios" },
 ];
 

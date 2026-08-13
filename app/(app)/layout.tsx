@@ -13,26 +13,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     (p) => ({ href: p.href, label: p.label }),
   );
 
-  // El selector de sucursal solo aplica a OWNER/SUPERADMIN (sucursalId null): un STAFF tiene su
-  // sucursal fija y no necesita cambiar de contexto.
+  // El selector de sucursal aparece si hay mas de una opcion para elegir: para OWNER/SUPERADMIN
+  // son todas las de la organizacion; para STAFF, solo las que tiene asignadas (user.sucursalIds).
   let sucursalSwitcher: React.ReactNode = null;
-  if (user.sucursalId === null) {
-    const sucursales = await prisma.sucursal.findMany({
-      where: { organizationId: user.organizationId, isActive: true },
-      orderBy: [{ isCentral: "desc" }, { name: "asc" }],
-      select: { id: true, name: true },
-    });
-    if (sucursales.length > 1) {
-      const cookieStore = await cookies();
-      const activeId = cookieStore.get("activeSucursalId")?.value;
-      const activeExists = sucursales.some((s) => s.id === activeId);
-      sucursalSwitcher = (
-        <SucursalSwitcher
-          sucursales={sucursales}
-          activeId={activeExists ? activeId! : sucursales[0].id}
-        />
-      );
-    }
+  const isOwnerLike = user.role !== "STAFF";
+  const sucursales = await prisma.sucursal.findMany({
+    where: isOwnerLike
+      ? { organizationId: user.organizationId, isActive: true }
+      : { id: { in: user.sucursalIds }, isActive: true },
+    orderBy: [{ isCentral: "desc" }, { name: "asc" }],
+    select: { id: true, name: true },
+  });
+  if (sucursales.length > 1) {
+    const cookieStore = await cookies();
+    const activeId = cookieStore.get("activeSucursalId")?.value;
+    const activeExists = sucursales.some((s) => s.id === activeId);
+    sucursalSwitcher = (
+      <SucursalSwitcher sucursales={sucursales} activeId={activeExists ? activeId! : sucursales[0].id} />
+    );
   }
 
   return (
