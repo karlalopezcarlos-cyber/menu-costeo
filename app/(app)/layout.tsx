@@ -3,7 +3,7 @@ import { requireOrgSession } from "@/lib/tenant";
 import { signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PANEL_DEFS, hasPanelAccess } from "@/lib/permissions";
-import NavLinks from "./NavLinks";
+import Sidebar from "./Sidebar";
 import SucursalSwitcher from "./_components/SucursalSwitcher";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -35,26 +35,31 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3">
-          <NavLinks items={navItems} />
-          <div className="flex items-center gap-4">
+      <Sidebar items={navItems} />
+      <div className="lg:pl-60">
+        <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/85 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-end gap-4 px-6">
             {sucursalSwitcher}
+            <div className="hidden h-5 w-px bg-neutral-200 sm:block" />
             <form
+              className="flex items-center gap-3"
               action={async () => {
                 "use server";
                 await signOut({ redirectTo: "/login" });
               }}
             >
-              <span className="mr-3 text-sm text-neutral-500">{user.email}</span>
-              <button type="submit" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
+              <span className="hidden text-sm text-neutral-500 sm:inline">{user.email}</span>
+              <button
+                type="submit"
+                className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900"
+              >
                 Salir
               </button>
             </form>
           </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1600px] px-6 py-6">{children}</main>
+        </header>
+        <main className="mx-auto max-w-[1600px] px-6 py-8">{children}</main>
+      </div>
     </div>
   );
 }

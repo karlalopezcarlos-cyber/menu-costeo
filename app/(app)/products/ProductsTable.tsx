@@ -113,12 +113,12 @@ export default function ProductsTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-xs placeholder:text-neutral-400"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 shadow-xs"
         >
           <option value="all">Todas las categorias</option>
           {categoryOptions.names.map((name) => (
@@ -129,29 +129,34 @@ export default function ProductsTable({
           {categoryOptions.hasUncategorized && <option value="none">Sin categoria</option>}
         </select>
       </div>
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="px-4 py-2 font-medium">
+              <th
+                key={col.key}
+                className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
-                  className="flex items-center gap-1 hover:text-neutral-900"
+                  className="flex items-center gap-1.5 transition-colors hover:text-neutral-900"
                 >
                   {col.label}
-                  {sortKey === col.key && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                  <span className={sortKey === col.key ? "text-brand-500" : "text-transparent"}>
+                    {sortKey === col.key && sortDir === "desc" ? "▼" : "▲"}
+                  </span>
                 </button>
               </th>
             ))}
-            <th className="px-4 py-2 font-medium"></th>
+            <th className="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody>
           {sortedRows.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
+              <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400">
                 {rows.length === 0
                   ? showArchived
                     ? "No hay productos archivados."
@@ -165,32 +170,56 @@ export default function ProductsTable({
               ? restoreProduct.bind(null, product.id)
               : archiveProduct.bind(null, product.id);
             return (
-              <tr key={product.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr
+                key={product.id}
+                className="border-t border-neutral-100 transition-colors hover:bg-neutral-50"
+              >
+                <td className="px-4 py-3 font-medium text-neutral-900">
                   {showArchived ? (
                     product.name
                   ) : (
-                    <Link href={`/products/${product.id}/edit`} className="hover:underline">
+                    <Link
+                      href={`/products/${product.id}/edit`}
+                      className="transition-colors hover:text-brand-600"
+                    >
                       {product.name}
                     </Link>
                   )}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{product.categoryName ?? "-"}</td>
-                <td className="px-4 py-2">{product.baseUnitLabel}</td>
-                <td className="px-4 py-2 text-neutral-500">
-                  {product.yieldPercentage === 100 ? "-" : `${product.yieldPercentage}%`}
+                <td className="px-4 py-3">
+                  {product.categoryName ? (
+                    <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+                      {product.categoryName}
+                    </span>
+                  ) : (
+                    <span className="text-neutral-400">-</span>
+                  )}
                 </td>
-                <td className="px-4 py-2">
-                  {product.currentUnitCost === null ? "Sin compras" : formatMoney(product.currentUnitCost, 4)}
+                <td className="px-4 py-3 text-neutral-600">{product.baseUnitLabel}</td>
+                <td className="px-4 py-3 text-neutral-600">
+                  {product.yieldPercentage === 100 ? (
+                    <span className="text-neutral-400">-</span>
+                  ) : (
+                    `${product.yieldPercentage}%`
+                  )}
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3">
+                  {product.currentUnitCost === null ? (
+                    <span className="text-neutral-400">Sin compras</span>
+                  ) : (
+                    <span className="font-medium text-neutral-900">
+                      {formatMoney(product.currentUnitCost, 4)}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
                   <form action={action}>
                     <button
                       type="submit"
                       className={
                         showArchived
-                          ? "text-neutral-500 hover:text-neutral-900"
-                          : "text-neutral-400 hover:text-red-600"
+                          ? "text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-900"
+                          : "text-sm font-medium text-neutral-400 transition-colors hover:text-red-600"
                       }
                     >
                       {showArchived ? "Restaurar" : "Archivar"}

@@ -1,24 +1,82 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Paleta del sistema: grafito y arena.
+ * La escala `neutral` de Tailwind se redefine con neutros calidos (en vez de los grises
+ * frios de fabrica), asi todas las pantallas que ya usan neutral-* toman el tono nuevo
+ * sin tener que tocarlas una por una. `brand` es el acento bronce.
+ */
+@theme {
+  --color-neutral-50: #f7f5f2;
+  --color-neutral-100: #f0ede8;
+  --color-neutral-200: #e5e1da;
+  --color-neutral-300: #d3cdc3;
+  --color-neutral-400: #a9a296;
+  --color-neutral-500: #7c766b;
+  --color-neutral-600: #5c574e;
+  --color-neutral-700: #46423a;
+  --color-neutral-800: #2d2a25;
+  --color-neutral-900: #1c1b19;
+  --color-neutral-950: #121110;
+
+  --color-brand-50: #faf6ef;
+  --color-brand-100: #f2e9d8;
+  --color-brand-200: #e3d2b0;
+  --color-brand-300: #cdb183;
+  --color-brand-400: #b08f5b;
+  --color-brand-500: #8a6a3e;
+  --color-brand-600: #73572f;
+  --color-brand-700: #5a4426;
+  --color-brand-800: #42321c;
+  --color-brand-900: #2c2113;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* La app está diseñada solo en modo claro; forzarlo evita texto blanco sobre fondo claro cuando el sistema está en modo oscuro. */
 :root {
+  --background: #f7f5f2;
+  --foreground: #1c1b19;
+  /* La app esta disenada solo en modo claro; forzarlo evita texto blanco sobre fondo
+     claro cuando el sistema esta en modo oscuro. */
   color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Campos de captura: un solo estilo para toda la app, con foco en bronce. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  background-color: #ffffff;
+  color: var(--foreground);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-neutral-400);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 1px;
+  border-color: var(--color-brand-400);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Las cifras se alinean en columna aunque cambien de ancho. */
+table {
+  font-variant-numeric: tabular-nums;
 }

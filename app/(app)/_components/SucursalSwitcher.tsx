@@ -26,7 +26,7 @@ export default function SucursalSwitcher({
       value={activeId}
       disabled={pending}
       onChange={(e) => handleChange(e.target.value)}
-      className="rounded-md border border-neutral-300 px-2 py-1 text-sm text-neutral-700"
+      className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 disabled:opacity-60"
     >
       {sucursales.map((s) => (
         <option key={s.id} value={s.id}>

@@ -30,30 +30,39 @@ export default async function ProductsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">
-          {showArchived ? "Productos archivados" : "Catalogo de productos"}
-        </h1>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-500">
+            Operacion
+          </p>
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">
+            {showArchived ? "Productos archivados" : "Catalogo de productos"}
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            {rows.length} {rows.length === 1 ? "producto" : "productos"}
+            {showArchived ? " archivados" : " activos"}
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           {showArchived ? (
-            <Link href="/products" className="text-sm text-neutral-500 hover:underline">
+            <Link href="/products" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
               Ver activos
             </Link>
           ) : (
-            <Link href="/products?view=archived" className="text-sm text-neutral-500 hover:underline">
+            <Link href="/products?view=archived" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
               Ver archivados
             </Link>
           )}
           <a
             href={showArchived ? "/api/export/products?view=archived" : "/api/export/products"}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Exportar a Excel
           </a>
           {!showArchived && (
             <Link
               href="/products/new"
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+              className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
             >
               Agregar producto
             </Link>
