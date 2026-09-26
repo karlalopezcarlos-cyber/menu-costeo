@@ -40,7 +40,7 @@ export default function SaleForm({
   return (
     <form
       action={formAction}
-      className="grid grid-cols-[9rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+      className="grid grid-cols-[9rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4"
     >
       <div className="space-y-1">
         <label htmlFor="date" className="text-sm font-medium text-neutral-700">
@@ -52,7 +52,7 @@ export default function SaleForm({
           type="date"
           required
           defaultValue={editing ? editing.dateInputValue : new Date().toISOString().slice(0, 10)}
-          className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
         />
       </div>
 
@@ -80,7 +80,7 @@ export default function SaleForm({
           required
           defaultValue={editing?.quantitySold}
           placeholder="0"
-          className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
         />
       </div>
 
@@ -102,7 +102,7 @@ export default function SaleForm({
             value={unitPrice}
             onChange={(e) => setUnitPrice(e.target.value)}
             placeholder="0.00"
-            className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function SaleForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : editing ? "Guardar cambios" : "Guardar"}
         </button>

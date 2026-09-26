@@ -28,7 +28,7 @@ export default function EditProductForm({
   const typeChanged = UNIT_META[baseUnit].type !== UNIT_META[product.baseUnit].type;
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div className="space-y-1">
         <label htmlFor="name" className="text-sm font-medium text-neutral-700">
           Nombre
@@ -38,7 +38,7 @@ export default function EditProductForm({
           name="name"
           required
           defaultValue={product.name}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -50,7 +50,7 @@ export default function EditProductForm({
           id="categoryId"
           name="categoryId"
           defaultValue={product.categoryId ?? ""}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="">Sin categoria</option>
           {categories.map((category) => (
@@ -74,7 +74,7 @@ export default function EditProductForm({
           required
           value={baseUnit}
           onChange={(e) => setBaseUnit(e.target.value as UnitValue)}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           {UNITS.map((unit) => (
             <option key={unit} value={unit}>
@@ -106,7 +106,7 @@ export default function EditProductForm({
           min="1"
           max="100"
           defaultValue={product.yieldPercentage}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <p className="text-xs text-neutral-500">
           100% = sin merma. Ajusta el costo de las siguientes compras que registres para este
@@ -132,7 +132,7 @@ export default function EditProductForm({
               name="presentationUnitLabel"
               defaultValue={product.presentationUnitLabel ?? ""}
               placeholder="Botella"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -147,7 +147,7 @@ export default function EditProductForm({
               min="0"
               defaultValue={product.presentationUnitQty ?? ""}
               placeholder="750"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function EditProductForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : "Guardar"}
         </button>

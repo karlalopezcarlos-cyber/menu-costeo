@@ -21,7 +21,7 @@ export default async function PlanningByPluPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Planeacion por PLU</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Planeacion por PLU</h1>
         <p className="text-sm text-neutral-500">
           Elige cuanto planeas vender de cada platillo. Explotamos la receta (incluyendo subrecetas)
           y descontamos lo que ya tienes, para decirte que producir y que comprar.

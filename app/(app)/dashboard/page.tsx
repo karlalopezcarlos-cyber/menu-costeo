@@ -26,6 +26,29 @@ const GROUP_COLUMNS: {
   { key: "consolidado", pctKey: "consolidadoPct", label: "CONSOLIDADO" },
 ];
 
+/** Tarjeta de indicador para el resumen de arriba. */
+function StatTile({
+  label,
+  value,
+  hint,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "default" | "positive" | "negative";
+}) {
+  const valueTone =
+    tone === "positive" ? "text-emerald-700" : tone === "negative" ? "text-red-600" : "text-neutral-900";
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold tracking-tight tabular-nums ${valueTone}`}>{value}</p>
+      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+    </div>
+  );
+}
+
 function Row({ row }: { row: IncomeStatementRowView }) {
   const description = INCOME_STATEMENT_ROW_DESCRIPTIONS[row.label];
   return (
@@ -72,7 +95,7 @@ export default async function DashboardPage({
   if (counts.length < 2) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-neutral-900">Estado de Resultados</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Estado de Resultados</h1>
         <p className="text-sm text-neutral-500">
           Necesitas al menos dos conteos de inventario (inicial y final) para ver el estado de
           resultados del periodo. Ve a Inventario y registra otro conteo.
@@ -104,36 +127,61 @@ export default async function DashboardPage({
   );
   const rows = buildIncomeStatementRows(result);
   const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}`;
+  const ventaTotal = result.ventaTotal.consolidado;
+  const costoPct = ventaTotal !== 0 ? (result.costoDeVentas.consolidado / ventaTotal) * 100 : null;
+  const potencialPct = ventaTotal !== 0 ? (result.costoPotencial.consolidado / ventaTotal) * 100 : null;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Estado de Resultados</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-500">
             {result.organizationName} — {result.sucursalName}
           </p>
-          <p className="text-sm text-neutral-500">
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">
+            Estado de Resultados
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
             {result.initialDateLabel} - {result.finalDateLabel}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <a
             href={`/api/export/income-statement${exportQuery}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Descargar Excel
           </a>
           <a
             href={`/api/export/income-statement/pdf${exportQuery}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Descargar PDF
           </a>
         </div>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile label="Venta total" value={formatMoney(result.ventaTotal.consolidado)} hint="Periodo seleccionado" />
+        <StatTile
+          label="Costo de ventas"
+          value={formatMoney(result.costoDeVentas.consolidado)}
+          hint={costoPct !== null ? `${costoPct.toFixed(2)}% de la venta total` : "Sin venta en el periodo"}
+        />
+        <StatTile
+          label="Costo potencial"
+          value={potencialPct !== null ? `${potencialPct.toFixed(2)}%` : "-"}
+          hint={`Teorico segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
+        />
+        <StatTile
+          label="Variacion"
+          value={formatMoney(result.variacion.consolidado)}
+          tone={result.variacion.consolidado >= 0 ? "positive" : "negative"}
+          hint={result.variacion.consolidado >= 0 ? "Favorable: costo real menor al teorico" : "Desfavorable: costo real mayor al teorico"}
+        />
+      </div>
+
+      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div className="space-y-1">
           <label htmlFor="initial" className="text-sm font-medium text-neutral-700">
             Fecha inicial (inventario)
@@ -142,7 +190,7 @@ export default async function DashboardPage({
             id="initial"
             name="initial"
             defaultValue={initialCountId}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {counts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -159,7 +207,7 @@ export default async function DashboardPage({
             id="final"
             name="final"
             defaultValue={finalCountId}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {counts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -170,7 +218,7 @@ export default async function DashboardPage({
         </div>
         <button
           type="submit"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Ver
         </button>
@@ -180,15 +228,15 @@ export default async function DashboardPage({
         grupo asignado (Configuracion &gt; Categorias) se consolidan en Miscelaneos.
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="bg-neutral-800 text-white">
-              <th className="px-2 py-2 text-left font-medium">CONCEPTO</th>
+            <tr className="bg-neutral-900 text-white">
+              <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em]">CONCEPTO</th>
               {GROUP_COLUMNS.map((col, index) => (
                 <th
                   key={col.key}
-                  className={`px-3 py-2 text-center font-medium ${index > 0 ? "border-l border-neutral-600" : ""}`}
+                  className={`px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.12em] ${index > 0 ? "border-l border-neutral-700" : ""}`}
                   colSpan={2}
                 >
                   {col.label}
@@ -216,7 +264,7 @@ export default async function DashboardPage({
             <Row row={rows[9]} />
             <Row row={rows[10]} />
 
-            <tr className="border-t border-neutral-100">
+            <tr className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
               <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Monto pagado"]}>
                 Monto pagado
               </td>
@@ -231,7 +279,7 @@ export default async function DashboardPage({
               ))}
             </tr>
 
-            <tr className="border-t border-neutral-100 font-semibold">
+            <tr className="border-t border-neutral-100 font-semibold transition-colors hover:bg-neutral-50">
               <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Venta promedio diaria"]}>
                 Venta promedio diaria
               </td>

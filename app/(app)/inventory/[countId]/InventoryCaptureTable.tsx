@@ -190,10 +190,10 @@ export default function InventoryCaptureTable({
 
   return (
     <form action={boundSave} className="space-y-3">
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div>
           <p className="text-sm text-neutral-500">Valor de inventario</p>
-          <p className="text-2xl font-semibold text-neutral-900">{formatMoney(grandTotal)}</p>
+          <p className="text-2xl font-semibold tracking-tight text-neutral-900">{formatMoney(grandTotal)}</p>
         </div>
         <div className="flex items-center gap-3">
           {autoSaveStatus === "saving" && (
@@ -212,7 +212,7 @@ export default function InventoryCaptureTable({
           )}
           <button
             type="submit"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Guardar conteo
           </button>
@@ -225,12 +225,12 @@ export default function InventoryCaptureTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
           {categoryOptions.names.map((name) => (
@@ -254,12 +254,12 @@ export default function InventoryCaptureTable({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               {COLUMNS.map((col) => (
-                <th key={col.key} className="px-4 py-2 font-medium">
+                <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(col.key)}
@@ -299,9 +299,9 @@ export default function InventoryCaptureTable({
                   key={row.key}
                   className={visible ? "border-t border-neutral-100" : "hidden"}
                 >
-                  <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                  <td className="px-4 py-2">{row.name}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
+                  <td className="px-4 py-3">{row.name}</td>
+                  <td className="px-4 py-3">
                     <span
                       className={`rounded px-2 py-0.5 text-xs font-medium ${
                         row.type === "Producto" ? "bg-neutral-100 text-neutral-600" : "bg-blue-100 text-blue-800"
@@ -310,7 +310,7 @@ export default function InventoryCaptureTable({
                       {row.type}
                     </span>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input type="hidden" name={`basis:${inputName}:${row.id}`} value={basis} />
                     {effectiveCost === 0 ? (
                       <span className="text-amber-500" title="Sin costo capturado todavia.">
@@ -326,14 +326,14 @@ export default function InventoryCaptureTable({
                           setCostBasis((prev) => ({ ...prev, [row.key]: e.target.value as CostBasis }))
                         }
                         title={`Rendimiento configurado: ${row.yieldPercentage}%`}
-                        className="ml-2 rounded border border-neutral-300 px-1 py-0.5 text-xs text-neutral-600"
+                        className="ml-2 rounded border border-neutral-200 px-1 py-0.5 text-xs text-neutral-600"
                       >
                         <option value="net">Con rendimiento</option>
                         <option value="gross">De compra</option>
                       </select>
                     )}
                   </td>
-                  <td className="px-4 py-2" onKeyDown={handleQuantityKeyDown}>
+                  <td className="px-4 py-3" onKeyDown={handleQuantityKeyDown}>
                     <input
                       type="hidden"
                       name={`qty:${inputName}:${row.id}`}
@@ -347,7 +347,7 @@ export default function InventoryCaptureTable({
                       onChange={(qty) => setQuantities((prev) => ({ ...prev, [row.key]: qty }))}
                     />
                   </td>
-                  <td className="px-4 py-2 text-base font-bold text-neutral-900">
+                  <td className="px-4 py-3 text-base font-bold text-neutral-900">
                     {formatMoney(qty * effectiveCost)}
                   </td>
                 </tr>

@@ -67,7 +67,7 @@ export default async function ItemKardexPage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Kardex - {kardex.itemName}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Kardex - {kardex.itemName}</h1>
         <p className="text-sm text-neutral-500">
           {itemType === "subrecipe" ? "Subreceta" : "Producto"} - {kardex.categoryName ?? "Sin categoria"} -
           Movimientos desde el conteo del {kardex.initialDateLabel}{" "}
@@ -76,21 +76,21 @@ export default async function ItemKardexPage({
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs text-neutral-500">Inicial ({kardex.initialDateLabel})</p>
           <p className="mt-1 text-lg font-semibold text-neutral-900">
             {fmt(kardex.initialQty)} {kardex.unitLabel}
             {presentationSuffix(kardex.initialQty, kardex.presentationUnitQty, kardex.presentationUnitLabel)}
           </p>
         </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs text-neutral-500">Teorico</p>
           <p className="mt-1 text-lg font-semibold text-neutral-900">
             {fmt(kardex.theoreticalFinalQty)} {kardex.unitLabel}
             {presentationSuffix(kardex.theoreticalFinalQty, kardex.presentationUnitQty, kardex.presentationUnitLabel)}
           </p>
         </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs text-neutral-500">
             Real {kardex.finalDateLabel ? `(${kardex.finalDateLabel})` : ""}
           </p>
@@ -100,7 +100,7 @@ export default async function ItemKardexPage({
               : "-"}
           </p>
         </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs text-neutral-500">Variacion</p>
           <p
             className={`mt-1 text-lg font-semibold ${
@@ -120,28 +120,28 @@ export default async function ItemKardexPage({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Tipo</th>
-              <th className="px-4 py-2 font-medium">Detalle</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
-              <th className="px-4 py-2 font-medium">Saldo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Tipo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Detalle</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Saldo</th>
             </tr>
           </thead>
           <tbody>
             <tr className="border-t border-neutral-100 bg-neutral-50">
-              <td className="px-4 py-2 text-neutral-500">{kardex.initialDateLabel}</td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3 text-neutral-500">{kardex.initialDateLabel}</td>
+              <td className="px-4 py-3">
                 <span className="rounded bg-neutral-200 px-2 py-0.5 text-xs font-medium text-neutral-700">
                   Inicial
                 </span>
               </td>
-              <td className="px-4 py-2 text-neutral-500">Conteo de inventario inicial</td>
-              <td className="px-4 py-2">-</td>
-              <td className="px-4 py-2 font-medium">
+              <td className="px-4 py-3 text-neutral-500">Conteo de inventario inicial</td>
+              <td className="px-4 py-3">-</td>
+              <td className="px-4 py-3 font-medium">
                 {fmt(kardex.initialQty)} {kardex.unitLabel}
               </td>
             </tr>
@@ -153,14 +153,14 @@ export default async function ItemKardexPage({
               </tr>
             )}
             {kardex.movements.map((m, index) => (
-              <tr key={index} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">{m.dateLabel}</td>
-                <td className="px-4 py-2">
+              <tr key={index} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3 text-neutral-500">{m.dateLabel}</td>
+                <td className="px-4 py-3">
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[m.type]}`}>
                     {TYPE_LABELS[m.type]}
                   </span>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3">
                   {m.href ? (
                     <Link href={m.href} className="hover:underline">
                       {m.label}
@@ -173,22 +173,22 @@ export default async function ItemKardexPage({
                   {m.qtyDelta > 0 ? "+" : ""}
                   {fmt(m.qtyDelta)} {kardex.unitLabel}
                 </td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-4 py-3 font-medium">
                   {fmt(m.runningBalance)} {kardex.unitLabel}
                 </td>
               </tr>
             ))}
             {kardex.actualFinalQty !== null && (
               <tr className="border-t border-neutral-200 bg-neutral-50">
-                <td className="px-4 py-2 text-neutral-500">{kardex.finalDateLabel}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{kardex.finalDateLabel}</td>
+                <td className="px-4 py-3">
                   <span className="rounded bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white">
                     Conteo real
                   </span>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">Conteo de inventario final (real)</td>
-                <td className="px-4 py-2">-</td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-4 py-3 text-neutral-500">Conteo de inventario final (real)</td>
+                <td className="px-4 py-3">-</td>
+                <td className="px-4 py-3 font-medium">
                   {fmt(kardex.actualFinalQty)} {kardex.unitLabel}
                 </td>
               </tr>

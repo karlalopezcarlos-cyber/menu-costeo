@@ -74,7 +74,7 @@ export default async function RecipesPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Recetas</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Recetas</h1>
         <div className="flex items-center gap-3">
           {showArchived ? (
             <Link href="/recipes" className="text-sm text-neutral-500 hover:underline">
@@ -87,32 +87,32 @@ export default async function RecipesPage({
           )}
           <a
             href={`/api/export/recipes${exportQuery}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Exportar costos
           </a>
           <a
             href={`/api/export/recipes/ingredients${exportQuery}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Exportar recetas
           </a>
           <a
             href={`/api/export/recipes/pdf${exportQuery}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Exportar a PDF
           </a>
           <Link
             href="/recipes/new"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Nueva receta
           </Link>
         </div>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         {showArchived && <input type="hidden" name="view" value="archived" />}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="type" className="block text-sm font-medium text-neutral-700">
@@ -122,7 +122,7 @@ export default async function RecipesPage({
             id="type"
             name="type"
             defaultValue={typeFilter}
-            className="min-w-56 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="min-w-56 rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="all">Todas</option>
             <option value="plu">Solo PLU (platillos de menu)</option>
@@ -131,7 +131,7 @@ export default async function RecipesPage({
         </div>
         <button
           type="submit"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Ver
         </button>

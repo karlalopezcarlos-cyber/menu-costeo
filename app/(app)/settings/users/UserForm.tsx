@@ -60,7 +60,7 @@ export default function UserForm({
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4">
+    <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       <h2 className="text-sm font-semibold text-neutral-900">
         {editing ? `Editar usuario: ${editing.email}` : "Nuevo usuario"}
       </h2>
@@ -74,7 +74,7 @@ export default function UserForm({
             id="name"
             name="name"
             defaultValue={editing?.name ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -87,7 +87,7 @@ export default function UserForm({
             type="email"
             required
             defaultValue={editing?.email ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -100,7 +100,7 @@ export default function UserForm({
             type="password"
             required={!editing}
             placeholder={editing ? "Dejar en blanco para no cambiar" : ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -155,7 +155,7 @@ export default function UserForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : editing ? "Guardar cambios" : "Crear usuario"}
         </button>

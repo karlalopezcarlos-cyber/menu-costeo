@@ -64,7 +64,7 @@ export default function PurchaseEditForm({
 
   return (
     <div className="space-y-4">
-      <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5">
+      <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <input type="hidden" name="purchaseId" value={purchaseId} />
         {recipeId && <input type="hidden" name="recipeId" value={recipeId} />}
 
@@ -88,7 +88,7 @@ export default function PurchaseEditForm({
               type="date"
               required
               defaultValue={purchaseDate}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -99,7 +99,7 @@ export default function PurchaseEditForm({
               id="supplierId"
               name="supplierId"
               defaultValue={supplierId}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               <option value="">Sin proveedor</option>
               {suppliers.map((s) => (
@@ -125,7 +125,7 @@ export default function PurchaseEditForm({
               required
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -137,7 +137,7 @@ export default function PurchaseEditForm({
               name="presentationUnit"
               value={unit}
               onChange={(e) => setUnit(e.target.value as UnitValue)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               {UNITS.map((u) => (
                 <option key={u} value={u} disabled={UNIT_META[u].type !== UNIT_META[baseUnit].type}>
@@ -163,7 +163,7 @@ export default function PurchaseEditForm({
                 required
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+                className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
               />
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function PurchaseEditForm({
             rows={2}
             defaultValue={comment ?? ""}
             placeholder="Opcional"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
 
@@ -194,7 +194,7 @@ export default function PurchaseEditForm({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
           >
             {pending ? "Guardando..." : "Guardar cambios"}
           </button>

@@ -46,7 +46,7 @@ export default async function StoreGraciasPage({
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">
         {order?.paymentStatus === "failed" ? "✕" : "✓"}
       </div>
-      <h1 className="text-2xl font-semibold text-neutral-900">{copy.title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{copy.title}</h1>
       {order && (
         <p className="text-neutral-600">
           Tu folio es <strong className="text-neutral-900">{formatStoreOrderFolio(order.folio)}</strong>.

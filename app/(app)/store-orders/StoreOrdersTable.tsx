@@ -93,12 +93,12 @@ export default function StoreOrdersTable({ rows }: { rows: StoreOrderRow[] }) {
 
       <div className="space-y-3">
         {visibleRows.length === 0 && (
-          <p className="rounded-lg border border-neutral-200 bg-white px-4 py-6 text-center text-neutral-400">
+          <p className="rounded-xl border border-neutral-200 bg-white shadow-sm px-4 py-6 text-center text-neutral-400">
             {statusFilter === "pending" ? "No hay pedidos pendientes." : "Todavia no hay pedidos en linea."}
           </p>
         )}
         {visibleRows.map((row) => (
-          <div key={row.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+          <div key={row.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">

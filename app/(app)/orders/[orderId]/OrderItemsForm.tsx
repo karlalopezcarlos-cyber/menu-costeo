@@ -49,7 +49,7 @@ export default function OrderItemsForm({
 
   return (
     <form action={boundSave} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-1">
           <label htmlFor="supplierId" className="text-sm font-medium text-neutral-700">
             Proveedor (opcional)
@@ -59,7 +59,7 @@ export default function OrderItemsForm({
             name="supplierId"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Sin proveedor</option>
             {suppliers.map((s) => (
@@ -79,19 +79,19 @@ export default function OrderItemsForm({
             rows={1}
             defaultValue={initialComment}
             placeholder="Ej. entregar antes de las 10 am"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Producto</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
-              <th className="px-4 py-2 font-medium">Comentario</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Producto</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Comentario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
@@ -106,8 +106,8 @@ export default function OrderItemsForm({
               const isRemoved = !!removed[row.id];
               return (
                 <tr key={row.id} className={`border-t border-neutral-100 ${isRemoved ? "opacity-40" : ""}`}>
-                  <td className="px-4 py-2">{row.productName}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">{row.productName}</td>
+                  <td className="px-4 py-3">
                     <input
                       type="hidden"
                       name={`presentation:${row.id}`}
@@ -132,7 +132,7 @@ export default function OrderItemsForm({
                       initialPresentationLabel={row.presentationLabel}
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       name={`itemComment:${row.id}`}
                       value={comments[row.id] ?? row.comment}
@@ -141,10 +141,10 @@ export default function OrderItemsForm({
                       }
                       disabled={isRemoved}
                       placeholder="Opcional"
-                      className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     {isRemoved ? (
                       <button
                         type="button"
@@ -174,7 +174,7 @@ export default function OrderItemsForm({
       {rows.length > 0 && (
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
         >
           Guardar cambios
         </button>

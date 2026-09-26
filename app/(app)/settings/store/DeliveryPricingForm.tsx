@@ -19,7 +19,7 @@ export default function DeliveryPricingForm({
   const [state, formAction, pending] = useActionState(updateDeliveryPricing, initialState);
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="space-y-1">
           <label htmlFor="deliveryBaseFee" className="text-sm font-medium text-neutral-700">
@@ -34,7 +34,7 @@ export default function DeliveryPricingForm({
               step="0.01"
               min="0"
               defaultValue={deliveryBaseFee}
-              className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
             />
           </div>
         </div>
@@ -51,7 +51,7 @@ export default function DeliveryPricingForm({
               step="0.01"
               min="0"
               defaultValue={deliveryPricePerKm}
-              className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
             />
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function DeliveryPricingForm({
               step="0.01"
               min="0"
               defaultValue={deliveryMinOrder}
-              className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
             />
           </div>
         </div>
@@ -85,7 +85,7 @@ export default function DeliveryPricingForm({
               min="0"
               defaultValue={deliveryMaxKm}
               placeholder="10"
-              className="w-full rounded-md border border-neutral-300 py-2 pl-2 pr-8 text-sm"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-2 pr-8 text-sm"
             />
             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400">km</span>
           </div>
@@ -103,7 +103,7 @@ export default function DeliveryPricingForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending ? "Guardando..." : "Guardar tarifa"}
       </button>

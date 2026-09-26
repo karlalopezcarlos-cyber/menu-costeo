@@ -101,7 +101,7 @@ export default async function NewPurchasePage({
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Registrar compra</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Registrar compra</h1>
       {products.length === 0 ? (
         <p className="text-sm text-neutral-500">
           Primero agrega al menos un producto en el catalogo.

@@ -24,7 +24,7 @@ export default async function AuditPage({
   if (counts.length === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-neutral-900">Auditoria de inventario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Auditoria de inventario</h1>
         <p className="text-sm text-neutral-500">
           Necesitas al menos un conteo de inventario capturado para poder analizar variaciones.
           Ve a Inventario y registra uno.
@@ -56,7 +56,7 @@ export default async function AuditPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Auditoria de inventario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Auditoria de inventario</h1>
         <p className="text-sm text-neutral-500">
           Inventario teorico por producto y subreceta (en cantidad, no en dinero): inicial +
           compras (registradas en Compras o pedidos ya recibidos) + produccion registrada - mermas
@@ -65,7 +65,7 @@ export default async function AuditPage({
         </p>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div className="space-y-1">
           <label htmlFor="initial" className="text-sm font-medium text-neutral-700">
             Inventario inicial
@@ -74,7 +74,7 @@ export default async function AuditPage({
             id="initial"
             name="initial"
             defaultValue={initialCountId}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {counts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -91,7 +91,7 @@ export default async function AuditPage({
             id="final"
             name="final"
             defaultValue={finalCountId}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Aun sin capturar (proyeccion a hoy)</option>
             {countsAfterInitial.map((c) => (
@@ -103,13 +103,13 @@ export default async function AuditPage({
         </div>
         <button
           type="submit"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Ver
         </button>
         <a
           href={`/api/export/audit?initial=${initialCountId}${finalCountId ? `&final=${finalCountId}` : ""}`}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Exportar a Excel
         </a>

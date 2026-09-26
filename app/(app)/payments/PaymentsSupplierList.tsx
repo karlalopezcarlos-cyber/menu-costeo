@@ -35,7 +35,7 @@ export default function PaymentsSupplierList({ rows }: { rows: SupplierBalanceRo
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar proveedor..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <label className="flex items-center gap-1.5 text-sm text-neutral-700">
           <input
@@ -48,14 +48,14 @@ export default function PaymentsSupplierList({ rows }: { rows: SupplierBalanceRo
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium text-right">Total comprado</th>
-              <th className="px-4 py-2 font-medium text-right">Total pagado</th>
-              <th className="px-4 py-2 font-medium text-right">Saldo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Proveedor</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total comprado</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total pagado</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Saldo</th>
             </tr>
           </thead>
           <tbody>
@@ -67,14 +67,14 @@ export default function PaymentsSupplierList({ rows }: { rows: SupplierBalanceRo
               </tr>
             )}
             {filtered.map((row) => (
-              <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   <Link href={`/payments/${row.id}`} className="text-neutral-900 hover:underline">
                     {row.name}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-right text-neutral-500">{money(row.totalPurchased)}</td>
-                <td className="px-4 py-2 text-right text-neutral-500">{money(row.totalPaid)}</td>
+                <td className="px-4 py-3 text-right text-neutral-500">{money(row.totalPurchased)}</td>
+                <td className="px-4 py-3 text-right text-neutral-500">{money(row.totalPaid)}</td>
                 <td className={`px-4 py-2 text-right font-medium ${row.balance > 0.005 ? "text-red-600" : "text-green-700"}`}>
                   {money(row.balance)}
                 </td>

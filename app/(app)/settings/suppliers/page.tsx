@@ -17,7 +17,7 @@ export default async function SuppliersPage() {
     <div className="max-w-4xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
           <SettingsNav active="/settings/suppliers" />
           <p className="mt-3 text-sm text-neutral-500">
             Estos proveedores aparecen como lista desplegable al registrar una compra o un pedido
@@ -27,7 +27,7 @@ export default async function SuppliersPage() {
         </div>
         <a
           href="/api/export/suppliers"
-          className="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="shrink-0 rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Exportar a Excel
         </a>
@@ -35,15 +35,15 @@ export default async function SuppliersPage() {
 
       <NewSupplierForm />
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Compras</th>
-              <th className="px-4 py-2 font-medium">Contacto principal</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nombre</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Compras</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Contacto principal</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Estado</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>

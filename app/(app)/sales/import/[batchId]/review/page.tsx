@@ -32,7 +32,7 @@ export default async function ImportReviewPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Platillos por reconocer</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Platillos por reconocer</h1>
       <p className="text-sm text-neutral-500">
         Estos nombres del archivo "{batch.fileName}" no coinciden con ninguna receta conocida.
         Resuelvelos una vez; en cargas futuras se reconoceran solos.
@@ -49,7 +49,7 @@ export default async function ImportReviewPage({
             const createAction = createRecipeForRow.bind(null, batch.id, row.id);
             const ignoreAction = ignoreRowAlways.bind(null, batch.id, row.id);
             return (
-              <div key={row.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+              <div key={row.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
                 <p className="font-medium text-neutral-900">{row.rawName}</p>
                 <p className="mb-3 text-sm text-neutral-500">
                   Fecha: {row.date ? row.date.toLocaleDateString("es-MX", { timeZone: "UTC" }) : "-"} - Cantidad:{" "}
@@ -61,7 +61,7 @@ export default async function ImportReviewPage({
                     <select
                       name="recipeId"
                       required
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="rounded-md border border-neutral-200 px-2 py-1 text-sm"
                     >
                       <option value="">Vincular a receta existente...</option>
                       {recipes.map((r) => (
@@ -81,7 +81,7 @@ export default async function ImportReviewPage({
                   <form action={createAction}>
                     <button
                       type="submit"
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                      className="rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                     >
                       Crear receta nueva
                     </button>
@@ -90,7 +90,7 @@ export default async function ImportReviewPage({
                   <form action={ignoreAction}>
                     <button
                       type="submit"
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-50"
+                      className="rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-50"
                     >
                       Ignorar siempre (no es un platillo)
                     </button>

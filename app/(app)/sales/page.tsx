@@ -75,26 +75,26 @@ export default async function SalesPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Ventas</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Ventas</h1>
         <div className="flex items-center gap-3">
           <Link href="/sales/tickets" className="text-sm text-neutral-500 hover:underline">
             Ver tickets de venta
           </Link>
           <a
             href="/api/export/sales-template"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Descargar plantilla
           </a>
           <Link
             href="/sales/import"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Importar desde Excel
           </Link>
           <Link
             href="/sales/new"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Registrar venta
           </Link>
@@ -111,7 +111,7 @@ export default async function SalesPage({
             name="from"
             type="date"
             defaultValue={toDateInputValue(from)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -123,12 +123,12 @@ export default async function SalesPage({
             name="to"
             type="date"
             defaultValue={toDateInputValue(to)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <button
           type="submit"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Ver
         </button>

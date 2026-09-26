@@ -68,7 +68,7 @@ export default function AddPurchaseItemForm({
   return (
     <form
       action={formAction}
-      className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5"
+      className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5"
     >
       {recipeId && <input type="hidden" name="recipeId" value={recipeId} />}
 
@@ -83,7 +83,7 @@ export default function AddPurchaseItemForm({
             required
             value={productId}
             onChange={(e) => handleProductChange(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
@@ -105,7 +105,7 @@ export default function AddPurchaseItemForm({
             required
             value={qty}
             onChange={(e) => setQty(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -117,7 +117,7 @@ export default function AddPurchaseItemForm({
             name="presentationUnit"
             value={unit}
             onChange={(e) => setUnit(e.target.value as UnitValue)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {UNITS.map((u) => (
               <option key={u} value={u} disabled={!product || UNIT_META[u].type !== UNIT_META[product.baseUnit].type}>
@@ -146,7 +146,7 @@ export default function AddPurchaseItemForm({
               required
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
             />
           </div>
         </div>
@@ -169,7 +169,7 @@ export default function AddPurchaseItemForm({
           name="comment"
           rows={2}
           placeholder="Opcional"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -179,7 +179,7 @@ export default function AddPurchaseItemForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Agregando..." : "Agregar a la compra"}
         </button>

@@ -68,12 +68,12 @@ export default function WasteTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar producto, subreceta o PLU..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
           {categoryNames.map((name) => (
@@ -92,7 +92,7 @@ export default function WasteTable({
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -104,7 +104,7 @@ export default function WasteTable({
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         {hasFilters && (
@@ -123,17 +123,17 @@ export default function WasteTable({
         )}
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <p className="text-sm text-neutral-500">Costo total de mermas (filtro actual)</p>
         <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               {COLUMNS.map((col) => (
-                <th key={col.key} className="px-4 py-2 font-medium">
+                <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(col.key)}
@@ -144,8 +144,8 @@ export default function WasteTable({
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-2 font-medium">Unidad</th>
-              <th className="px-4 py-2 font-medium">
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Unidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort("cost")}
@@ -155,8 +155,8 @@ export default function WasteTable({
                   {sortKey === "cost" && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
-              <th className="px-4 py-2 font-medium">Comentario</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Comentario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
@@ -170,10 +170,10 @@ export default function WasteTable({
               </tr>
             )}
             {sortedRows.map((row) => (
-              <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
-                <td className="px-4 py-2">{row.itemName}</td>
-                <td className="px-4 py-2">
+              <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
+                <td className="px-4 py-3">{row.itemName}</td>
+                <td className="px-4 py-3">
                   <span
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
                       row.itemType === "plu"
@@ -186,17 +186,17 @@ export default function WasteTable({
                     {row.itemTypeLabel}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                <td className="px-4 py-2 text-neutral-500">{row.quantityLabel}</td>
-                <td className="px-4 py-2 text-neutral-500">{row.unitLabel}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-500">{row.quantityLabel}</td>
+                <td className="px-4 py-3 text-neutral-500">{row.unitLabel}</td>
+                <td className="px-4 py-3">
                   {formatMoney(row.cost)}
                   {row.costBasisLabel && (
                     <span className="ml-1 text-xs text-amber-600">({row.costBasisLabel})</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{row.comment ?? "-"}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3 text-neutral-500">{row.comment ?? "-"}</td>
+                <td className="px-4 py-3 text-right">
                   <button
                     type="button"
                     onClick={() => {

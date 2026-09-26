@@ -115,12 +115,12 @@ export default function MenuEngineeringTable({
   }, [rows, sortKey, sortDir]);
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white">
+    <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
         <thead className="sticky top-0 z-10 bg-neutral-900 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="whitespace-nowrap px-4 py-2 font-medium">
+              <th key={col.key} className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
@@ -135,8 +135,8 @@ export default function MenuEngineeringTable({
         </thead>
         <tbody>
           {sortedRows.map((row) => (
-            <tr key={row.recipeId} className="border-t border-neutral-100">
-              <td className="px-4 py-2">
+            <tr key={row.recipeId} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <td className="px-4 py-3">
                 {row.recipeName}
                 {row.costUnreliable && (
                   <span
@@ -147,11 +147,11 @@ export default function MenuEngineeringTable({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2">{row.quantitySold}</td>
-              <td className="px-4 py-2">{formatMoney(row.unitPrice)}</td>
-              <td className="px-4 py-2">{formatMoney(row.cost)}</td>
-              <td className="px-4 py-2">{formatMoney(row.margin)}</td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">{row.quantitySold}</td>
+              <td className="px-4 py-3">{formatMoney(row.unitPrice)}</td>
+              <td className="px-4 py-3">{formatMoney(row.cost)}</td>
+              <td className="px-4 py-3">{formatMoney(row.margin)}</td>
+              <td className="px-4 py-3">
                 {row.costPct !== null ? (
                   <span
                     className={
@@ -168,8 +168,8 @@ export default function MenuEngineeringTable({
                   "-"
                 )}
               </td>
-              <td className="px-4 py-2">{(row.popularity * 100).toFixed(1)}%</td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">{(row.popularity * 100).toFixed(1)}%</td>
+              <td className="px-4 py-3">
                 <span className={`rounded px-2 py-0.5 text-xs font-medium ${BADGE_CLASSES[row.classification]}`}>
                   {CLASSIFICATION_ICONS[row.classification]} {CLASSIFICATION_LABELS[row.classification]}
                 </span>

@@ -23,7 +23,7 @@ export default async function SucursalesPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
         <SettingsNav active="/settings/sucursales" />
         <p className="mt-3 text-sm text-neutral-500">
           Cada sucursal tiene sus propias compras, ventas, recetas e inventario. La sucursal marcada

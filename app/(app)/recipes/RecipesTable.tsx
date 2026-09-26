@@ -93,7 +93,7 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
   }, [rows, search, sortKey, sortDir]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       {rows.length > 0 && (
         <div className="border-b border-neutral-100 px-4 py-2">
           <input
@@ -101,15 +101,15 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar receta o categoria..."
-            className="w-full max-w-xs rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
+            className="w-full max-w-xs rounded-md border border-neutral-200 px-2.5 py-1.5 text-sm"
           />
         </div>
       )}
       <table className="w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="px-4 py-2 font-medium">
+              <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
@@ -120,7 +120,7 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
                 </button>
               </th>
             ))}
-            <th className="px-4 py-2 font-medium"></th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
           </tr>
         </thead>
         <tbody>
@@ -139,8 +139,8 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
             </tr>
           )}
           {sortedRows.map((recipe) => (
-            <tr key={recipe.id} className="border-t border-neutral-100">
-              <td className="px-4 py-2">
+            <tr key={recipe.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <td className="px-4 py-3">
                 {showArchived ? (
                   recipe.name
                 ) : (
@@ -157,8 +157,8 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2 text-neutral-500">{recipe.categoryName ?? "-"}</td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3 text-neutral-500">{recipe.categoryName ?? "-"}</td>
+              <td className="px-4 py-3">
                 <button
                   type="button"
                   title="Click para cambiar el tipo de receta"
@@ -170,23 +170,23 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
                   {recipe.isMenuItem ? "PLU" : "Subreceta"}
                 </button>
               </td>
-              <td className="px-4 py-2 text-neutral-500">
+              <td className="px-4 py-3 text-neutral-500">
                 {recipe.yieldQty} {recipe.yieldUnitLabel}
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">
                 {recipe.costError ? (
                   <span className="text-red-600">{recipe.costError}</span>
                 ) : (
                   formatMoney(recipe.cost!)
                 )}
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">
                 {recipe.costPerUnit === null ? "-" : formatMoney(recipe.costPerUnit, 4)}
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">
                 {recipe.sellingPrice === null ? "-" : formatMoney(recipe.sellingPrice)}
               </td>
-              <td className="px-4 py-2">
+              <td className="px-4 py-3">
                 {recipe.costPct === null ? (
                   "-"
                 ) : (
@@ -203,7 +203,7 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-4 py-3 text-right">
                 {showArchived && (
                   <form action={restoreRecipe.bind(null, recipe.id)}>
                     <button type="submit" className="text-neutral-500 hover:text-neutral-900">

@@ -18,7 +18,7 @@ export default async function RecipeCategoriesPage() {
   return (
     <div className="max-w-md space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
         <SettingsNav active="/settings/recipe-categories" />
         <p className="mt-3 text-sm text-neutral-500">
           Estas categorias aparecen como lista desplegable al crear una receta nueva.
@@ -27,14 +27,14 @@ export default async function RecipeCategoriesPage() {
 
       <NewRecipeCategoryForm />
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Recetas</th>
-              <th className="px-4 py-2 font-medium">Grupo (Estado de Resultados)</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nombre</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Recetas</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Grupo (Estado de Resultados)</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
@@ -46,19 +46,19 @@ export default async function RecipeCategoriesPage() {
               </tr>
             )}
             {categories.map((category) => (
-              <tr key={category.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={category.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   <InlineNameEditor id={category.id} initialName={category.name} action={updateRecipeCategoryName} />
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{category._count.recipes}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{category._count.recipes}</td>
+                <td className="px-4 py-3">
                   <CategoryGroupSelect
                     categoryId={category.id}
                     initialGroup={category.group}
                     action={updateRecipeCategoryGroup}
                   />
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3 text-right">
                   <form
                     action={async () => {
                       "use server";

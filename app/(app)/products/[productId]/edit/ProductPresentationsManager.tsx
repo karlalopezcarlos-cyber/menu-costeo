@@ -61,7 +61,7 @@ export default function ProductPresentationsManager({
             id="presLabel"
             name="label"
             placeholder="Lata 2.75kg"
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
           />
         </div>
         <div className="w-24 space-y-1">
@@ -75,7 +75,7 @@ export default function ProductPresentationsManager({
             step="any"
             min="0"
             placeholder="2.75"
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
           />
         </div>
         <div className="w-24 space-y-1">
@@ -86,7 +86,7 @@ export default function ProductPresentationsManager({
             id="presUnit"
             name="unit"
             defaultValue={baseUnit}
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
           >
             {UNITS.map((unit) => (
               <option key={unit} value={unit}>
@@ -98,7 +98,7 @@ export default function ProductPresentationsManager({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           {pending ? "Agregando..." : "+ Agregar"}
         </button>

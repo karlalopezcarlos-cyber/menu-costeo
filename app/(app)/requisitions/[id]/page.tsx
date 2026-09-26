@@ -58,20 +58,20 @@ export default async function RequisicionDetailPage({
         {requisicion.note && <p className="mt-1 text-sm text-neutral-600">{requisicion.note}</p>}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Producto / Subreceta</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
-              <th className="px-4 py-2 font-medium">Costo unitario</th>
-              <th className="px-4 py-2 font-medium">Costo total</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Producto / Subreceta</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Costo unitario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Costo total</th>
             </tr>
           </thead>
           <tbody>
             {requisicion.items.map((item) => (
-              <tr key={item.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={item.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   {item.product?.name ?? item.subRecipe?.name}
                   {item.subRecipeId && (
                     <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
@@ -79,11 +79,11 @@ export default async function RequisicionDetailPage({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-4 py-3 text-neutral-500">
                   {item.quantity.toString()} {UNIT_LABELS[item.unit as UnitValue]}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{formatMoney(Number(item.unitCost), 4)}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{formatMoney(Number(item.unitCost), 4)}</td>
+                <td className="px-4 py-3">
                   {formatMoney(Number(item.quantity) * Number(item.unitCost))}
                 </td>
               </tr>
@@ -92,7 +92,7 @@ export default async function RequisicionDetailPage({
         </table>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <p className="text-sm text-neutral-500">Costo total de la requisicion</p>
         <p className="text-xl font-semibold text-neutral-900">{formatMoney(total)}</p>
       </div>

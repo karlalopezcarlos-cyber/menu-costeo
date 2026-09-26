@@ -23,8 +23,8 @@ export default function SupplierRow({
   const [state, formAction, pending] = useActionState(boundUpdate, initialState);
 
   return (
-    <tr className="border-t border-neutral-100 align-top">
-      <td className="px-4 py-2">
+    <tr className="border-t border-neutral-100 align-top transition-colors hover:bg-neutral-50">
+      <td className="px-4 py-3">
         <InlineNameEditor id={supplier.id} initialName={supplier.name} action={updateSupplierName} />
         <div>
           <Link href={`/settings/suppliers/${supplier.id}`} className="text-xs text-neutral-500 hover:underline">
@@ -32,26 +32,26 @@ export default function SupplierRow({
           </Link>
         </div>
       </td>
-      <td className="px-4 py-2 text-neutral-500">{supplier.purchaseCount}</td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3 text-neutral-500">{supplier.purchaseCount}</td>
+      <td className="px-4 py-3">
         <form action={formAction} className="flex flex-wrap items-center gap-2">
           <input
             name="phone"
             defaultValue={supplier.phone ?? ""}
             placeholder="WhatsApp: 5215512345678"
-            className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            className="w-40 rounded-md border border-neutral-200 px-2 py-1 text-sm"
           />
           <input
             name="email"
             type="email"
             defaultValue={supplier.email ?? ""}
             placeholder="correo@proveedor.com"
-            className="w-48 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            className="w-48 rounded-md border border-neutral-200 px-2 py-1 text-sm"
           />
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            className="rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
             {pending ? "Guardando..." : "Guardar"}
           </button>
@@ -59,7 +59,7 @@ export default function SupplierRow({
           {state?.success && <span className="text-xs text-emerald-700">Guardado</span>}
         </form>
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <form action={toggleSupplierActive.bind(null, supplier.id, !supplier.isActive)}>
           <button
             type="submit"
@@ -69,7 +69,7 @@ export default function SupplierRow({
           </button>
         </form>
       </td>
-      <td className="px-4 py-2 text-right">
+      <td className="px-4 py-3 text-right">
         <form action={deleteSupplier.bind(null, supplier.id)}>
           <button type="submit" className="text-neutral-400 hover:text-red-600">
             Borrar

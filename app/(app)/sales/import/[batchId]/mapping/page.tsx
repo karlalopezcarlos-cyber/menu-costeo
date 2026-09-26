@@ -24,7 +24,7 @@ export default async function ImportMappingPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Mapear columnas</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Mapear columnas</h1>
       <p className="text-sm text-neutral-500">
         Archivo: {batch.fileName} - {rawRows.length} filas detectadas. Indica que columna
         corresponde a cada dato.
@@ -32,7 +32,7 @@ export default async function ImportMappingPage({
 
       <form
         action={processImportBatchWithId}
-        className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5"
+        className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5"
       >
         <div className="grid grid-cols-4 gap-3">
           <div className="space-y-1">
@@ -43,7 +43,7 @@ export default async function ImportMappingPage({
               id="dateHeader"
               name="dateHeader"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               {headers.map((h) => (
                 <option key={h} value={h}>
@@ -60,7 +60,7 @@ export default async function ImportMappingPage({
               id="nameHeader"
               name="nameHeader"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               {headers.map((h) => (
                 <option key={h} value={h}>
@@ -77,7 +77,7 @@ export default async function ImportMappingPage({
               id="qtyHeader"
               name="qtyHeader"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               {headers.map((h) => (
                 <option key={h} value={h}>
@@ -94,7 +94,7 @@ export default async function ImportMappingPage({
               id="priceHeader"
               name="priceHeader"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             >
               {headers.map((h) => (
                 <option key={h} value={h}>
@@ -107,15 +107,15 @@ export default async function ImportMappingPage({
 
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
         >
           Procesar archivo
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               {headers.map((h) => (
                 <th key={h} className="whitespace-nowrap px-3 py-2 font-medium">
@@ -126,7 +126,7 @@ export default async function ImportMappingPage({
           </thead>
           <tbody>
             {preview.map((row, i) => (
-              <tr key={i} className="border-t border-neutral-100">
+              <tr key={i} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                 {headers.map((_, colIdx) => (
                   <td key={colIdx} className="whitespace-nowrap px-3 py-2 text-neutral-600">
                     {row[colIdx] ?? ""}

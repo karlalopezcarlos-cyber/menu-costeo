@@ -39,7 +39,7 @@ export default function EditRecipeDetailsForm({
       <div className="flex-1">
         {!editing ? (
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900">{name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{name}</h1>
             <p className="text-sm text-neutral-500">
               Rendimiento: {yieldQty} {UNIT_LABELS[yieldUnit]}
               {isMenuItem && " - Platillo de menu"}
@@ -47,7 +47,7 @@ export default function EditRecipeDetailsForm({
             </p>
           </div>
         ) : (
-          <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+          <form action={formAction} className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-3 space-y-1 sm:col-span-1">
                 <label htmlFor="edit-name" className="text-xs font-medium text-neutral-700">
@@ -58,7 +58,7 @@ export default function EditRecipeDetailsForm({
                   name="name"
                   defaultValue={name}
                   required
-                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-1">
@@ -73,7 +73,7 @@ export default function EditRecipeDetailsForm({
                   min="0"
                   defaultValue={yieldQty}
                   required
-                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-1">
@@ -85,7 +85,7 @@ export default function EditRecipeDetailsForm({
                   name="yieldUnit"
                   defaultValue={yieldUnit}
                   required
-                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
                 >
                   {UNITS.map((unit) => (
                     <option key={unit} value={unit}>
@@ -102,7 +102,7 @@ export default function EditRecipeDetailsForm({
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
               >
                 {pending ? "Guardando..." : "Guardar"}
               </button>

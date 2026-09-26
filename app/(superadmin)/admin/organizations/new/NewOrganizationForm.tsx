@@ -20,7 +20,7 @@ function CopyCredentialsButton({ orgName, email, password }: { orgName: string; 
     <button
       type="button"
       onClick={handleCopy}
-      className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+      className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
     >
       {copied ? "Copiado ✓" : "Copiar usuario y contrasena"}
     </button>
@@ -64,7 +64,7 @@ export default function NewOrganizationForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div className="space-y-1">
         <label htmlFor="orgName" className="text-sm font-medium text-neutral-700">
           Nombre del restaurante
@@ -73,7 +73,7 @@ export default function NewOrganizationForm() {
           id="orgName"
           name="orgName"
           required
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -87,7 +87,7 @@ export default function NewOrganizationForm() {
         <input
           id="ownerName"
           name="ownerName"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -100,7 +100,7 @@ export default function NewOrganizationForm() {
           name="ownerEmail"
           type="email"
           required
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -115,12 +115,12 @@ export default function NewOrganizationForm() {
             type={showPassword ? "text" : "password"}
             required
             minLength={8}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+            className="shrink-0 rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             {showPassword ? "Ocultar" : "Mostrar"}
           </button>
@@ -133,7 +133,7 @@ export default function NewOrganizationForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Creando..." : "Crear cliente"}
         </button>

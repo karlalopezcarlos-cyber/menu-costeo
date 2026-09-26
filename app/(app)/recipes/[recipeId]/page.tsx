@@ -215,7 +215,7 @@ export default async function RecipeDetailPage({
         </nav>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <p className="text-sm text-neutral-500">Costo total de la receta</p>
         {costError ? (
           <p className="text-lg font-semibold text-red-600">{costError}</p>
@@ -257,7 +257,7 @@ export default async function RecipeDetailPage({
         subRecipeOptions={subRecipeOptions.map((r) => ({ ...r, yieldUnit: r.yieldUnit as UnitValue }))}
       />
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <form
           action={async (formData: FormData) => {
             "use server";
@@ -274,18 +274,18 @@ export default async function RecipeDetailPage({
             rows={8}
             defaultValue={recipe.instructions ?? ""}
             placeholder="Describe aqui el paso a paso de preparacion de esta receta..."
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <button
             type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Guardar procedimientos
           </button>
         </form>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <form
           action={async (formData: FormData) => {
             "use server";
@@ -302,11 +302,11 @@ export default async function RecipeDetailPage({
             rows={3}
             defaultValue={recipe.storeDescription ?? ""}
             placeholder="Como se ve este platillo en tu menu publico -- ej. ingredientes destacados, que lo hace especial..."
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <button
             type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Guardar descripcion
           </button>

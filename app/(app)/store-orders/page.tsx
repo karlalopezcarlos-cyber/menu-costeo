@@ -51,7 +51,7 @@ export default async function StoreOrdersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Pedidos en linea</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pedidos en linea</h1>
           <p className="text-sm text-neutral-500">Pedidos hechos por clientes desde tu tienda publica.</p>
         </div>
         <div className="flex items-center gap-4">

@@ -78,7 +78,7 @@ export default async function PurchaseDetailPage({
         {purchases.length > 1 && (
           <p className="mt-1 text-sm text-neutral-500">{purchases.length} productos en esta compra.</p>
         )}
-        <dl className="mt-3 grid grid-cols-3 gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm">
+        <dl className="mt-3 grid grid-cols-3 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm px-4 py-3 text-sm">
           <div>
             <dt className="text-neutral-500">Proveedor</dt>
             <dd className="font-medium text-neutral-900">{supplierName}</dd>

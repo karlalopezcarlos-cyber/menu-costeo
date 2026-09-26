@@ -87,12 +87,12 @@ export default function SalesTable({
   }, [rows, sortKey, sortDir]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="px-4 py-2 font-medium">
+              <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
@@ -103,7 +103,7 @@ export default function SalesTable({
                 </button>
               </th>
             ))}
-            <th className="px-4 py-2 font-medium"></th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
           </tr>
         </thead>
         <tbody>
@@ -115,13 +115,13 @@ export default function SalesTable({
             </tr>
           )}
           {sortedRows.map((row) => (
-            <tr key={row.id} className="border-t border-neutral-100">
-              <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
-              <td className="px-4 py-2">{row.recipeName}</td>
-              <td className="px-4 py-2">{row.quantitySold}</td>
-              <td className="px-4 py-2">{formatMoney(row.unitPrice)}</td>
-              <td className="px-4 py-2">{formatMoney(row.quantitySold * row.unitPrice)}</td>
-              <td className="px-4 py-2 text-neutral-400">
+            <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
+              <td className="px-4 py-3">{row.recipeName}</td>
+              <td className="px-4 py-3">{row.quantitySold}</td>
+              <td className="px-4 py-3">{formatMoney(row.unitPrice)}</td>
+              <td className="px-4 py-3">{formatMoney(row.quantitySold * row.unitPrice)}</td>
+              <td className="px-4 py-3 text-neutral-400">
                 <div>{SOURCE_LABELS[row.source] ?? row.source}</div>
                 {row.tickets.length > 0 && (
                   <div className="mt-0.5 flex flex-wrap gap-1">
@@ -137,7 +137,7 @@ export default function SalesTable({
                   </div>
                 )}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-4 py-3 text-right">
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"

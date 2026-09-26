@@ -29,7 +29,7 @@ export default async function NewWastePage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Registrar merma</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Registrar merma</h1>
       {products.length === 0 && recipes.length === 0 ? (
         <p className="text-sm text-neutral-500">
           Primero agrega al menos un producto, subreceta o receta de menu en el catalogo.

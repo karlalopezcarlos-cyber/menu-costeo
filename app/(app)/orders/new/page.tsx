@@ -78,7 +78,7 @@ export default async function NewOrderPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Pedido sugerido</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pedido sugerido</h1>
           <p className="text-sm text-neutral-500">
             Comparamos tu stock objetivo contra el inventario teorico a hoy
             {stock.asOfLabel ? ` (a partir del conteo del ${stock.asOfLabel})` : ""}.

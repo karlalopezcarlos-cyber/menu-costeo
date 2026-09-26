@@ -17,7 +17,7 @@ function NewSucursalForm() {
   const [state, formAction, pending] = useActionState(createSucursal, initialState);
 
   return (
-    <form action={formAction} className="rounded-lg border border-neutral-200 bg-white p-4">
+    <form action={formAction} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
           <label htmlFor="name" className="text-sm font-medium text-neutral-700">
@@ -28,13 +28,13 @@ function NewSucursalForm() {
             name="name"
             required
             placeholder="Ej. Sucursal Centro"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Agregando..." : "Agregar"}
         </button>
@@ -60,7 +60,7 @@ function EditSucursalForm({ sucursal, onDone }: { sucursal: SucursalRow; onDone:
         name="name"
         defaultValue={sucursal.name}
         required
-        className="rounded-md border border-neutral-300 px-2 py-1 text-sm"
+        className="rounded-md border border-neutral-200 px-2 py-1 text-sm"
       />
       <button type="submit" disabled={pending} className="text-sm text-neutral-700 hover:underline disabled:opacity-50">
         Guardar
@@ -80,20 +80,20 @@ export default function SucursalesManager({ sucursales }: { sucursales: Sucursal
     <div className="space-y-6">
       <NewSucursalForm />
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Nombre</th>
-              <th className="px-4 py-2 font-medium">Usuarios</th>
-              <th className="px-4 py-2 font-medium">Estado</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nombre</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Usuarios</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Estado</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
             {sucursales.map((s) => (
-              <tr key={s.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={s.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   {editingId === s.id ? (
                     <EditSucursalForm sucursal={s} onDone={() => setEditingId(null)} />
                   ) : (
@@ -107,13 +107,13 @@ export default function SucursalesManager({ sucursales }: { sucursales: Sucursal
                     </>
                   )}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{s.userCount}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{s.userCount}</td>
+                <td className="px-4 py-3">
                   <span className={s.isActive ? "text-green-700" : "text-neutral-400"}>
                     {s.isActive ? "Activa" : "Inactiva"}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3 text-right">
                   {editingId !== s.id && (
                     <div className="flex items-center justify-end gap-3">
                       <button

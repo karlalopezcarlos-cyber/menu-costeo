@@ -24,7 +24,7 @@ export default async function RecipeActivityPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">{recipe.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{recipe.name}</h1>
         <nav className="mt-3 flex gap-4 border-b border-neutral-200 text-sm">
           <Link href={`/recipes/${recipe.id}`} className="pb-2 text-neutral-500 hover:text-neutral-900">
             Detalle

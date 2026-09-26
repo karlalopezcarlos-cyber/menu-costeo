@@ -162,14 +162,14 @@ export default function PurchasesTable({
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Buscar producto..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <input
           type="text"
           value={folioInput}
           onChange={(e) => setFolioInput(e.target.value)}
           placeholder="Buscar folio..."
-          className="w-full max-w-[10rem] rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-[10rem] rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <div className="space-y-1">
           <label htmlFor="dateFrom" className="text-xs font-medium text-neutral-500">
@@ -183,7 +183,7 @@ export default function PurchasesTable({
               setDateFrom(e.target.value);
               navigate({ dateFrom: e.target.value });
             }}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -198,7 +198,7 @@ export default function PurchasesTable({
               setDateTo(e.target.value);
               navigate({ dateTo: e.target.value });
             }}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         {(dateFrom || dateTo) && (
@@ -225,7 +225,7 @@ export default function PurchasesTable({
               setSupplierFilter(e.target.value);
               navigate({ supplier: e.target.value });
             }}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Todos los proveedores</option>
             {supplierOptions.map((name) => (
@@ -249,17 +249,17 @@ export default function PurchasesTable({
         </label>
         <a
           href={exportHref}
-          className="ml-auto rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="ml-auto rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Exportar a Excel
         </a>
       </div>
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               {COLUMNS.slice(0, 4).map((column) => (
-                <th key={column.key} className="px-4 py-2 font-medium">
+                <th key={column.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(column.key)}
@@ -270,9 +270,9 @@ export default function PurchasesTable({
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-2 font-medium">Unidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Unidad</th>
               {COLUMNS.slice(4).map((column) => (
-                <th key={column.key} className="px-4 py-2 font-medium">
+                <th key={column.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(column.key)}
@@ -296,22 +296,22 @@ export default function PurchasesTable({
               </tr>
             )}
             {sortedRows.map((purchase) => (
-              <tr key={purchase.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">
+              <tr key={purchase.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3 text-neutral-500">
                   <Link href={`/purchases/${purchase.folio}`} className="text-neutral-700 hover:underline">
                     {purchase.folioLabel}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{purchase.dateLabel}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{purchase.dateLabel}</td>
+                <td className="px-4 py-3">
                   {purchase.productName}
                   {purchase.note && <p className="mt-0.5 text-xs text-amber-600">{purchase.note}</p>}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{purchase.quantityLabel}</td>
-                <td className="px-4 py-2 text-neutral-500">{purchase.unitLabel}</td>
-                <td className="px-4 py-2 text-neutral-500">{purchase.supplierName ?? "-"}</td>
-                <td className="px-4 py-2">{formatMoney(purchase.totalPrice)}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{purchase.quantityLabel}</td>
+                <td className="px-4 py-3 text-neutral-500">{purchase.unitLabel}</td>
+                <td className="px-4 py-3 text-neutral-500">{purchase.supplierName ?? "-"}</td>
+                <td className="px-4 py-3">{formatMoney(purchase.totalPrice)}</td>
+                <td className="px-4 py-3">
                   <span className="inline-flex items-center">
                     <span className="mr-1.5 inline-flex w-2 shrink-0 justify-center">
                       {(() => {

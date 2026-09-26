@@ -196,7 +196,7 @@ export default function StoreApp({
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">✓</div>
-        <h1 className="text-2xl font-semibold text-neutral-900">¡Pedido recibido!</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">¡Pedido recibido!</h1>
         <p className="text-neutral-600">
           Tu folio es <strong className="text-neutral-900">{state.folioLabel}</strong>.{" "}
           {fulfillmentType === "delivery"
@@ -271,7 +271,7 @@ export default function StoreApp({
               name="customerName"
               required
               placeholder="¿A nombre de quien va el pedido?"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -284,7 +284,7 @@ export default function StoreApp({
               type="tel"
               required
               placeholder="10 digitos"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
             />
             <p className="text-xs text-neutral-500">
               Lo necesitamos por si hay alguna duda con tu pedido. Espera nuestra confirmacion por
@@ -301,7 +301,7 @@ export default function StoreApp({
               name="comment"
               rows={2}
               placeholder="Instrucciones especiales, alergias, etc."
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
             />
           </div>
 
@@ -314,7 +314,7 @@ export default function StoreApp({
               name="packagingNotes"
               rows={3}
               placeholder={"Ej:\nMARIANA: 2 de camaron + 1 de pollo\nJORGE: 5 de camaron"}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
             />
             <p className="text-xs text-neutral-500">
               Si tu pedido se reparte entre varias personas, escribe aqui como va cada paquete para
@@ -392,13 +392,13 @@ export default function StoreApp({
                     }}
                     suggestFn={suggestDeliveryAddress}
                     placeholder="Calle, numero, colonia"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
                   />
                   <button
                     type="button"
                     onClick={handleCalculateDelivery}
                     disabled={deliveryCalculating || !deliveryAddress.trim()}
-                    className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    className="shrink-0 rounded-lg border border-neutral-200 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
                   >
                     {deliveryCalculating ? "Calculando..." : "Calcular"}
                   </button>
@@ -595,7 +595,7 @@ function PickupLocationCard({
         <button
           type="button"
           onClick={handleCopy}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+          className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
         >
           {copied ? "¡Copiada!" : "Copiar direccion"}
         </button>
@@ -604,7 +604,7 @@ function PickupLocationCard({
             href={mapsHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+            className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
           >
             Ver en el mapa
           </a>
@@ -658,7 +658,7 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (value: numb
     );
   }
   return (
-    <div className="flex items-center gap-3 rounded-full border border-neutral-300 px-2 py-1">
+    <div className="flex items-center gap-3 rounded-full border border-neutral-200 px-2 py-1">
       <button
         type="button"
         onClick={() => onChange(value - 1)}

@@ -47,7 +47,7 @@ export default function BusinessLocationForm({
   }
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div className="space-y-1">
         <label htmlFor="businessAddress" className="text-sm font-medium text-neutral-700">
           Direccion de tu negocio (punto de partida para los envios)
@@ -64,13 +64,13 @@ export default function BusinessLocationForm({
             }}
             suggestFn={suggestBusinessAddress}
             placeholder="Calle, numero, colonia, ciudad"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <button
             type="button"
             onClick={handleLocate}
             disabled={locating || !address.trim()}
-            className="shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            className="shrink-0 rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
           >
             {locating ? "Ubicando..." : "Ubicar en el mapa"}
           </button>
@@ -95,7 +95,7 @@ export default function BusinessLocationForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending ? "Guardando..." : "Guardar ubicacion"}
       </button>

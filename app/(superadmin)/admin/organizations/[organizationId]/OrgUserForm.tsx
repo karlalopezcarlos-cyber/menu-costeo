@@ -71,7 +71,7 @@ export default function OrgUserForm({
             id={`name-${user.id}`}
             name="name"
             defaultValue={user.name ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -84,7 +84,7 @@ export default function OrgUserForm({
             type="email"
             required
             defaultValue={user.email}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -96,7 +96,7 @@ export default function OrgUserForm({
             name="password"
             type="password"
             placeholder="Dejar en blanco para no cambiar"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -149,7 +149,7 @@ export default function OrgUserForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : "Guardar cambios"}
         </button>

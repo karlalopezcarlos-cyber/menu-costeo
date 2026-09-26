@@ -308,7 +308,7 @@ export default function PurchaseForm({
       <input type="hidden" name="purchaseOrderId" value={selectedPedidoId} />
 
       {pendingOrders.length > 0 && (
-        <div className="space-y-1 rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="space-y-1 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="pendingOrder" className="text-sm font-medium text-neutral-700">
               Recibir pedido pendiente (opcional)
@@ -331,7 +331,7 @@ export default function PurchaseForm({
             id="pendingOrder"
             value={selectedPedidoId}
             onChange={(e) => handlePendingOrderChange(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Sin pedido (compra libre)</option>
             {pendingOrders.map((o) => (
@@ -351,7 +351,7 @@ export default function PurchaseForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-1">
           <label htmlFor="purchaseDate" className="text-sm font-medium text-neutral-700">
             Fecha de compra
@@ -362,7 +362,7 @@ export default function PurchaseForm({
             type="date"
             required
             defaultValue={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -374,7 +374,7 @@ export default function PurchaseForm({
             name="supplierId"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Sin proveedor</option>
             {suppliers.map((s) => (
@@ -386,7 +386,7 @@ export default function PurchaseForm({
         </div>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-2">
           <div className={`grid ${GRID_COLS} gap-2 px-1 text-xs font-medium text-neutral-500`}>
             <span></span>
@@ -460,7 +460,7 @@ export default function PurchaseForm({
                       })
                     }
                     placeholder="900"
-                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                    className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                   />
                   {product?.presentationUnitQty && (
                     <div className="flex items-center gap-1 text-xs text-neutral-500">
@@ -472,7 +472,7 @@ export default function PurchaseForm({
                         value={row.pieceCount}
                         onChange={(e) => handlePieceCountChange(row.key, e.target.value, product)}
                         placeholder="1"
-                        className="w-14 rounded border border-neutral-300 px-1 py-0.5 text-xs"
+                        className="w-14 rounded border border-neutral-200 px-1 py-0.5 text-xs"
                       />
                       <span>{product.presentationUnitLabel}(s)</span>
                     </div>
@@ -488,12 +488,12 @@ export default function PurchaseForm({
                         onChange={(e) => handlePresentationCountChange(row.key, e.target.value, product)}
                         placeholder="1"
                         disabled={!row.presentationChoiceId}
-                        className="w-12 rounded border border-neutral-300 px-1 py-0.5 text-xs disabled:bg-neutral-50"
+                        className="w-12 rounded border border-neutral-200 px-1 py-0.5 text-xs disabled:bg-neutral-50"
                       />
                       <select
                         value={row.presentationChoiceId}
                         onChange={(e) => handlePresentationChoiceChange(row.key, e.target.value, product)}
-                        className="rounded border border-neutral-300 px-1 py-0.5 text-xs"
+                        className="rounded border border-neutral-200 px-1 py-0.5 text-xs"
                       >
                         <option value="">Presentacion...</option>
                         {product.presentations.map((p) => (
@@ -509,7 +509,7 @@ export default function PurchaseForm({
                 <select
                   value={row.presentationUnit}
                   onChange={(e) => updateRow(row.key, { presentationUnit: e.target.value as UnitValue })}
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                 >
                   {UNITS.map((unit) => (
                     <option
@@ -533,7 +533,7 @@ export default function PurchaseForm({
                     value={row.totalPrice}
                     onChange={(e) => updateRow(row.key, { totalPrice: e.target.value })}
                     placeholder="30"
-                    className="w-full rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm font-medium"
+                    className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm font-medium"
                   />
                 </div>
 
@@ -573,7 +573,7 @@ export default function PurchaseForm({
       <button
         type="button"
         onClick={addRow}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
       >
         + Agregar otro producto
       </button>
@@ -584,7 +584,7 @@ export default function PurchaseForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : rows.length > 1 ? `Guardar ${rows.length} compras` : "Guardar compra"}
         </button>

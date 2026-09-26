@@ -15,7 +15,7 @@ export default function NewRecipeForm({
   const [state, formAction, pending] = useActionState(createRecipe, initialState);
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div className="space-y-1">
         <label htmlFor="name" className="text-sm font-medium text-neutral-700">
           Nombre
@@ -25,7 +25,7 @@ export default function NewRecipeForm({
           name="name"
           required
           placeholder="Ej. Salsa base, o Tacos al pastor"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -37,7 +37,7 @@ export default function NewRecipeForm({
           id="categoryId"
           name="categoryId"
           defaultValue=""
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="">Sin categoria</option>
           {categories.map((category) => (
@@ -64,7 +64,7 @@ export default function NewRecipeForm({
             min="0"
             required
             placeholder="1"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -76,7 +76,7 @@ export default function NewRecipeForm({
             name="yieldUnit"
             required
             defaultValue="PIECE"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {UNITS.map((unit) => (
               <option key={unit} value={unit}>
@@ -104,7 +104,7 @@ export default function NewRecipeForm({
           type="number"
           step="any"
           min="0"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -118,7 +118,7 @@ export default function NewRecipeForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : "Guardar y agregar ingredientes"}
         </button>

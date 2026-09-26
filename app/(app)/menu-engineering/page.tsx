@@ -43,7 +43,7 @@ export default async function MenuEngineeringPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Ingenieria de menu</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Ingenieria de menu</h1>
         <div className="flex items-center gap-3">
           {rowViews.length > 0 && (
             <MenuEngineeringChatDialog
@@ -54,7 +54,7 @@ export default async function MenuEngineeringPage({
           )}
           <a
             href={`/api/export/menu-engineering?${baseQuery}&iva=${ivaMode}`}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Exportar a Excel
           </a>
@@ -73,7 +73,7 @@ export default async function MenuEngineeringPage({
               name="from"
               type="date"
               defaultValue={toDateInputValue(fromDate)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -85,18 +85,18 @@ export default async function MenuEngineeringPage({
               name="to"
               type="date"
               defaultValue={toDateInputValue(toDate)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <button
             type="submit"
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             Ver
           </button>
         </form>
 
-        <div className="flex overflow-hidden rounded-md border border-neutral-300">
+        <div className="flex overflow-hidden rounded-md border border-neutral-200">
           <Link
             href={`/menu-engineering?${baseQuery}&iva=con`}
             className={`px-3 py-2 text-sm font-medium ${

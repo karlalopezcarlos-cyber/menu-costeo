@@ -99,13 +99,13 @@ export default function StockTargetTable({ rows }: { rows: StockRow[] }) {
 
   return (
     <form action={saveStockTargets} className="space-y-3">
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <p className="text-sm text-neutral-500">
           Los productos sin stock objetivo (0) no apareceran en pedidos sugeridos.
         </p>
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
         >
           Guardar
         </button>
@@ -117,12 +117,12 @@ export default function StockTargetTable({ rows }: { rows: StockRow[] }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
           {categoryOptions.names.map((name) => (
@@ -146,12 +146,12 @@ export default function StockTargetTable({ rows }: { rows: StockRow[] }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               {COLUMNS.map((col) => (
-                <th key={col.key} className="px-4 py-2 font-medium">
+                <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(col.key)}
@@ -183,12 +183,12 @@ export default function StockTargetTable({ rows }: { rows: StockRow[] }) {
               const visible = matchesFilter(row);
               return (
                 <tr key={row.id} className={visible ? "border-t border-neutral-100" : "hidden"}>
-                  <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                  <td className="px-4 py-2">{row.name}</td>
-                  <td className="px-4 py-2 text-neutral-500">
+                  <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
+                  <td className="px-4 py-3">{row.name}</td>
+                  <td className="px-4 py-3 text-neutral-500">
                     {row.currentStock !== null ? `${row.currentStock} ${row.unitLabel}` : "-"}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <input
                         name={`target:${row.id}`}
@@ -200,7 +200,7 @@ export default function StockTargetTable({ rows }: { rows: StockRow[] }) {
                           setTargets((prev) => ({ ...prev, [row.id]: e.target.value }))
                         }
                         placeholder="0"
-                        className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                        className="w-24 rounded-md border border-neutral-200 px-2 py-1 text-sm"
                       />
                       <span className="text-neutral-400">{row.unitLabel}</span>
                     </div>

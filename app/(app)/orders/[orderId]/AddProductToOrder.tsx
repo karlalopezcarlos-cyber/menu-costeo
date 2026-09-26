@@ -58,7 +58,7 @@ export default function AddProductToOrder({
   }
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+    <form action={formAction} className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       <h2 className="text-sm font-medium text-neutral-700">Agregar producto al pedido</h2>
       <input type="hidden" name="presentationLabel" value={presentationLabel ?? ""} />
       <input type="hidden" name="quantity" value={quantity} />
@@ -86,7 +86,7 @@ export default function AddProductToOrder({
             <button
               type="submit"
               disabled={pending || !quantity}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
             >
               {pending ? "Agregando..." : "Agregar"}
             </button>

@@ -56,7 +56,7 @@ export default function SearchableSelect({
         }}
         placeholder={placeholder}
         autoComplete="off"
-        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
       />
       {open && (
         <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-md border border-neutral-200 bg-white shadow-lg">

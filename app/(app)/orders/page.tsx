@@ -26,7 +26,7 @@ export default async function OrdersPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Pedidos</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pedidos</h1>
         <div className="flex items-center gap-3">
           {showReceived ? (
             <Link href="/orders" className="text-sm text-neutral-500 hover:underline">
@@ -48,15 +48,15 @@ export default async function OrdersPage({
           : "Un pedido desaparece de aqui en cuanto se recibe por completo; a partir de ahi solo queda su historial en Compras."}
       </p>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Folio</th>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Estatus</th>
-              <th className="px-4 py-2 font-medium">Proveedor</th>
-              <th className="px-4 py-2 font-medium">Productos</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Estatus</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Proveedor</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Productos</th>
             </tr>
           </thead>
           <tbody>
@@ -75,16 +75,16 @@ export default async function OrdersPage({
               </tr>
             )}
             {orders.map((order) => (
-              <tr key={order.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={order.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   <Link href={`/orders/${order.id}`} className="font-medium hover:underline">
                     {formatOrderFolio(order.folio)}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-4 py-3 text-neutral-500">
                   {order.createdAt.toLocaleDateString("es-MX", { timeZone: "UTC" })}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3">
                   <span
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
                       order.status === "RECEIVED"
@@ -95,8 +95,8 @@ export default async function OrdersPage({
                     {STATUS_LABELS[order.status] ?? order.status}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{order.supplier?.name ?? "-"}</td>
-                <td className="px-4 py-2 text-neutral-500">{order.items.length}</td>
+                <td className="px-4 py-3 text-neutral-500">{order.supplier?.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-500">{order.items.length}</td>
               </tr>
             ))}
           </tbody>

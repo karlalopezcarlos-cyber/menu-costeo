@@ -11,7 +11,7 @@ export default async function NewProductPage() {
 
   return (
     <div className="max-w-md space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Nuevo producto</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Nuevo producto</h1>
       <NewProductForm categories={categories} />
     </div>
   );

@@ -63,20 +63,20 @@ function ContactList({
             name={inputType === "tel" ? "phone" : "email"}
             type={inputType}
             placeholder={placeholder}
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
           />
         </div>
         <div className="w-32 space-y-1">
           <input
             name="label"
             placeholder="Etiqueta (opcional)"
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           {pending ? "Agregando..." : "+ Agregar"}
         </button>

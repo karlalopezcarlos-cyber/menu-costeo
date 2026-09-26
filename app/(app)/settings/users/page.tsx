@@ -38,7 +38,7 @@ export default async function UsersPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
         <SettingsNav active="/settings/users" />
         <p className="mt-3 text-sm text-neutral-500">
           Cambia el nombre de tu negocio y administra quien puede entrar a tu cuenta y que paneles

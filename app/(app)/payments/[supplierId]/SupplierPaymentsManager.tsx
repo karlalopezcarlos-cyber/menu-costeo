@@ -79,7 +79,7 @@ function AbonoForm({
                 max={remaining}
                 required
                 defaultValue={remaining.toFixed(2)}
-                className="w-28 rounded-md border border-neutral-300 py-2 pl-5 pr-2 text-sm"
+                className="w-28 rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm"
               />
             </div>
           </div>
@@ -90,14 +90,14 @@ function AbonoForm({
               type="date"
               required
               defaultValue={todayInputValue()}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <p className="text-xs text-neutral-500">Saldo pendiente de este folio: {money(remaining)}</p>
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
           >
             {pending ? "Guardando..." : "Guardar abono"}
           </button>
@@ -142,8 +142,8 @@ function FolioPaymentRow({
 
   return (
     <Fragment>
-      <tr className="border-t border-neutral-100">
-        <td className="px-4 py-2 text-center">
+      <tr className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+        <td className="px-4 py-3 text-center">
           <input
             type="checkbox"
             checked={checked}
@@ -151,14 +151,14 @@ function FolioPaymentRow({
             className="h-4 w-4 rounded border-neutral-300"
           />
         </td>
-        <td className="px-4 py-2 text-neutral-500">{row.folioLabel}</td>
-        <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
-        <td className="px-4 py-2 text-right">{money(row.total)}</td>
-        <td className="px-4 py-2 text-right text-neutral-500">
+        <td className="px-4 py-3 text-neutral-500">{row.folioLabel}</td>
+        <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
+        <td className="px-4 py-3 text-right">{money(row.total)}</td>
+        <td className="px-4 py-3 text-right text-neutral-500">
           {row.abonado > 0 ? `${money(row.abonado)} de ${money(row.total)}` : "-"}
         </td>
-        <td className="px-4 py-2 text-neutral-500">{row.paidDateLabel ?? "-"}</td>
-        <td className="px-4 py-2 text-center">
+        <td className="px-4 py-3 text-neutral-500">{row.paidDateLabel ?? "-"}</td>
+        <td className="px-4 py-3 text-center">
           <label className="inline-flex items-center gap-1.5">
             <input
               type="checkbox"
@@ -170,7 +170,7 @@ function FolioPaymentRow({
             <span className="text-xs text-neutral-500">Pagado</span>
           </label>
         </td>
-        <td className="px-4 py-2 text-center">
+        <td className="px-4 py-3 text-center">
           {!row.isPaid && (
             <label className="inline-flex items-center gap-1.5">
               <input
@@ -306,15 +306,15 @@ export default function SupplierPaymentsManager({
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs font-medium text-neutral-500">Total comprado</p>
           <p className="mt-1 text-xl font-semibold text-neutral-900">{money(totalPurchased)}</p>
         </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs font-medium text-neutral-500">Total pagado</p>
           <p className="mt-1 text-xl font-semibold text-neutral-900">{money(totalPaid)}</p>
         </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-xs font-medium text-neutral-500">Saldo al proveedor</p>
           <p className={`mt-1 text-xl font-semibold ${balance > 0.005 ? "text-red-600" : "text-green-700"}`}>
             {money(balance)}
@@ -330,7 +330,7 @@ export default function SupplierPaymentsManager({
             value={folioSearch}
             onChange={(e) => setFolioSearch(e.target.value)}
             placeholder="Buscar folio..."
-            className="w-full max-w-[10rem] rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full max-w-[10rem] rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <div className="space-y-1">
             <label htmlFor="dateFrom" className="text-xs font-medium text-neutral-500">
@@ -341,7 +341,7 @@ export default function SupplierPaymentsManager({
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           <div className="space-y-1">
@@ -353,7 +353,7 @@ export default function SupplierPaymentsManager({
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
           {(dateFrom || dateTo) && (
@@ -381,7 +381,7 @@ export default function SupplierPaymentsManager({
             type="button"
             onClick={toggleSelectAll}
             disabled={filteredRows.length === 0}
-            className="ml-auto rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            className="ml-auto rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
           >
             {allFilteredSelected ? "Deseleccionar todo" : "Seleccionar todo"}
           </button>
@@ -402,25 +402,25 @@ export default function SupplierPaymentsManager({
               type="button"
               onClick={bulkUnpay}
               disabled={bulkPending}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+              className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
             >
               Quitar pago de seleccionados
             </button>
           </div>
         )}
 
-        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-neutral-500">
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
               <tr>
-                <th className="px-4 py-2 font-medium"></th>
-                <th className="px-4 py-2 font-medium">Folio</th>
-                <th className="px-4 py-2 font-medium">Fecha</th>
-                <th className="px-4 py-2 font-medium text-right">Total</th>
-                <th className="px-4 py-2 font-medium text-right">Abonado</th>
-                <th className="px-4 py-2 font-medium">Fecha de pago</th>
-                <th className="px-4 py-2 font-medium text-center">Pagado</th>
-                <th className="px-4 py-2 font-medium text-center">Abonar</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Abonado</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha de pago</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-center">Pagado</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-center">Abonar</th>
               </tr>
             </thead>
             <tbody>
@@ -459,19 +459,19 @@ export default function SupplierPaymentsManager({
             <table className="w-full text-sm">
               <thead className="bg-amber-100/60 text-left text-amber-800">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Folio</th>
-                  <th className="px-4 py-2 font-medium text-right">Pagado</th>
-                  <th className="px-4 py-2 font-medium">Fecha de pago</th>
-                  <th className="px-4 py-2 font-medium"></th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Pagado</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha de pago</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
                 </tr>
               </thead>
               <tbody>
                 {orphanedFolioRows.map((row) => (
                   <tr key={row.folio} className="border-t border-amber-200">
-                    <td className="px-4 py-2 text-amber-900">{row.folioLabel}</td>
-                    <td className="px-4 py-2 text-right text-amber-900">{money(row.amount)}</td>
-                    <td className="px-4 py-2 text-amber-900">{row.paidDateLabel ?? "-"}</td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-3 text-amber-900">{row.folioLabel}</td>
+                    <td className="px-4 py-3 text-right text-amber-900">{money(row.amount)}</td>
+                    <td className="px-4 py-3 text-amber-900">{row.paidDateLabel ?? "-"}</td>
+                    <td className="px-4 py-3 text-right">
                       <form action={resetFolios}>
                         <input type="hidden" name="supplierId" value={supplier.id} />
                         <input type="hidden" name="folios" value={row.folio} />
@@ -494,23 +494,23 @@ export default function SupplierPaymentsManager({
           <p className="text-sm text-neutral-500">
             Estos abonos ya no se pueden crear desde aqui; todo abono nuevo se liga a un folio.
           </p>
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-left text-neutral-500">
+              <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Fecha</th>
-                  <th className="px-4 py-2 font-medium text-right">Monto</th>
-                  <th className="px-4 py-2 font-medium">Nota</th>
-                  <th className="px-4 py-2 font-medium"></th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Monto</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nota</th>
+                  <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
                 </tr>
               </thead>
               <tbody>
                 {legacyAdvanceRows.map((adv) => (
-                  <tr key={adv.id} className="border-t border-neutral-100">
-                    <td className="px-4 py-2 text-neutral-500">{adv.paidDateLabel}</td>
-                    <td className="px-4 py-2 text-right">{money(adv.amount)}</td>
-                    <td className="px-4 py-2 text-neutral-500">{adv.note ?? "-"}</td>
-                    <td className="px-4 py-2 text-right">
+                  <tr key={adv.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                    <td className="px-4 py-3 text-neutral-500">{adv.paidDateLabel}</td>
+                    <td className="px-4 py-3 text-right">{money(adv.amount)}</td>
+                    <td className="px-4 py-3 text-neutral-500">{adv.note ?? "-"}</td>
+                    <td className="px-4 py-3 text-right">
                       <form action={deleteAdvancePayment}>
                         <input type="hidden" name="id" value={adv.id} />
                         <input type="hidden" name="supplierId" value={supplier.id} />

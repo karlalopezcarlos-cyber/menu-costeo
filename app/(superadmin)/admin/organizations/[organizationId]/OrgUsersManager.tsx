@@ -31,42 +31,42 @@ export default function OrgUsersManager({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
           <tr>
-            <th className="px-4 py-2 font-medium">Nombre</th>
-            <th className="px-4 py-2 font-medium">Correo</th>
-            <th className="px-4 py-2 font-medium">Rol</th>
-            <th className="px-4 py-2 font-medium">Sucursal</th>
-            <th className="px-4 py-2 font-medium">Paneles</th>
-            <th className="px-4 py-2 font-medium">Estado</th>
-            <th className="px-4 py-2 font-medium"></th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nombre</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Correo</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Rol</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Sucursal</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Paneles</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Estado</th>
+            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
             <Fragment key={u.id}>
-              <tr className="border-t border-neutral-100">
-                <td className="px-4 py-2">{u.name ?? "-"}</td>
-                <td className="px-4 py-2 text-neutral-500">{u.email}</td>
-                <td className="px-4 py-2 text-neutral-500">{u.role === "OWNER" ? "Dueno" : "Staff"}</td>
-                <td className="px-4 py-2 text-neutral-500">
+              <tr className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">{u.name ?? "-"}</td>
+                <td className="px-4 py-3 text-neutral-500">{u.email}</td>
+                <td className="px-4 py-3 text-neutral-500">{u.role === "OWNER" ? "Dueno" : "Staff"}</td>
+                <td className="px-4 py-3 text-neutral-500">
                   {u.role === "OWNER" ? "Todas" : u.sucursalNames.length > 0 ? u.sucursalNames.join(", ") : "-"}
                 </td>
-                <td className="px-4 py-2 text-neutral-500">
+                <td className="px-4 py-3 text-neutral-500">
                   {u.role === "OWNER"
                     ? "Todos"
                     : u.allowedPanels.length === 0
                       ? "Ninguno (solo Panel)"
                       : u.allowedPanels.map((p) => PANEL_LABELS.get(p) ?? p).join(", ")}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3">
                   <span className={u.isActive ? "text-green-700" : "text-neutral-400"}>
                     {u.isActive ? "Activo" : "Inactivo"}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-3">
                     <button
                       type="button"
@@ -86,7 +86,7 @@ export default function OrgUsersManager({
                 </td>
               </tr>
               {editingId === u.id && (
-                <tr className="border-t border-neutral-100">
+                <tr className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                   <td colSpan={7} className="px-4 py-3">
                     <OrgUserForm
                       organizationId={organizationId}

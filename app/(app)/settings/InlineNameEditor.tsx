@@ -64,7 +64,7 @@ export default function InlineNameEditor({
               setError(null);
             }
           }}
-          className="w-40 rounded-md border border-neutral-300 px-2 py-1 text-sm disabled:opacity-50"
+          className="w-40 rounded-md border border-neutral-200 px-2 py-1 text-sm disabled:opacity-50"
         />
         <button
           type="button"

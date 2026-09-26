@@ -25,7 +25,7 @@ export default function SupplierDetailsForm({
   const [state, formAction, pending] = useActionState(boundAction, initialState);
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5">
+    <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div>
         <p className="text-sm font-medium text-neutral-700">Informacion del proveedor</p>
         <p className="text-xs text-neutral-500">
@@ -43,7 +43,7 @@ export default function SupplierDetailsForm({
             id="businessName"
             name="businessName"
             defaultValue={details.businessName ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -54,7 +54,7 @@ export default function SupplierDetailsForm({
             id="rfc"
             name="rfc"
             defaultValue={details.rfc ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function SupplierDetailsForm({
           id="address"
           name="address"
           defaultValue={details.address ?? ""}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -80,7 +80,7 @@ export default function SupplierDetailsForm({
             id="contactName"
             name="contactName"
             defaultValue={details.contactName ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -92,7 +92,7 @@ export default function SupplierDetailsForm({
             name="paymentMethod"
             placeholder="Ej. Transferencia, efectivo, cheque"
             defaultValue={details.paymentMethod ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function SupplierDetailsForm({
             name="bankInfo"
             placeholder="Ej. BBVA 0123456789, CLABE ..."
             defaultValue={details.bankInfo ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <div className="space-y-1">
@@ -121,7 +121,7 @@ export default function SupplierDetailsForm({
             min="0"
             step="1"
             defaultValue={details.creditDays ?? ""}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function SupplierDetailsForm({
           name="notes"
           rows={3}
           defaultValue={details.notes ?? ""}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
@@ -145,7 +145,7 @@ export default function SupplierDetailsForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending ? "Guardando..." : "Guardar"}
       </button>

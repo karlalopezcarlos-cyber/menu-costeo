@@ -4,7 +4,7 @@ export default function PlanningLandingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Proyeccion de compras y produccion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Proyeccion de compras y produccion</h1>
         <p className="text-sm text-neutral-500">
           Dos formas de calcular que te hace falta comprar, a partir de tu inventario teorico a hoy.
         </p>
@@ -13,7 +13,7 @@ export default function PlanningLandingPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
           href="/orders/new"
-          className="block space-y-2 rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          className="block space-y-2 rounded-xl border border-neutral-200 bg-white shadow-sm p-5 hover:border-neutral-400"
         >
           <h2 className="text-lg font-semibold text-neutral-900">Por stock objetivo</h2>
           <p className="text-sm text-neutral-500">
@@ -25,7 +25,7 @@ export default function PlanningLandingPage() {
 
         <Link
           href="/planning/plu"
-          className="block space-y-2 rounded-lg border border-neutral-200 bg-white p-5 hover:border-neutral-400"
+          className="block space-y-2 rounded-xl border border-neutral-200 bg-white shadow-sm p-5 hover:border-neutral-400"
         >
           <h2 className="text-lg font-semibold text-neutral-900">Por PLU (planeacion de ventas)</h2>
           <p className="text-sm text-neutral-500">

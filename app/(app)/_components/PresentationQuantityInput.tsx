@@ -114,7 +114,7 @@ export default function PresentationQuantityInput({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder="0"
-          className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+          className="w-20 rounded-md border border-neutral-200 px-2 py-1 text-sm"
         />
         <span className="text-xs text-neutral-400">{unitLabel}</span>
       </div>
@@ -173,13 +173,13 @@ export default function PresentationQuantityInput({
               onChange={(e) => updateLine(index, { count: e.target.value })}
               disabled={disabled}
               placeholder="0"
-              className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              className="w-16 rounded-md border border-neutral-200 px-2 py-1 text-sm"
             />
             <select
               value={line.presentationId}
               onChange={(e) => updateLine(index, { presentationId: e.target.value })}
               disabled={disabled}
-              className="rounded border border-neutral-300 px-1 py-0.5 text-xs text-neutral-600"
+              className="rounded border border-neutral-200 px-1 py-0.5 text-xs text-neutral-600"
             >
               <option value={MANUAL}>Cantidad libre ({unitLabel})</option>
               {presentations.map((p) => (
@@ -212,7 +212,7 @@ export default function PresentationQuantityInput({
           </button>
         )}
         {value && lines.some((l) => l.presentationId !== MANUAL) && (
-          <p className="inline-block rounded border border-neutral-300 bg-neutral-50 px-2 py-1 text-sm font-bold text-neutral-900">
+          <p className="inline-block rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-sm font-bold text-neutral-900">
             = {Number(value).toLocaleString("es-MX", { maximumFractionDigits: 2 })} {unitLabel}
           </p>
         )}
@@ -273,7 +273,7 @@ export default function PresentationQuantityInput({
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             placeholder="0"
-            className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            className="w-20 rounded-md border border-neutral-200 px-2 py-1 text-sm"
           />
         ) : (
           <input
@@ -284,7 +284,7 @@ export default function PresentationQuantityInput({
             onChange={(e) => handlePieceCountChange(e.target.value)}
             disabled={disabled}
             placeholder="0"
-            className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            className="w-16 rounded-md border border-neutral-200 px-2 py-1 text-sm"
           />
         )}
         <span className="text-xs text-neutral-400">
@@ -302,7 +302,7 @@ export default function PresentationQuantityInput({
             onChange={(e) => handleExtraQtyChange(e.target.value)}
             disabled={disabled}
             placeholder="0"
-            className="w-14 rounded border border-neutral-300 px-1 py-0.5 text-xs"
+            className="w-14 rounded border border-neutral-200 px-1 py-0.5 text-xs"
           />
           <span className="text-xs text-neutral-400">{unitLabel} suelto</span>
         </div>
@@ -311,7 +311,7 @@ export default function PresentationQuantityInput({
         value={mode}
         onChange={(e) => handleModeChange(e.target.value)}
         disabled={disabled}
-        className="w-full rounded border border-neutral-300 px-1 py-0.5 text-xs text-neutral-600"
+        className="w-full rounded border border-neutral-200 px-1 py-0.5 text-xs text-neutral-600"
       >
         <option value={MANUAL}>Cantidad libre ({unitLabel})</option>
         {presentations.map((p) => (
@@ -321,7 +321,7 @@ export default function PresentationQuantityInput({
         ))}
       </select>
       {mode !== MANUAL && value && (
-        <p className="inline-block rounded border border-neutral-300 bg-neutral-50 px-2 py-1 text-sm font-bold text-neutral-900">
+        <p className="inline-block rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-sm font-bold text-neutral-900">
           = {Number(value).toLocaleString("es-MX", { maximumFractionDigits: 2 })} {unitLabel}
         </p>
       )}

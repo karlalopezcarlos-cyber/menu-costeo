@@ -23,7 +23,7 @@ export default function DeliveryDatesManager({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-5">
+    <div className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
       <div>
         <p className="text-sm font-medium text-neutral-700">Dias disponibles para entrega</p>
         <p className="text-xs text-neutral-500">
@@ -37,13 +37,13 @@ export default function DeliveryDatesManager({
           type="date"
           value={newDate}
           onChange={(e) => setNewDate(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={pending || !newDate}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
         >
           {pending ? "Agregando..." : "Agregar fecha"}
         </button>

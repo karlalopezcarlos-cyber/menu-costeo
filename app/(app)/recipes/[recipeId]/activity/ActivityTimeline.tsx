@@ -37,7 +37,7 @@ export default function ActivityTimeline({ timeline }: { timeline: TimelineEntry
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar por producto..."
-        className="w-full max-w-sm rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full max-w-sm rounded-md border border-neutral-200 px-3 py-2 text-sm"
       />
 
       {filtered.length === 0 ? (
@@ -51,7 +51,7 @@ export default function ActivityTimeline({ timeline }: { timeline: TimelineEntry
           {filtered.map((entry) => (
             <li
               key={entry.id}
-              className="flex items-start justify-between gap-4 rounded-lg border border-neutral-200 bg-white p-3"
+              className="flex items-start justify-between gap-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-3"
             >
               <div>
                 <span

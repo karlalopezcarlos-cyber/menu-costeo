@@ -109,12 +109,12 @@ export default function PlanningPurchaseTable({
       <input type="hidden" name="rows" value={rowsPayload} />
       <input type="hidden" name="redirectTo" value="purchase" />
 
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <p className="text-sm text-neutral-500">Presupuesto de compra estimado</p>
         <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div className="space-y-1">
           <label htmlFor="planningSupplierId" className="text-sm font-medium text-neutral-700">
             Proveedor (opcional)
@@ -124,7 +124,7 @@ export default function PlanningPurchaseTable({
             name="supplierId"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Sin proveedor</option>
             {suppliers.map((s) => (
@@ -143,7 +143,7 @@ export default function PlanningPurchaseTable({
             name="comment"
             rows={1}
             placeholder="Ej. entregar antes de las 10 am"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -154,12 +154,12 @@ export default function PlanningPurchaseTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar producto..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
           {categoryOptions.names.map((name) => (
@@ -171,13 +171,13 @@ export default function PlanningPurchaseTable({
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium"></th>
-              <th className="px-4 py-2 font-medium">Categoria</th>
-              <th className="px-4 py-2 font-medium">
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Categoria</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort("name")}
@@ -187,9 +187,9 @@ export default function PlanningPurchaseTable({
                   {sortKey === "name" && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
-              <th className="px-4 py-2 font-medium">Necesario total</th>
-              <th className="px-4 py-2 font-medium">Existencia</th>
-              <th className="px-4 py-2 font-medium">
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Necesario total</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Existencia</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 <button
                   type="button"
                   onClick={() => handleSort("netQty")}
@@ -199,8 +199,8 @@ export default function PlanningPurchaseTable({
                   {sortKey === "netQty" && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
-              <th className="px-4 py-2 font-medium">Cantidad a pedir</th>
-              <th className="px-4 py-2 font-medium">Comentario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad a pedir</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Comentario</th>
             </tr>
           </thead>
           <tbody>
@@ -218,7 +218,7 @@ export default function PlanningPurchaseTable({
                   key={row.itemId}
                   className={`border-t border-neutral-100 ${isChecked ? "bg-emerald-50" : "bg-white"}`}
                 >
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -226,14 +226,14 @@ export default function PlanningPurchaseTable({
                       className="h-4 w-4 rounded border-neutral-300"
                     />
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
+                  <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
                   <td className={`px-4 py-2 ${isChecked ? "text-neutral-400 line-through" : ""}`}>{row.name}</td>
-                  <td className="px-4 py-2 text-neutral-500">{row.grossQtyLabel}</td>
-                  <td className="px-4 py-2 text-neutral-500">{row.onHandQtyLabel}</td>
-                  <td className="px-4 py-2 font-medium">
+                  <td className="px-4 py-3 text-neutral-500">{row.grossQtyLabel}</td>
+                  <td className="px-4 py-3 text-neutral-500">{row.onHandQtyLabel}</td>
+                  <td className="px-4 py-3 font-medium">
                     {Number(row.netQty).toLocaleString("es-MX", { maximumFractionDigits: 2 })} {row.unitLabel}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <PresentationQuantityInput
                       baseUnit={row.baseUnit}
                       unitLabel={row.unitLabel}
@@ -250,13 +250,13 @@ export default function PlanningPurchaseTable({
                       multiPresentation
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       value={comments[row.itemId] ?? ""}
                       onChange={(e) => setComments((prev) => ({ ...prev, [row.itemId]: e.target.value }))}
                       onBlur={(e) => handleCommentBlur(row.itemId, e.target.value)}
                       placeholder="Ej. tienda X"
-                      className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
                     />
                   </td>
                 </tr>
@@ -271,7 +271,7 @@ export default function PlanningPurchaseTable({
       <button
         type="submit"
         disabled={pending || selectedCount === 0}
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending
           ? "Enviando a Registrar compra..."

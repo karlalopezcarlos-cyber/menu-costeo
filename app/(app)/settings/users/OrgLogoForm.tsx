@@ -11,7 +11,7 @@ export default function OrgLogoForm({ hasLogo, updatedAt }: { hasLogo: boolean; 
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <div className="flex items-start gap-4 rounded-lg border border-neutral-200 bg-white p-4">
+    <div className="flex items-start gap-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       {hasLogo ? (
         <img
           src={`/api/organization/logo?v=${updatedAt}`}

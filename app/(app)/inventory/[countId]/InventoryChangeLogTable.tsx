@@ -32,17 +32,17 @@ export default function InventoryChangeLogTable({ rows }: { rows: ChangeLogRow[]
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar producto o subreceta..."
-        className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
       />
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Fecha y hora</th>
-              <th className="px-4 py-2 font-medium">Usuario</th>
-              <th className="px-4 py-2 font-medium">Producto / Subreceta</th>
-              <th className="px-4 py-2 font-medium">Antes</th>
-              <th className="px-4 py-2 font-medium">Despues</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha y hora</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Usuario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Producto / Subreceta</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Antes</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Despues</th>
             </tr>
           </thead>
           <tbody>
@@ -64,11 +64,11 @@ export default function InventoryChangeLogTable({ rows }: { rows: ChangeLogRow[]
               const isFirstCapture = row.previousQuantity === null;
               const isDeletion = row.newQuantity === 0;
               return (
-                <tr key={row.id} className="border-t border-neutral-100">
-                  <td className="px-4 py-2 text-neutral-500">{row.changedAtLabel}</td>
-                  <td className="px-4 py-2 text-neutral-500">{row.changedByName ?? "-"}</td>
-                  <td className="px-4 py-2">{row.itemName}</td>
-                  <td className="px-4 py-2 text-neutral-500">
+                <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                  <td className="px-4 py-3 text-neutral-500">{row.changedAtLabel}</td>
+                  <td className="px-4 py-3 text-neutral-500">{row.changedByName ?? "-"}</td>
+                  <td className="px-4 py-3">{row.itemName}</td>
+                  <td className="px-4 py-3 text-neutral-500">
                     {isFirstCapture ? (
                       <span className="text-neutral-300">-</span>
                     ) : (

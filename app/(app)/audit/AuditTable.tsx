@@ -178,12 +178,12 @@ export default function AuditTable({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar producto o subreceta..."
-        className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
       />
       <select
         value={typeFilter}
         onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
       >
         <option value="all">Productos y subrecetas</option>
         <option value="product">Solo productos</option>
@@ -192,7 +192,7 @@ export default function AuditTable({
       <select
         value={categoryFilter}
         onChange={(e) => setCategoryFilter(e.target.value)}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
       >
         <option value="all">Todas las categorias</option>
         {categoryOptions.names.map((name) => (
@@ -237,7 +237,7 @@ export default function AuditTable({
       )}
       <a
         href={pdfHref}
-        className="ml-auto rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        className="ml-auto rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
       >
         Exportar seleccion a PDF
       </a>
@@ -245,7 +245,7 @@ export default function AuditTable({
   );
 
   const table = (
-    <div className="rounded-lg border border-neutral-200 bg-white">
+    <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full table-fixed text-sm">
         <colgroup>
           {COLUMNS.map((col) => (
@@ -295,7 +295,7 @@ export default function AuditTable({
             const kardexHref = `/audit/${row.itemId}?${kardexParams.toString()}`;
             const inputName = `comment:${row.itemType}:${row.itemId}`;
             return (
-              <tr key={`${row.itemType}-${row.itemId}`} className="border-t border-neutral-100">
+              <tr key={`${row.itemType}-${row.itemId}`} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                 <td className="px-2 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
                 <td className="px-2 py-2">
                   <span
@@ -398,7 +398,7 @@ export default function AuditTable({
                       name={inputName}
                       defaultValue={row.comment ?? ""}
                       placeholder="Explica la variacion..."
-                      className="w-full min-w-0 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="w-full min-w-0 rounded-md border border-neutral-200 px-2 py-1 text-sm"
                     />
                   ) : (
                     <span className="text-xs text-neutral-300">Sin conteo final</span>
@@ -423,11 +423,11 @@ export default function AuditTable({
 
   const cards = (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <p className="text-sm text-neutral-500">Monto total de faltantes</p>
         <p className="mt-1 text-2xl font-semibold text-red-600">-{formatMoney(totalShortageAmount)}</p>
       </div>
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <p className="text-sm text-neutral-500">Monto total de sobrantes</p>
         <p className="mt-1 text-2xl font-semibold text-emerald-700">+{formatMoney(totalSurplusAmount)}</p>
       </div>
@@ -441,7 +441,7 @@ export default function AuditTable({
       {table}
       <button
         type="submit"
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
       >
         Guardar comentarios
       </button>

@@ -32,7 +32,7 @@ export default function OrderSendActions({
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Enviar por WhatsApp
         </a>
@@ -50,7 +50,7 @@ export default function OrderSendActions({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
           >
             {pending ? "Enviando..." : "Enviar por correo"}
           </button>

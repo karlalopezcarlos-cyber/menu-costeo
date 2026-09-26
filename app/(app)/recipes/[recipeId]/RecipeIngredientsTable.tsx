@@ -117,7 +117,7 @@ export default function RecipeIngredientsTable({
   }, [rows, search, sortKey, sortDir]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       {rows.length > 0 && (
         <div className="border-b border-neutral-100 px-3 py-2">
           <input
@@ -125,7 +125,7 @@ export default function RecipeIngredientsTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar ingrediente o categoria..."
-            className="w-full max-w-xs rounded-md border border-neutral-300 px-2.5 py-1.5 text-[13px]"
+            className="w-full max-w-xs rounded-md border border-neutral-200 px-2.5 py-1.5 text-[13px]"
           />
         </div>
       )}
@@ -139,7 +139,7 @@ export default function RecipeIngredientsTable({
           <col className="w-[19%]" />
           <col className="w-8" />
         </colgroup>
-        <thead className="bg-neutral-50 text-left text-neutral-500">
+        <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
           <tr>
             {COLUMNS.map((col) => (
               <th

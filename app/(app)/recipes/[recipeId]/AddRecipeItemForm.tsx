@@ -60,7 +60,7 @@ export default function AddRecipeItemForm({
       : subRecipeOptions.find((r) => r.id === subRecipeId)?.yieldUnit;
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+    <form action={formAction} className="space-y-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-neutral-700">Agregar ingrediente</p>
         <p className="text-xs text-neutral-500">
@@ -133,14 +133,14 @@ export default function AddRecipeItemForm({
           min="0"
           required
           placeholder="Cantidad"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           name="unit"
           required
           value={unit}
           onChange={(e) => setUnit(e.target.value as UnitValue)}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           {UNITS.map((u) => (
             <option
@@ -159,7 +159,7 @@ export default function AddRecipeItemForm({
       <button
         type="submit"
         disabled={pending || (!hasProducts && !hasSubRecipes)}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending ? "Agregando..." : "Agregar"}
       </button>

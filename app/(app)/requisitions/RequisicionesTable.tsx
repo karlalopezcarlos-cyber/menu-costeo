@@ -48,12 +48,12 @@ export default function RequisicionesTable({ rows }: { rows: RequisicionRow[] })
           value={folioSearch}
           onChange={(e) => setFolioSearch(e.target.value)}
           placeholder="Buscar folio..."
-          className="w-full max-w-[10rem] rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-[10rem] rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={directionFilter}
           onChange={(e) => setDirectionFilter(e.target.value as typeof directionFilter)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Enviadas y recibidas</option>
           <option value="enviada">Solo enviadas</option>
@@ -61,17 +61,17 @@ export default function RequisicionesTable({ rows }: { rows: RequisicionRow[] })
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Folio</th>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Origen</th>
-              <th className="px-4 py-2 font-medium">Destino</th>
-              <th className="px-4 py-2 font-medium">Direccion</th>
-              <th className="px-4 py-2 font-medium">Productos</th>
-              <th className="px-4 py-2 font-medium">Costo total</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Origen</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Destino</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Direccion</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Productos</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Costo total</th>
             </tr>
           </thead>
           <tbody>
@@ -85,24 +85,24 @@ export default function RequisicionesTable({ rows }: { rows: RequisicionRow[] })
               </tr>
             )}
             {filteredRows.map((row) => (
-              <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   <Link href={`/requisitions/${row.id}`} className="text-neutral-700 hover:underline">
                     {row.folioLabel}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{row.dateLabel}</td>
-                <td className="px-4 py-2 text-neutral-500">{row.fromSucursalName}</td>
-                <td className="px-4 py-2 text-neutral-500">{row.toSucursalName}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
+                <td className="px-4 py-3 text-neutral-500">{row.fromSucursalName}</td>
+                <td className="px-4 py-3 text-neutral-500">{row.toSucursalName}</td>
+                <td className="px-4 py-3">
                   <span
                     className={`rounded px-2 py-0.5 text-xs font-medium ${DIRECTION_STYLE[row.direction]}`}
                   >
                     {DIRECTION_LABEL[row.direction]}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{row.itemCount}</td>
-                <td className="px-4 py-2">{formatMoney(row.total)}</td>
+                <td className="px-4 py-3 text-neutral-500">{row.itemCount}</td>
+                <td className="px-4 py-3">{formatMoney(row.total)}</td>
               </tr>
             ))}
           </tbody>

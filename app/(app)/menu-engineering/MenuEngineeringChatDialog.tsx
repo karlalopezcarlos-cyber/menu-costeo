@@ -69,7 +69,7 @@ export default function MenuEngineeringChatDialog({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
       >
         Consultar con IA
       </button>
@@ -132,7 +132,7 @@ export default function MenuEngineeringChatDialog({
                 placeholder="Escribe tu pregunta..."
                 disabled={pending}
                 autoFocus
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-100"
+                className="flex-1 rounded-md border border-neutral-200 px-3 py-2 text-sm disabled:bg-neutral-100"
               />
               <button
                 type="submit"

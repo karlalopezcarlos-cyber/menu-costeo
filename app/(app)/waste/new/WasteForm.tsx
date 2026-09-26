@@ -155,7 +155,7 @@ export default function WasteForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="rows" value={rowsPayload} />
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="max-w-xs space-y-1">
           <label htmlFor="wasteDate" className="text-sm font-medium text-neutral-700">
             Fecha de merma
@@ -166,12 +166,12 @@ export default function WasteForm({
             type="date"
             required
             defaultValue={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-2">
           <div className={`grid ${GRID_COLS} gap-2 px-1 text-xs font-medium text-neutral-500`}>
             <span></span>
@@ -197,7 +197,7 @@ export default function WasteForm({
                 <select
                   value={row.itemType}
                   onChange={(e) => setRowType(row.key, e.target.value as ItemType)}
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                 >
                   <option value="product">Producto</option>
                   <option value="subrecipe">Subreceta / PLU</option>
@@ -231,14 +231,14 @@ export default function WasteForm({
                   value={row.quantity}
                   onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
                   placeholder="0"
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                 />
 
                 {row.itemType === "product" ? (
                   <select
                     value={row.unit}
                     onChange={(e) => updateRow(row.key, { unit: e.target.value as UnitValue })}
-                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                    className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                   >
                     {UNITS.map((unit) => (
                       <option
@@ -258,7 +258,7 @@ export default function WasteForm({
                   value={row.comment}
                   onChange={(e) => updateRow(row.key, { comment: e.target.value })}
                   placeholder="Ej. se cayo, caduco..."
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                  className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                 />
 
                 <div className="text-sm leading-tight text-neutral-700">
@@ -279,7 +279,7 @@ export default function WasteForm({
                       value={row.costBasis}
                       onChange={(e) => updateRow(row.key, { costBasis: e.target.value as CostBasis })}
                       title={`Rendimiento configurado: ${Number(product!.yieldPercentage)}%`}
-                      className="ml-2 rounded border border-neutral-300 px-1 py-0.5 text-xs text-neutral-600"
+                      className="ml-2 rounded border border-neutral-200 px-1 py-0.5 text-xs text-neutral-600"
                     >
                       <option value="net">Con rendimiento</option>
                       <option value="gross">De compra</option>
@@ -314,7 +314,7 @@ export default function WasteForm({
       <button
         type="button"
         onClick={addRow}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
       >
         + Agregar otro renglon
       </button>
@@ -325,7 +325,7 @@ export default function WasteForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : rows.length > 1 ? `Guardar ${rows.length} mermas` : "Guardar merma"}
         </button>

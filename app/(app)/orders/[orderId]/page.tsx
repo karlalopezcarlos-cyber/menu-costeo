@@ -152,7 +152,7 @@ export default async function OrderDetailPage({
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Pedido {folioLabel} - {dateLabel}
           </h1>
           <span
@@ -170,10 +170,10 @@ export default async function OrderDetailPage({
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <a
           href={`/api/export/orders/${order.id}/pdf`}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Descargar PDF para proveedor
         </a>
@@ -186,7 +186,7 @@ export default async function OrderDetailPage({
         {order.status === "OPEN" ? (
           <Link
             href={`/purchases/new?pedido=${order.id}`}
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Registrar compra de este pedido
           </Link>
@@ -194,7 +194,7 @@ export default async function OrderDetailPage({
           <form action={boundReopen}>
             <button
               type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
             >
               Reabrir pedido
             </button>
@@ -208,7 +208,7 @@ export default async function OrderDetailPage({
       </div>
 
       {(hasReceiptData || order.status === "RECEIVED") && (
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 space-y-2">
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4 space-y-2">
           <h2 className="text-sm font-medium text-neutral-700">Recepcion</h2>
           <p className="text-sm text-neutral-600">
             {completeCount} de {receiptSummary.length} producto

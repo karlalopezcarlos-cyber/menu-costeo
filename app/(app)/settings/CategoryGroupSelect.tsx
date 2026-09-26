@@ -23,7 +23,7 @@ export default function CategoryGroupSelect({
           action(categoryId, value);
         });
       }}
-      className="rounded-md border border-neutral-300 px-2 py-1 text-sm disabled:opacity-50"
+      className="rounded-md border border-neutral-200 px-2 py-1 text-sm disabled:opacity-50"
     >
       <option value="">Sin grupo</option>
       <option value="ALIMENTO">Alimento</option>

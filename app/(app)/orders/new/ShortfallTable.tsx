@@ -148,7 +148,7 @@ export default function ShortfallTable({
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="rows" value={rowsPayload} />
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-1">
           <label htmlFor="supplierId" className="text-sm font-medium text-neutral-700">
             Proveedor (opcional)
@@ -158,7 +158,7 @@ export default function ShortfallTable({
             name="supplierId"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Sin proveedor</option>
             {suppliers.map((s) => (
@@ -177,7 +177,7 @@ export default function ShortfallTable({
             name="comment"
             rows={1}
             placeholder="Ej. entregar antes de las 10 am"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -188,12 +188,12 @@ export default function ShortfallTable({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar producto..."
-          className="w-full max-w-xs rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
           {categoryOptions.names.map((name) => (
@@ -236,13 +236,13 @@ export default function ShortfallTable({
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
               {COLUMNS.map((col) => (
-                <th key={col.key} className="px-4 py-2 font-medium">
+                <th key={col.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
                     onClick={() => handleSort(col.key)}
@@ -253,7 +253,7 @@ export default function ShortfallTable({
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-2 font-medium">Cantidad a pedir</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad a pedir</th>
             </tr>
           </thead>
           <tbody>
@@ -284,7 +284,7 @@ export default function ShortfallTable({
                       : `border-t border-neutral-100 ${row.alreadyInOpenOrder ? "bg-amber-50" : "bg-white"}`
                   }
                 >
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -294,8 +294,8 @@ export default function ShortfallTable({
                       className="h-4 w-4 rounded border-neutral-300"
                     />
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
+                  <td className="px-4 py-3">
                     {row.name}
                     {row.alreadyInOpenOrder && (
                       <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
@@ -303,16 +303,16 @@ export default function ShortfallTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">
+                  <td className="px-4 py-3 text-neutral-500">
                     {row.currentStock} {row.unitLabel}
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">
+                  <td className="px-4 py-3 text-neutral-500">
                     {row.targetStock} {row.unitLabel}
                   </td>
-                  <td className="px-4 py-2 font-medium">
+                  <td className="px-4 py-3 font-medium">
                     {row.shortfall} {row.unitLabel}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <PresentationQuantityInput
                       baseUnit={row.baseUnit}
                       unitLabel={row.unitLabel}
@@ -338,7 +338,7 @@ export default function ShortfallTable({
         <button
           type="submit"
           disabled={pending || selectedCount === 0}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending
             ? "Creando pedido..."

@@ -28,7 +28,7 @@ export default async function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-neutral-900">Pagos a proveedores</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pagos a proveedores</h1>
       <PaymentsSupplierList rows={rows} />
     </div>
   );

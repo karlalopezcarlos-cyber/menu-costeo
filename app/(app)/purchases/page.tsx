@@ -68,10 +68,10 @@ export default async function PurchasesPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Compras</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Compras</h1>
         <Link
           href="/purchases/new"
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
         >
           Registrar compra
         </Link>

@@ -63,7 +63,7 @@ export default function IncomeStatementChat({
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white">
+    <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -112,7 +112,7 @@ export default function IncomeStatementChat({
               onChange={(e) => setInput(e.target.value)}
               placeholder="Escribe tu pregunta..."
               disabled={pending}
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:bg-neutral-100"
+              className="flex-1 rounded-md border border-neutral-200 px-3 py-2 text-sm disabled:bg-neutral-100"
             />
             <button
               type="submit"

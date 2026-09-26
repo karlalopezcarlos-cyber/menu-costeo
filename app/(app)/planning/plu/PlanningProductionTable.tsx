@@ -50,7 +50,7 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="rows" value={rowsPayload} />
 
-      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <p className="text-sm text-neutral-500">Costo estimado de produccion</p>
         <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
       </div>
@@ -65,21 +65,21 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
           type="date"
           required
           defaultValue={new Date().toISOString().slice(0, 10)}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium"></th>
-              <th className="px-4 py-2 font-medium">Subreceta</th>
-              <th className="px-4 py-2 font-medium">Necesario total</th>
-              <th className="px-4 py-2 font-medium">Existencia</th>
-              <th className="px-4 py-2 font-medium">Cantidad a producir</th>
-              <th className="px-4 py-2 font-medium">Comentario</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Subreceta</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Necesario total</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Existencia</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad a producir</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Comentario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
@@ -90,7 +90,7 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
                   key={row.itemId}
                   className={`border-t border-neutral-100 ${isChecked ? "bg-emerald-50" : "bg-white"}`}
                 >
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -99,9 +99,9 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
                     />
                   </td>
                   <td className={`px-4 py-2 ${isChecked ? "text-neutral-400 line-through" : ""}`}>{row.name}</td>
-                  <td className="px-4 py-2 text-neutral-500">{row.grossQtyLabel}</td>
-                  <td className="px-4 py-2 text-neutral-500">{row.onHandQtyLabel}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3 text-neutral-500">{row.grossQtyLabel}</td>
+                  <td className="px-4 py-3 text-neutral-500">{row.onHandQtyLabel}</td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
@@ -109,21 +109,21 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
                         min="0"
                         value={quantities[row.itemId] ?? ""}
                         onChange={(e) => setQuantities((prev) => ({ ...prev, [row.itemId]: e.target.value }))}
-                        className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                        className="w-24 rounded-md border border-neutral-200 px-2 py-1 text-sm"
                       />
                       <span className="text-xs text-neutral-400">{row.unitLabel}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <input
                       value={comments[row.itemId] ?? ""}
                       onChange={(e) => setComments((prev) => ({ ...prev, [row.itemId]: e.target.value }))}
                       onBlur={(e) => handleCommentBlur(row.itemId, e.target.value)}
                       placeholder="Opcional"
-                      className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                      className="w-full rounded-md border border-neutral-200 px-2 py-1 text-sm"
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     <a
                       href={`/recipes/${row.subRecipeId}/execute?qty=${quantities[row.itemId] ?? row.netQty}`}
                       target="_blank"
@@ -145,7 +145,7 @@ export default function PlanningProductionTable({ rows }: { rows: ProductionResu
       <button
         type="submit"
         disabled={pending || selectedCount === 0}
-        className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
         {pending
           ? "Registrando..."

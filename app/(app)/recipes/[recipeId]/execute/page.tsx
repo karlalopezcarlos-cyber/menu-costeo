@@ -56,20 +56,20 @@ export default async function RecipeExecutePage({
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-neutral-900">{recipe.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{recipe.name}</h1>
         <p className="text-sm text-neutral-500">
           Vas a preparar: <strong className="text-neutral-900">{targetQty.toNumber().toLocaleString("es-MX", { maximumFractionDigits: 2 })} {yieldUnitLabel}</strong>
           {" "}(la receta base rinde {yieldQty.toNumber().toLocaleString("es-MX", { maximumFractionDigits: 2 })} {yieldUnitLabel})
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Categoria</th>
-              <th className="px-4 py-2 font-medium">Ingrediente</th>
-              <th className="px-4 py-2 font-medium">Cantidad</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Categoria</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Ingrediente</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Cantidad</th>
             </tr>
           </thead>
           <tbody>
@@ -81,9 +81,9 @@ export default async function RecipeExecutePage({
               </tr>
             )}
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
-                <td className="px-4 py-2">
+              <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
+                <td className="px-4 py-3">
                   {row.name}
                   {row.isSubRecipe && (
                     <span className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-600">
@@ -91,7 +91,7 @@ export default async function RecipeExecutePage({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-4 py-3 font-medium">
                   {row.quantityLabel} {row.unitLabel}
                 </td>
               </tr>
@@ -101,7 +101,7 @@ export default async function RecipeExecutePage({
       </div>
 
       {recipe.instructions && (
-        <div className="space-y-2 rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="space-y-2 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
           <h2 className="text-sm font-medium text-neutral-700">Procedimiento</h2>
           <p className="whitespace-pre-wrap text-sm text-neutral-700">{recipe.instructions}</p>
         </div>

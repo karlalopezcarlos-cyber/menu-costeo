@@ -39,7 +39,7 @@ export default async function StoreSettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Configuracion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
         <SettingsNav active="/settings/store" />
         <p className="mt-3 text-sm text-neutral-500">
           Configura el link publico donde tus clientes pueden ver tu menu y hacer pedidos, para la

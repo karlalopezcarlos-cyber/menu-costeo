@@ -34,7 +34,7 @@ export default async function InventoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Inventario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Inventario</h1>
         <Link href="/orders/new" className="text-sm text-neutral-500 hover:underline">
           Ver pedido sugerido
         </Link>
@@ -42,7 +42,7 @@ export default async function InventoryPage() {
 
       <form
         action={createInventoryCount}
-        className="flex items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4"
+        className="flex items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4"
       >
         <div className="space-y-1">
           <label htmlFor="date" className="text-sm font-medium text-neutral-700">
@@ -54,25 +54,25 @@ export default async function InventoryPage() {
             type="date"
             required
             defaultValue={toDateInputValue(new Date())}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
         >
           Nuevo conteo
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Productos contados</th>
-              <th className="px-4 py-2 font-medium">Valor de inventario</th>
-              <th className="px-4 py-2 font-medium"></th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Productos contados</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Valor de inventario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
@@ -84,15 +84,15 @@ export default async function InventoryPage() {
               </tr>
             )}
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-neutral-100">
-                <td className="px-4 py-2">
+              <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                <td className="px-4 py-3">
                   <Link href={`/inventory/${row.id}`} className="hover:underline">
                     {row.dateLabel}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-neutral-500">{row.itemCount}</td>
-                <td className="px-4 py-2 font-medium">{formatMoney(row.totalValue)}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-3 text-neutral-500">{row.itemCount}</td>
+                <td className="px-4 py-3 font-medium">{formatMoney(row.totalValue)}</td>
+                <td className="px-4 py-3 text-right">
                   <DeleteCountButton countId={row.id} />
                 </td>
               </tr>

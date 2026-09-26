@@ -18,7 +18,7 @@ export default async function SaleTicketsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Tickets de venta</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Tickets de venta</h1>
           <p className="text-sm text-neutral-500">Historial de ventas capturadas como ticket.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -27,21 +27,21 @@ export default async function SaleTicketsPage() {
           </Link>
           <Link
             href="/sales/new"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
           >
             Registrar venta
           </Link>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Folio</th>
-              <th className="px-4 py-2 font-medium">Fecha</th>
-              <th className="px-4 py-2 font-medium">Platillos</th>
-              <th className="px-4 py-2 font-medium">Total</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Platillos</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -58,17 +58,17 @@ export default async function SaleTicketsPage() {
                 0,
               );
               return (
-                <tr key={ticket.id} className="border-t border-neutral-100">
-                  <td className="px-4 py-2">
+                <tr key={ticket.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+                  <td className="px-4 py-3">
                     <Link href={`/sales/tickets/${ticket.id}`} className="font-medium text-neutral-900 hover:underline">
                       {formatSaleFolio(ticket.folio)}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">
+                  <td className="px-4 py-3 text-neutral-500">
                     {ticket.date.toLocaleDateString("es-MX", { timeZone: "UTC" })}
                   </td>
-                  <td className="px-4 py-2 text-neutral-500">{ticket.items.length}</td>
-                  <td className="px-4 py-2">{formatMoney(total)}</td>
+                  <td className="px-4 py-3 text-neutral-500">{ticket.items.length}</td>
+                  <td className="px-4 py-3">{formatMoney(total)}</td>
                 </tr>
               );
             })}

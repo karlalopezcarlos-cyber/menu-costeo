@@ -88,7 +88,7 @@ export default function PlanningForm({
   return (
     <div className="space-y-6">
       {initialRun && !showForm && (
-        <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4">
+        <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
           <p className="text-sm text-neutral-500">Calculado el {initialRun.createdAtLabel}.</p>
           <button
             type="button"
@@ -113,14 +113,14 @@ export default function PlanningForm({
               <button
                 type="button"
                 onClick={loadPendingStoreDemand}
-                className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 Cargar pedidos pendientes
               </button>
             </div>
           )}
 
-          <div className="rounded-lg border border-neutral-200 bg-white p-5">
+          <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
             <div className="space-y-2">
               <div className={`grid ${GRID_COLS} gap-2 px-1 text-xs font-medium text-neutral-500`}>
                 <span></span>
@@ -149,7 +149,7 @@ export default function PlanningForm({
                     value={row.quantity}
                     onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
                     placeholder="0"
-                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                    className="w-full rounded-md border border-neutral-200 px-2 py-2 text-sm"
                   />
 
                   {row.recipeId && Number(row.quantity) > 0 ? (
@@ -186,14 +186,14 @@ export default function PlanningForm({
             <button
               type="button"
               onClick={addRow}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
             >
               + Agregar otro platillo
             </button>
             <button
               type="submit"
               disabled={pending}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+              className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
             >
               {pending ? "Calculando..." : initialRun ? "Recalcular proyeccion" : "Calcular proyeccion"}
             </button>
