@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FondoBadge } from "@/components/brand/FondoLogo";
 
 export type NavItem = { href: string; label: string };
 
@@ -83,9 +84,7 @@ export default function Sidebar({ items }: { items: NavItem[] }) {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-neutral-800 bg-neutral-900 lg:flex">
         <div className="flex h-16 items-center border-b border-neutral-800 px-5">
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-500 text-sm font-semibold text-white">
-              F
-            </span>
+            <FondoBadge size={30} tone="dark" />
             <span className="text-[15px] font-semibold uppercase tracking-[0.22em] text-neutral-100">
               Fondo
             </span>

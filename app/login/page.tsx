@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { authenticate } from "./actions";
+import { FondoSeal } from "@/components/brand/FondoLogo";
 
 const initialState: { error?: string } = {};
 
@@ -15,15 +16,10 @@ export default function LoginPage() {
         className="w-full max-w-sm space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-6"
       >
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-500 text-base font-semibold text-white">
-              F
-            </span>
-            <span className="text-[17px] font-semibold uppercase tracking-[0.22em] text-neutral-900">
-              Fondo
-            </span>
+          <div className="flex justify-center">
+            <FondoSeal size={132} tone="light" />
           </div>
-          <h1 className="mt-5 text-xl font-semibold tracking-tight text-neutral-900">Iniciar sesion</h1>
+          <h1 className="mt-6 text-xl font-semibold tracking-tight text-neutral-900">Iniciar sesion</h1>
           <p className="mt-1 text-sm text-neutral-500">
             Costeo, inventario y control de operacion
           </p>
