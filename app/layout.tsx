@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Costeo de Menu",
-  description: "Costeo de recetas e ingenieria de menu para restaurantes",
+  title: "Fondo",
+  description: "Fondo — costeo, inventario y control de operacion para restaurantes",
 };
 
 export default function RootLayout({

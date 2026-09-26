@@ -84,10 +84,10 @@ export default function Sidebar({ items }: { items: NavItem[] }) {
         <div className="flex h-16 items-center border-b border-neutral-800 px-5">
           <Link href="/dashboard" className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-500 text-sm font-semibold text-white">
-              M
+              F
             </span>
-            <span className="text-[13px] font-semibold uppercase tracking-[0.16em] text-neutral-100">
-              Menu Costeo
+            <span className="text-[15px] font-semibold uppercase tracking-[0.22em] text-neutral-100">
+              Fondo
             </span>
           </Link>
         </div>

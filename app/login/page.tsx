@@ -12,11 +12,21 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <form
         action={formAction}
-        className="w-full max-w-sm space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-6 shadow-sm"
+        className="w-full max-w-sm space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-6"
       >
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Iniciar sesion</h1>
-          <p className="text-sm text-neutral-500">Costeo de menu</p>
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-500 text-base font-semibold text-white">
+              F
+            </span>
+            <span className="text-[17px] font-semibold uppercase tracking-[0.22em] text-neutral-900">
+              Fondo
+            </span>
+          </div>
+          <h1 className="mt-5 text-xl font-semibold tracking-tight text-neutral-900">Iniciar sesion</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Costeo, inventario y control de operacion
+          </p>
         </div>
 
         <div className="space-y-1">
@@ -28,7 +38,7 @@ export default function LoginPage() {
             name="email"
             type="email"
             required
-            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
 
@@ -41,7 +51,7 @@ export default function LoginPage() {
             name="password"
             type="password"
             required
-            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
 
