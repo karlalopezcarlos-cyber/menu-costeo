@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { computePortioning, averageYield, PortioningError } from "@/lib/portioning";
 import { loadPortioningOptions } from "@/lib/portioning-options";
-import { removeYieldFactor } from "@/lib/units";
+import { removeYieldFactor, type UnitValue } from "@/lib/units";
+import { recalcProductCostsForYield } from "@/lib/costing";
 
 export type PortioningState = { error?: string };
 
@@ -134,6 +135,12 @@ export async function createPortioning(
         });
       }
     });
+
+    // Fuera de la transaccion: recostear el historial puede tocar muchas compras y no debe
+    // alargar el candado sobre el folio.
+    if (nuevoRendimiento) {
+      await recalcProductCostsForYield(product.id, product.baseUnit as UnitValue, nuevoRendimiento);
+    }
   } catch (error) {
     if (error instanceof PortioningError) return { error: error.message };
     console.error("createPortioning error:", error);
@@ -144,5 +151,6 @@ export async function createPortioning(
 
   revalidatePath("/portioning");
   revalidatePath("/products");
+  revalidatePath("/recipes");
   redirect("/portioning");
 }

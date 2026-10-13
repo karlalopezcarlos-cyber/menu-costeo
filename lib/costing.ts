@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { convertQty, type UnitValue } from "@/lib/units";
+import { applyYieldFactor, computeUnitCost, convertQty, type UnitValue } from "@/lib/units";
 
 export class CircularReferenceError extends Error {
   constructor(recipeName: string) {
@@ -270,4 +270,51 @@ export async function recalcProductCurrentCost(productId: string) {
       currentUnitCostUpdatedAt: latest?.purchaseDate ?? null,
     },
   });
+}
+
+/**
+ * Vuelve a costear el historial de un producto cuando cambia su rendimiento.
+ *
+ * El costo guardado de cada compra (`computedUnitCost`) es el precio pagado dividido entre el
+ * rendimiento: es el costo por unidad aprovechable. Si el rendimiento cambia —porque el usuario
+ * lo corrigio a mano o porque un porcionamiento midio la realidad— ese costo queda viejo, y con
+ * el quedan viejas todas las recetas que usan el producto. Aqui se recalculan las compras y, con
+ * ellas, el costo vigente del catalogo.
+ *
+ * Las compras cuya unidad no sea convertible a la unidad base se dejan intactas en vez de tumbar
+ * la operacion: son datos heredados que ya estaban mal y que no deben impedir el ajuste del resto.
+ */
+export async function recalcProductCostsForYield(
+  productId: string,
+  baseUnit: UnitValue,
+  yieldPercentage: Decimal.Value,
+) {
+  const purchases = await prisma.purchase.findMany({ where: { productId } });
+
+  const updates = [];
+  for (const p of purchases) {
+    let newCost: Decimal;
+    try {
+      const gross = computeUnitCost(
+        p.totalPrice,
+        p.presentationQty,
+        p.presentationUnit as UnitValue,
+        baseUnit,
+      );
+      newCost = applyYieldFactor(gross, yieldPercentage);
+    } catch {
+      continue;
+    }
+    updates.push(
+      prisma.purchase.update({ where: { id: p.id }, data: { computedUnitCost: newCost.toString() } }),
+    );
+  }
+
+  // Por lotes: un catalogo con mucho historial se pasa del limite de tiempo de una transaccion.
+  const TAMANO_LOTE = 50;
+  for (let i = 0; i < updates.length; i += TAMANO_LOTE) {
+    await prisma.$transaction(updates.slice(i, i + TAMANO_LOTE));
+  }
+
+  await recalcProductCurrentCost(productId);
 }

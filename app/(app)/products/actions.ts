@@ -13,7 +13,7 @@ import {
   UNITS,
   type UnitValue,
 } from "@/lib/units";
-import { recalcProductCurrentCost } from "@/lib/costing";
+import { recalcProductCurrentCost, recalcProductCostsForYield } from "@/lib/costing";
 import { Prisma } from "@/generated/prisma/client";
 
 function parseUnit(value: FormDataEntryValue | null): UnitValue {
@@ -149,6 +149,7 @@ export async function updateProduct(
     }
 
     const baseUnitChanged = baseUnit !== existing.baseUnit;
+    const yieldChanged = !yieldPercentage.equals(new Decimal(existing.yieldPercentage.toString()));
 
     if (baseUnitChanged) {
       const purchases = await prisma.purchase.findMany({ where: { productId } });
@@ -206,8 +207,11 @@ export async function updateProduct(
       },
     });
 
-    if (baseUnitChanged) {
-      await recalcProductCurrentCost(productId);
+    // Cambiar el rendimiento cambia el costo por unidad aprovechable de todo el historial, y
+    // con el, el de todas las recetas que usan este producto. Antes esto solo pasaba al cambiar
+    // la unidad base, asi que corregir una merma no tenia ningun efecto en el costeo.
+    if (baseUnitChanged || yieldChanged) {
+      await recalcProductCostsForYield(productId, baseUnit, yieldPercentage);
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar el producto." };
