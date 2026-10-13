@@ -94,12 +94,15 @@ export default function PurchaseForm({
   lastPurchaseByProduct,
   pendingOrders,
   initialPedidoId,
+  suggestedFolio,
 }: {
   products: ProductOption[];
   suppliers: SupplierOption[];
   lastPurchaseByProduct: Record<string, LastPurchase>;
   pendingOrders: PendingOrderOption[];
   initialPedidoId?: string;
+  /** Folio interno que le tocaria a esta compra (COM-0043); se usa como sugerencia. */
+  suggestedFolio: string;
 }) {
   const [state, formAction, pending] = useActionState(createPurchase, initialState);
   const nextKeyRef = useRef(1);
@@ -351,7 +354,7 @@ export default function PurchaseForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
+      <div className="grid grid-cols-3 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
         <div className="space-y-1">
           <label htmlFor="purchaseDate" className="text-sm font-medium text-neutral-700">
             Fecha de compra
@@ -383,6 +386,23 @@ export default function PurchaseForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="invoiceFolio" className="text-sm font-medium text-neutral-700">
+            Folio de factura (opcional)
+          </label>
+          <input
+            id="invoiceFolio"
+            name="invoiceFolio"
+            type="text"
+            maxLength={60}
+            placeholder={suggestedFolio}
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-neutral-500">
+            El folio de la nota o factura del proveedor, para encontrar la compra desde el papel.
+            Si lo dejas vacio se guarda {suggestedFolio}.
+          </p>
         </div>
       </div>
 

@@ -38,8 +38,14 @@ export function buildPurchaseWhere(
 ): Prisma.PurchaseWhereInput {
   const where: Prisma.PurchaseWhereInput = { sucursalId };
 
-  if (filters.search.trim()) {
-    where.product = { name: { contains: filters.search.trim(), mode: "insensitive" } };
+  // La busqueda libre cubre nombre de producto y folio de factura: el usuario llega con el
+  // papel del proveedor en la mano y teclea lo que ve ahi, sin saber en que campo cae.
+  const search = filters.search.trim();
+  if (search) {
+    where.OR = [
+      { product: { name: { contains: search, mode: "insensitive" } } },
+      { invoiceFolio: { contains: search, mode: "insensitive" } },
+    ];
   }
 
   const folioNumber = filters.folio.trim() ? parsePurchaseFolio(filters.folio) : null;

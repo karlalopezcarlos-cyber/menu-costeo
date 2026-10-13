@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { computeUnitCost, type UnitValue } from "@/lib/units";
 import { formatOrderFolio } from "@/lib/orders/folio";
+import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import { listSuppliersForCapture } from "@/lib/suppliers";
 import PurchaseForm, { type PendingOrderOption } from "./PurchaseForm";
 
@@ -13,7 +14,11 @@ export default async function NewPurchasePage({
   const { pedido } = await searchParams;
   const user = await requireSucursalContext();
 
-  const [products, suppliers, recentPurchases, openOrders] = await Promise.all([
+  const [organization, products, suppliers, recentPurchases, openOrders] = await Promise.all([
+    prisma.organization.findUniqueOrThrow({
+      where: { id: user.organizationId },
+      select: { nextPurchaseFolio: true },
+    }),
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
@@ -108,6 +113,7 @@ export default async function NewPurchasePage({
         </p>
       ) : (
         <PurchaseForm
+      suggestedFolio={formatPurchaseFolio(organization.nextPurchaseFolio)}
           products={products.map((p) => ({
             ...p,
             baseUnit: p.baseUnit as UnitValue,

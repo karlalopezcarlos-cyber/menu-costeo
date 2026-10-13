@@ -8,6 +8,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { applyYieldFactor, computeUnitCost, convertQty, UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatOrderFolio } from "@/lib/orders/folio";
+import { formatPurchaseFolio } from "@/lib/purchases/folio";
 
 function parseUnit(value: unknown): UnitValue {
   if (typeof value === "string" && (UNITS as readonly string[]).includes(value)) {
@@ -35,6 +36,7 @@ export async function createPurchase(
     const purchaseDateRaw = String(formData.get("purchaseDate") ?? "");
     const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
     const supplierId = supplierIdRaw || null;
+    const invoiceFolioInput = String(formData.get("invoiceFolio") ?? "").trim().slice(0, 60);
     const rowsRaw = String(formData.get("rows") ?? "[]");
     purchaseOrderId = String(formData.get("purchaseOrderId") ?? "").trim() || null;
 
@@ -169,7 +171,10 @@ export async function createPurchase(
         select: { nextPurchaseFolio: true },
       });
       const folio = org.nextPurchaseFolio - 1;
-      const withFolios = toCreateWithNotes.map((entry) => ({ ...entry, folio }));
+      // Si no capturaron el folio de la factura del proveedor, se guarda el folio interno
+      // (COM-0043) para que la compra siempre sea localizable por folio desde el buscador.
+      const invoiceFolio = invoiceFolioInput || formatPurchaseFolio(folio);
+      const withFolios = toCreateWithNotes.map((entry) => ({ ...entry, folio, invoiceFolio }));
       await tx.purchase.createMany({ data: withFolios });
       if (!purchaseOrder) return;
 

@@ -370,10 +370,15 @@ model Purchase {
   note              String?
   /// Comentario libre capturado por el usuario para este renglon de la compra (ej. "llego danado").
   comment           String?
+  /// Folio de la factura o nota del proveedor, tal como viene en el papel. Sirve para localizar
+  /// la compra desde el documento fisico. Si el usuario no lo captura, se guarda el folio interno
+  /// (ej. "COM-0043") para que el campo nunca quede vacio al buscar.
+  invoiceFolio      String?
 
   /// El folio ya no es unico por renglon: todos los productos capturados en una misma compra
   /// (un solo envio del formulario) comparten el mismo folio.
   @@index([organizationId, folio])
+  @@index([organizationId, invoiceFolio])
   @@index([organizationId, productId, purchaseDate])
   @@index([organizationId, purchaseDate])
   @@index([sucursalId, purchaseDate])

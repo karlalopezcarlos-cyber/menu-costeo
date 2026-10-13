@@ -161,7 +161,7 @@ export default function PurchasesTable({
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Buscar producto..."
+          placeholder="Buscar producto o folio de factura..."
           className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <input
@@ -301,6 +301,9 @@ export default function PurchasesTable({
                   <Link href={`/purchases/${purchase.folio}`} className="text-neutral-700 hover:underline">
                     {purchase.folioLabel}
                   </Link>
+                  {purchase.invoiceFolio && purchase.invoiceFolio !== purchase.folioLabel && (
+                    <p className="mt-0.5 text-xs text-neutral-400">Factura {purchase.invoiceFolio}</p>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-neutral-500">{purchase.dateLabel}</td>
                 <td className="px-4 py-3">

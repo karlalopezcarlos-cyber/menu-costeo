@@ -7,6 +7,8 @@ export type PurchaseRow = {
   id: string;
   folio: number;
   folioLabel: string;
+  /** Folio de la factura del proveedor. Para compras viejas puede venir vacio. */
+  invoiceFolio: string | null;
   productId: string;
   dateLabel: string;
   dateValue: number;
@@ -51,6 +53,7 @@ type PurchaseWithRelations = {
   totalPrice: Decimal;
   computedUnitCost: Decimal;
   note: string | null;
+  invoiceFolio: string | null;
   product: { name: string; baseUnit: string };
   supplier: { name: string } | null;
 };
@@ -69,6 +72,7 @@ export function toPurchaseRow(purchase: PurchaseWithRelations, hasPendingOrder: 
     id: purchase.id,
     folio: purchase.folio,
     folioLabel: formatPurchaseFolio(purchase.folio),
+    invoiceFolio: purchase.invoiceFolio,
     productId: purchase.productId,
     dateLabel: purchase.purchaseDate.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     dateValue: purchase.purchaseDate.getTime(),
