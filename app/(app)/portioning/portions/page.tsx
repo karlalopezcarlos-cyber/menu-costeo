@@ -4,6 +4,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { formatMoney } from "@/lib/format";
+import PortionRowActions from "./PortionRowActions";
 
 export default async function PortionsPage() {
   const user = await requireSucursalContext();
@@ -74,12 +75,13 @@ export default async function PortionsPage() {
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Lleva</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Mas</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Costo por pieza</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-neutral-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-neutral-400">
                   Todavia no hay porciones. Crea la primera para poder registrar porcionamientos.
                 </td>
               </tr>
@@ -97,6 +99,9 @@ export default async function PortionsPage() {
                 </td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
                   {row.costo === null ? <span className="text-neutral-400">—</span> : formatMoney(row.costo, 2)}
+                </td>
+                <td className="px-4 py-3">
+                  <PortionRowActions recipeId={row.id} name={row.name} />
                 </td>
               </tr>
             ))}

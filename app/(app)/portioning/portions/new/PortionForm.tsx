@@ -2,10 +2,18 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { createPortion, type PortionState } from "../actions";
+import type { PortionState } from "../actions";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 
 export type ProductOption = { id: string; name: string; baseUnit: UnitValue };
+
+export type PortionInitial = {
+  name: string;
+  parentProductId: string;
+  parentQty: string;
+  parentUnit: UnitValue;
+  extras: { productId: string; qty: string; unit: UnitValue }[];
+};
 
 type Extra = { key: number; productId: string; qty: string; unit: UnitValue | "" };
 
@@ -18,11 +26,23 @@ function unitsFor(product: ProductOption | undefined): UnitValue[] {
   return UNITS.filter((u) => UNIT_META[u].type === tipo);
 }
 
-export default function PortionForm({ products }: { products: ProductOption[] }) {
-  const [state, formAction, pending] = useActionState(createPortion, initialState);
-  const [parentProductId, setParentProductId] = useState("");
-  const [parentUnit, setParentUnit] = useState<UnitValue | "">("");
-  const [extras, setExtras] = useState<Extra[]>([]);
+export default function PortionForm({
+  products,
+  action,
+  initial,
+  submitLabel = "Crear porcion",
+}: {
+  products: ProductOption[];
+  action: (state: PortionState | undefined, formData: FormData) => Promise<PortionState>;
+  initial?: PortionInitial;
+  submitLabel?: string;
+}) {
+  const [state, formAction, pending] = useActionState(action, initialState);
+  const [parentProductId, setParentProductId] = useState(initial?.parentProductId ?? "");
+  const [parentUnit, setParentUnit] = useState<UnitValue | "">(initial?.parentUnit ?? "");
+  const [extras, setExtras] = useState<Extra[]>(
+    initial?.extras.map((e, i) => ({ key: i + 1, ...e })) ?? [],
+  );
 
   const parent = products.find((p) => p.id === parentProductId);
   const parentUnits = unitsFor(parent);
@@ -40,6 +60,7 @@ export default function PortionForm({ products }: { products: ProductOption[] })
             type="text"
             required
             maxLength={120}
+            defaultValue={initial?.name ?? ""}
             placeholder="Ej. CAMARON 20 G"
             className="w-full max-w-md rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
@@ -81,6 +102,7 @@ export default function PortionForm({ products }: { products: ProductOption[] })
               step="0.0001"
               min="0"
               required
+              defaultValue={initial?.parentQty ?? ""}
               placeholder="20"
               className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
@@ -212,7 +234,7 @@ export default function PortionForm({ products }: { products: ProductOption[] })
           disabled={pending}
           className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
-          {pending ? "Creando..." : "Crear porcion"}
+          {pending ? "Guardando..." : submitLabel}
         </button>
         <Link
           href="/portioning/portions"

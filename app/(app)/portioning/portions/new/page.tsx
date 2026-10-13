@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { type UnitValue } from "@/lib/units";
 import PortionForm, { type ProductOption } from "./PortionForm";
+import { createPortion } from "../actions";
 
 export default async function NewPortionPage() {
   const user = await requireSucursalContext();
@@ -37,7 +38,7 @@ export default async function NewPortionPage() {
         </Link>
       </div>
 
-      <PortionForm products={options} />
+      <PortionForm products={options} action={createPortion} />
     </div>
   );
 }
