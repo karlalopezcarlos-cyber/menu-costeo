@@ -14,6 +14,10 @@ export type FolioRow = {
   abonado: number;
   isPaid: boolean;
   paidDateLabel: string | null;
+  /** Vencimiento segun los dias de credito del proveedor. Null si no tiene credito configurado. */
+  dueDateLabel: string | null;
+  dueLabel: string | null;
+  dueState: "vigente" | "hoy" | "vencido" | null;
 };
 
 export type LegacyAdvanceRow = {
@@ -156,6 +160,26 @@ function FolioPaymentRow({
         <td className="px-4 py-3 text-right">{money(row.total)}</td>
         <td className="px-4 py-3 text-right text-neutral-500">
           {row.abonado > 0 ? `${money(row.abonado)} de ${money(row.total)}` : "-"}
+        </td>
+        <td className="px-4 py-3">
+          {row.dueDateLabel ? (
+            <>
+              <span className="text-neutral-600">{row.dueDateLabel}</span>
+              <span
+                className={
+                  row.dueState === "vencido"
+                    ? "mt-0.5 block text-xs font-medium text-red-600"
+                    : row.dueState === "hoy"
+                      ? "mt-0.5 block text-xs font-medium text-amber-600"
+                      : "mt-0.5 block text-xs text-neutral-500"
+                }
+              >
+                {row.dueLabel}
+              </span>
+            </>
+          ) : (
+            <span className="text-neutral-400">-</span>
+          )}
         </td>
         <td className="px-4 py-3 text-neutral-500">{row.paidDateLabel ?? "-"}</td>
         <td className="px-4 py-3 text-center">
@@ -418,6 +442,7 @@ export default function SupplierPaymentsManager({
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Abonado</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Vence</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha de pago</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-center">Pagado</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-center">Abonar</th>

@@ -9,6 +9,12 @@ export type SupplierBalanceRow = {
   totalPurchased: number;
   totalPaid: number;
   balance: number;
+  /** Dias de credito pactados con el proveedor. Null = no configurado. */
+  creditDays: number | null;
+  /** Folios ya vencidos que siguen debiendose. */
+  overdueCount: number;
+  /** Dias para el vencimiento mas proximo de los folios pendientes. */
+  nextDueDays: number | null;
 };
 
 function money(n: number): string {
@@ -56,6 +62,7 @@ export default function PaymentsSupplierList({ rows }: { rows: SupplierBalanceRo
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total comprado</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total pagado</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Saldo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Credito</th>
             </tr>
           </thead>
           <tbody>
@@ -77,6 +84,28 @@ export default function PaymentsSupplierList({ rows }: { rows: SupplierBalanceRo
                 <td className="px-4 py-3 text-right text-neutral-500">{money(row.totalPaid)}</td>
                 <td className={`px-4 py-2 text-right font-medium ${row.balance > 0.005 ? "text-red-600" : "text-green-700"}`}>
                   {money(row.balance)}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {row.creditDays === null ? (
+                    <span className="text-neutral-400">Sin credito</span>
+                  ) : (
+                    <>
+                      <span className="text-neutral-600">{row.creditDays} dias</span>
+                      {row.overdueCount > 0 ? (
+                        <span className="mt-0.5 block text-xs font-medium text-red-600">
+                          {row.overdueCount === 1 ? "1 folio vencido" : `${row.overdueCount} folios vencidos`}
+                        </span>
+                      ) : row.nextDueDays !== null ? (
+                        <span className="mt-0.5 block text-xs text-neutral-500">
+                          {row.nextDueDays === 0
+                            ? "vence hoy"
+                            : row.nextDueDays === 1
+                              ? "vence en 1 dia"
+                              : `vence en ${row.nextDueDays} dias`}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

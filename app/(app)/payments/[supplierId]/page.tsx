@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
+import { computeDueInfo } from "@/lib/payments/credit";
 import SupplierPaymentsManager, {
   type LegacyAdvanceRow,
   type FolioRow,
@@ -66,6 +67,9 @@ export default async function SupplierPaymentsPage({
     .map(([folio, data]) => {
       const abonado = abonadoByFolio.get(folio) ?? 0;
       const lastPaidDate = lastPaidDateByFolio.get(folio) ?? null;
+      const isPaid = abonado >= data.total - 0.005;
+      // El vencimiento solo interesa mientras el folio siga debiendose.
+      const due = isPaid ? null : computeDueInfo(new Date(data.dateValue), supplier.creditDays);
       return {
         folio,
         folioLabel: formatPurchaseFolio(folio),
@@ -73,8 +77,11 @@ export default async function SupplierPaymentsPage({
         dateValue: data.dateValue,
         total: data.total,
         abonado,
-        isPaid: abonado >= data.total - 0.005,
+        isPaid,
         paidDateLabel: lastPaidDate ? lastPaidDate.toLocaleDateString("es-MX", { timeZone: "UTC" }) : null,
+        dueDateLabel: due?.dueDateLabel ?? null,
+        dueLabel: due?.label ?? null,
+        dueState: due?.state ?? null,
       };
     })
     .sort((a, b) => b.folio - a.folio);

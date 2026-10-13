@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { computeDueInfo } from "@/lib/payments/credit";
 
 /**
  * El saldo de un proveedor es simplemente lo comprado menos lo pagado: cada folio marcado como
@@ -36,6 +37,61 @@ export async function computeAllSupplierBalances(
     const totalPurchased = purchasedBySupplier.get(supplierId) ?? 0;
     const totalPaid = paidBySupplier.get(supplierId) ?? 0;
     result.set(supplierId, { totalPurchased, totalPaid, balance: totalPurchased - totalPaid });
+  }
+  return result;
+}
+
+/**
+ * Folios vencidos y proximo vencimiento por proveedor, para la lista de cuentas por pagar.
+ *
+ * Un folio cuenta como vencido cuando ya paso su fecha limite (fecha de compra + dias de
+ * credito del proveedor) y todavia le falta por abonar. Se resuelve en dos consultas agrupadas,
+ * sin recorrer compra por compra.
+ */
+export async function computeOverdueBySupplier(
+  sucursalId: string,
+  creditDaysBySupplier: Map<string, number | null>,
+): Promise<Map<string, { overdueCount: number; nextDueDays: number | null }>> {
+  const [purchaseGroups, paymentGroups] = await Promise.all([
+    prisma.purchase.groupBy({
+      by: ["supplierId", "folio"],
+      where: { sucursalId, supplierId: { not: null } },
+      _sum: { totalPrice: true },
+      _min: { purchaseDate: true },
+    }),
+    prisma.supplierPayment.groupBy({
+      by: ["supplierId", "folio"],
+      where: { sucursalId, folio: { not: null } },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const paidByKey = new Map(
+    paymentGroups.map((g) => [`${g.supplierId}:${g.folio}`, Number(g._sum.amount ?? 0)]),
+  );
+
+  const result = new Map<string, { overdueCount: number; nextDueDays: number | null }>();
+  for (const group of purchaseGroups) {
+    const supplierId = group.supplierId as string;
+    const creditDays = creditDaysBySupplier.get(supplierId);
+    if (creditDays === null || creditDays === undefined) continue;
+
+    const total = Number(group._sum.totalPrice ?? 0);
+    const paid = paidByKey.get(`${supplierId}:${group.folio}`) ?? 0;
+    if (paid >= total - 0.005) continue; // ya esta cubierto
+
+    const purchaseDate = group._min.purchaseDate;
+    if (!purchaseDate) continue;
+    const due = computeDueInfo(purchaseDate, creditDays);
+    if (!due) continue;
+
+    const current = result.get(supplierId) ?? { overdueCount: 0, nextDueDays: null };
+    if (due.daysLeft < 0) {
+      current.overdueCount += 1;
+    } else if (current.nextDueDays === null || due.daysLeft < current.nextDueDays) {
+      current.nextDueDays = due.daysLeft;
+    }
+    result.set(supplierId, current);
   }
   return result;
 }
