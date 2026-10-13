@@ -25,6 +25,8 @@ type RecipeNode = {
   name: string;
   yieldQty: Decimal;
   yieldUnit: UnitValue;
+  /** Receta de porcion: define el gramaje de una porcion para el modulo de Porcionamiento. */
+  isPortion: boolean;
   items: RecipeItemWithProduct[];
 };
 
@@ -107,6 +109,7 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
           name: r.name,
           yieldQty: new Decimal(r.yieldQty),
           yieldUnit: r.yieldUnit as UnitValue,
+          isPortion: r.isPortion,
           items: r.items.map((i) => ({
             id: i.id,
             productId: i.productId,

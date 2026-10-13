@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { type UnitValue } from "@/lib/units";
 import { computePortioning, averageYield, PortioningError } from "@/lib/portioning";
+import { loadPortioningOptions } from "@/lib/portioning-options";
 
 export type PortioningState = { error?: string };
 
@@ -17,8 +17,6 @@ export async function createPortioning(
   _prevState: PortioningState | undefined,
   formData: FormData,
 ): Promise<PortioningState> {
-  let folio: number | null = null;
-
   try {
     const user = await requireSucursalContext();
 
@@ -35,52 +33,42 @@ export async function createPortioning(
 
     const product = await prisma.product.findFirst({
       where: { id: productId, organizationId: user.organizationId },
-      select: { id: true, name: true, baseUnit: true, currentUnitCost: true },
+      select: { id: true, name: true, baseUnit: true, currentUnitCost: true, yieldPercentage: true },
     });
     if (!product) return { error: "El producto no existe o no es de tu organizacion." };
 
-    // Renglones de salida: receta de porcion + cuantas salieron.
+    // El consumo por porcion y el costo de los demas ingredientes se recalculan aqui desde las
+    // recetas, nunca se toman de lo que mande el navegador.
+    const { options } = await loadPortioningOptions(user.sucursalId, [product]);
+
     const recipeIds = formData.getAll("outputRecipeId").map((v) => String(v).trim());
     const portionCounts = formData.getAll("outputPortions").map((v) => String(v).trim());
 
-    const recetasPedidas = recipeIds
+    const pedidas = recipeIds
       .map((recipeId, i) => ({ recipeId, portionsRaw: portionCounts[i] ?? "" }))
       .filter((r) => r.recipeId && r.portionsRaw);
 
-    if (recetasPedidas.length === 0) {
+    if (pedidas.length === 0) {
       return { error: "Captura al menos un tipo de porcion que haya salido." };
     }
 
-    const recetas = await prisma.recipe.findMany({
-      where: {
-        id: { in: recetasPedidas.map((r) => r.recipeId) },
-        sucursalId: user.sucursalId,
-        isPortion: true,
-      },
-      select: { id: true, name: true, yieldQty: true, yieldUnit: true },
-    });
-    const recetaPorId = new Map(recetas.map((r) => [r.id, r]));
-
-    const outputs = recetasPedidas.map((pedida) => {
-      const receta = recetaPorId.get(pedida.recipeId);
-      if (!receta) {
-        throw new PortioningError("Una de las recetas de porcion no existe o no esta marcada como porcion.");
+    const outputs = pedidas.map((pedida) => {
+      const option = options.find((o) => o.recipeId === pedida.recipeId && o.productId === product.id);
+      if (!option) {
+        throw new PortioningError(
+          `Una de las recetas no lleva ${product.name} entre sus ingredientes, o no esta marcada como porcion.`,
+        );
       }
       return {
-        recipeId: receta.id,
-        recipeName: receta.name,
+        recipeId: option.recipeId,
+        recipeName: option.recipeName,
         portions: Number(pedida.portionsRaw),
-        portionQty: receta.yieldQty.toString(),
-        portionUnit: receta.yieldUnit as UnitValue,
+        baseQtyPerPortion: option.baseQtyPerPortion,
+        extraCostPerPortion: option.extraCostPerPortion,
       };
     });
 
-    const calculo = computePortioning(
-      initialQty,
-      product.baseUnit as UnitValue,
-      product.currentUnitCost.toString(),
-      outputs,
-    );
+    const calculo = computePortioning(initialQty, product.currentUnitCost.toString(), outputs);
 
     // El rendimiento que se le guarda al producto es el promedio de sus ultimos porcionamientos,
     // incluyendo este: un corte atipico no debe mover el costeo de todas sus recetas.
@@ -101,7 +89,7 @@ export async function createPortioning(
         data: { nextPortioningFolio: { increment: 1 } },
         select: { nextPortioningFolio: true },
       });
-      folio = org.nextPortioningFolio - 1;
+      const folio = org.nextPortioningFolio - 1;
 
       await tx.portioningEntry.create({
         data: {
@@ -119,7 +107,7 @@ export async function createPortioning(
             create: calculo.outputs.map((o, index) => ({
               recipeId: o.recipeId,
               portions: o.portions,
-              portionQty: o.portionQtyInBase.toString(),
+              portionQty: o.baseQtyPerPortion.toString(),
               realUnitCost: o.realUnitCost.toFixed(6),
               sortOrder: index,
             })),

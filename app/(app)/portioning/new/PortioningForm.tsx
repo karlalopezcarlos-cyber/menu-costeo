@@ -4,23 +4,8 @@ import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
 import Decimal from "decimal.js";
 import { createPortioning, type PortioningState } from "../actions";
-import { UNIT_LABELS, convertQty, type UnitValue } from "@/lib/units";
+import type { PortionableProduct, PortionOption } from "@/lib/portioning-options";
 import { formatMoney } from "@/lib/format";
-
-export type ProductOption = {
-  id: string;
-  name: string;
-  baseUnit: UnitValue;
-  currentUnitCost: string;
-  yieldPercentage: string;
-};
-
-export type PortionRecipeOption = {
-  id: string;
-  name: string;
-  yieldQty: string;
-  yieldUnit: UnitValue;
-};
 
 type Renglon = { key: number; recipeId: string; portions: string };
 
@@ -28,10 +13,10 @@ const initialState: PortioningState = {};
 
 export default function PortioningForm({
   products,
-  portionRecipes,
+  options,
 }: {
-  products: ProductOption[];
-  portionRecipes: PortionRecipeOption[];
+  products: PortionableProduct[];
+  options: PortionOption[];
 }) {
   const [state, formAction, pending] = useActionState(createPortioning, initialState);
   const [productId, setProductId] = useState("");
@@ -39,6 +24,8 @@ export default function PortioningForm({
   const [renglones, setRenglones] = useState<Renglon[]>([{ key: 1, recipeId: "", portions: "" }]);
 
   const product = products.find((p) => p.id === productId) ?? null;
+  // Una receta solo aparece si lleva el producto elegido entre sus ingredientes.
+  const recetasDelProducto = options.filter((o) => o.productId === productId);
 
   // El mismo calculo que hace el servidor, para que veas el resultado antes de guardar.
   const resumen = useMemo(() => {
@@ -48,22 +35,29 @@ export default function PortioningForm({
 
     let porcionado = new Decimal(0);
     let totalPorciones = 0;
-    const detalle: { name: string; portions: number; peso: Decimal }[] = [];
+    const detalle: {
+      name: string;
+      portions: number;
+      peso: Decimal;
+      extra: Decimal;
+      pesoPorcion: Decimal;
+    }[] = [];
 
     for (const r of renglones) {
-      const receta = portionRecipes.find((pr) => pr.id === r.recipeId);
+      const opcion = recetasDelProducto.find((o) => o.recipeId === r.recipeId);
       const porciones = Number(r.portions);
-      if (!receta || !Number.isInteger(porciones) || porciones <= 0) continue;
-      let pesoPorcion: Decimal;
-      try {
-        pesoPorcion = convertQty(receta.yieldQty, receta.yieldUnit, product.baseUnit);
-      } catch {
-        continue; // unidades incompatibles: el servidor lo reporta con detalle
-      }
+      if (!opcion || !Number.isInteger(porciones) || porciones <= 0) continue;
+      const pesoPorcion = new Decimal(opcion.baseQtyPerPortion);
       const peso = pesoPorcion.times(porciones);
       porcionado = porcionado.plus(peso);
       totalPorciones += porciones;
-      detalle.push({ name: receta.name, portions: porciones, peso });
+      detalle.push({
+        name: opcion.recipeName,
+        portions: porciones,
+        peso,
+        extra: new Decimal(opcion.extraCostPerPortion),
+        pesoPorcion,
+      });
     }
 
     if (totalPorciones === 0) return null;
@@ -79,16 +73,21 @@ export default function PortioningForm({
       rendimiento,
       costoTotal,
       excede,
-      detalle: detalle.map((d) => ({
-        ...d,
-        costoReal: porcionado.isZero()
+      detalle: detalle.map((d) => {
+        const costoBase = porcionado.isZero()
           ? new Decimal(0)
-          : costoTotal.times(d.peso).dividedBy(porcionado).dividedBy(d.portions),
-      })),
+          : costoTotal.times(d.peso).dividedBy(porcionado).dividedBy(d.portions);
+        return {
+          ...d,
+          costoBase,
+          costoReal: costoBase.plus(d.extra),
+          costoTeorico: d.pesoPorcion.times(new Decimal(product.currentUnitCost)).plus(d.extra),
+        };
+      }),
     };
-  }, [product, initialQty, renglones, portionRecipes]);
+  }, [product, initialQty, renglones, recetasDelProducto]);
 
-  const unidad = product ? UNIT_LABELS[product.baseUnit] : "";
+  const unidad = product?.baseUnitLabel ?? "";
 
   return (
     <form action={formAction} className="space-y-4">
@@ -116,7 +115,10 @@ export default function PortioningForm({
           <select
             id="product"
             value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+            onChange={(e) => {
+              setProductId(e.target.value);
+              setRenglones([{ key: 1, recipeId: "", portions: "" }]);
+            }}
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Elige un producto</option>
@@ -161,10 +163,11 @@ export default function PortioningForm({
           </p>
         </div>
 
-        {portionRecipes.length === 0 ? (
+        {products.length === 0 ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            Todavia no tienes recetas marcadas como porcion. Crea una en Recetas —por ejemplo
-            &quot;Porcion camaron 20 g&quot;— y marca la casilla &quot;Es una porcion&quot;.
+            Todavia no hay nada que porcionar. Crea una receta en Recetas —por ejemplo
+            &quot;CAMARON 80 G&quot;, que rinde 1 PZA y lleva 80 g de camaron— y marca la casilla
+            &quot;Es una porcion&quot;.
           </p>
         ) : (
           <>
@@ -182,10 +185,13 @@ export default function PortioningForm({
                     }
                     className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
                   >
-                    <option value="">Elige la porcion</option>
-                    {portionRecipes.map((pr) => (
-                      <option key={pr.id} value={pr.id}>
-                        {pr.name} ({Number(pr.yieldQty)} {UNIT_LABELS[pr.yieldUnit]})
+                    <option value="">
+                      {productId ? "Elige la porcion" : "Primero elige el producto"}
+                    </option>
+                    {recetasDelProducto.map((o) => (
+                      <option key={o.recipeId} value={o.recipeId}>
+                        {o.recipeName} — {Number(o.baseQtyPerPortion).toLocaleString("es-MX", { maximumFractionDigits: 4 })}{" "}
+                        {unidad} por {o.portionUnitLabel}
                       </option>
                     ))}
                   </select>
@@ -277,8 +283,12 @@ export default function PortioningForm({
               <div className="mt-4 border-t border-brand-200 pt-3">
                 {resumen.detalle.map((d) => (
                   <p key={d.name} className="text-sm text-neutral-700">
-                    {d.portions} × {d.name} — costo real{" "}
-                    <b>{formatMoney(d.costoReal.toNumber(), 2)}</b> por porcion
+                    {d.portions} × {d.name} — <b>{formatMoney(d.costoReal.toNumber(), 2)} por pieza</b>
+                    <span className="text-neutral-500">
+                      {" "}
+                      (sin merma costaria {formatMoney(d.costoTeorico.toNumber(), 2)}
+                      {d.extra.gt(0) ? `, incluye ${formatMoney(d.extra.toNumber(), 2)} de otros ingredientes` : ""})
+                    </span>
                   </p>
                 ))}
                 {product && (
