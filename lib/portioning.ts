@@ -58,13 +58,17 @@ export type PortioningResult = {
 export class PortioningError extends Error {}
 
 /**
- * @param initialQty  Cantidad con la que se empezo, en la unidad base del producto.
- * @param unitCost    Costo por unidad base del producto.
- * @param outputs     Tipos de porcion que salieron, con su consumo de producto base.
+ * @param initialQty      Cantidad con la que se empezo, en la unidad base del producto.
+ * @param grossUnitCost   Costo por unidad COMPRADA (sin aplicar rendimiento). Es lo que costo
+ *                        de verdad el producto crudo que entro.
+ * @param usableUnitCost  Costo por unidad APROVECHABLE (el del catalogo, que ya trae aplicado
+ *                        el rendimiento). Solo se usa para el comparativo teorico.
+ * @param outputs         Tipos de porcion que salieron, con su consumo de producto base.
  */
 export function computePortioning(
   initialQty: Decimal.Value,
-  unitCost: Decimal.Value,
+  grossUnitCost: Decimal.Value,
+  usableUnitCost: Decimal.Value,
   outputs: PortioningOutputInput[],
 ): PortioningResult {
   const initial = new Decimal(initialQty);
@@ -75,8 +79,9 @@ export function computePortioning(
     throw new PortioningError("Captura al menos un tipo de porcion que haya salido.");
   }
 
-  const cost = new Decimal(unitCost);
-  const totalCost = initial.times(cost);
+  const bruto = new Decimal(grossUnitCost);
+  const aprovechable = new Decimal(usableUnitCost);
+  const totalCost = initial.times(bruto);
 
   const parciales = outputs.map((output) => {
     if (!Number.isInteger(output.portions) || output.portions <= 0) {
@@ -127,7 +132,9 @@ export function computePortioning(
       baseCostPerPortion,
       extraCostPerPortion: p.extraCost,
       realUnitCost: baseCostPerPortion.plus(p.extraCost),
-      theoreticalUnitCost: p.baseQtyPerPortion.times(cost).plus(p.extraCost),
+      // Lo que hoy dice la receta que cuesta esta porcion, con el rendimiento capturado en el
+      // catalogo. Cuando ese rendimiento es el correcto, este numero y el real coinciden.
+      theoreticalUnitCost: p.baseQtyPerPortion.times(aprovechable).plus(p.extraCost),
     };
   });
 

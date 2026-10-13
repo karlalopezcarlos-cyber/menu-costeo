@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { loadOrgRecipeGraph, getRecipeUsagePerUnit, getRecipeCost } from "@/lib/costing";
-import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { UNIT_LABELS, removeYieldFactor, type UnitValue } from "@/lib/units";
 
 export type PortionOption = {
   recipeId: string;
@@ -20,7 +20,10 @@ export type PortionableProduct = {
   name: string;
   baseUnitLabel: string;
   baseUnit: UnitValue;
+  /** Costo por unidad APROVECHABLE: ya trae aplicado el rendimiento del producto. */
   currentUnitCost: string;
+  /** Costo por unidad COMPRADA, sin el rendimiento. Es lo que de verdad costo lo que entro. */
+  grossUnitCost: string;
   yieldPercentage: string;
 };
 
@@ -86,6 +89,7 @@ export async function loadPortioningOptions(
       baseUnit: p.baseUnit as UnitValue,
       baseUnitLabel: UNIT_LABELS[p.baseUnit as UnitValue],
       currentUnitCost: String(p.currentUnitCost),
+      grossUnitCost: removeYieldFactor(String(p.currentUnitCost), String(p.yieldPercentage)).toString(),
       yieldPercentage: String(p.yieldPercentage),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));

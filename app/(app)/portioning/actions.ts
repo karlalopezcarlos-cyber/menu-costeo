@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { computePortioning, averageYield, PortioningError } from "@/lib/portioning";
 import { loadPortioningOptions } from "@/lib/portioning-options";
+import { removeYieldFactor } from "@/lib/units";
 
 export type PortioningState = { error?: string };
 
@@ -68,7 +69,18 @@ export async function createPortioning(
       };
     });
 
-    const calculo = computePortioning(initialQty, product.currentUnitCost.toString(), outputs);
+    // Lo que entro se costea al precio de compra (bruto). El costo guardado del producto ya
+    // viene dividido entre su rendimiento, asi que usarlo aqui contaria la merma dos veces.
+    const grossUnitCost = removeYieldFactor(
+      product.currentUnitCost.toString(),
+      product.yieldPercentage.toString(),
+    );
+    const calculo = computePortioning(
+      initialQty,
+      grossUnitCost,
+      product.currentUnitCost.toString(),
+      outputs,
+    );
 
     // El rendimiento que se le guarda al producto es el promedio de sus ultimos porcionamientos,
     // incluyendo este: un corte atipico no debe mover el costeo de todas sus recetas.
@@ -99,7 +111,7 @@ export async function createPortioning(
           date: new Date(`${dateRaw}T00:00:00.000Z`),
           productId: product.id,
           initialQty: calculo.initialQty.toString(),
-          unitCost: product.currentUnitCost.toString(),
+          unitCost: grossUnitCost.toString(),
           realYieldPct: calculo.realYieldPct.toFixed(2),
           comment,
           createdByUserId: user.id,

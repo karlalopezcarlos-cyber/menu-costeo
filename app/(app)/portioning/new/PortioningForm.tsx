@@ -62,7 +62,8 @@ export default function PortioningForm({
 
     if (totalPorciones === 0) return null;
 
-    const costoTotal = entrada.times(new Decimal(product.currentUnitCost));
+    // Lo que entro se valua al precio de compra: el costo del catalogo ya trae el rendimiento.
+    const costoTotal = entrada.times(new Decimal(product.grossUnitCost));
     const rendimiento = porcionado.dividedBy(entrada).times(100);
     const excede = porcionado.gt(entrada);
 
@@ -148,8 +149,9 @@ export default function PortioningForm({
           />
           {product && (
             <p className="text-xs text-neutral-500">
-              Costo: {formatMoney(Number(product.currentUnitCost), 2)} por {unidad} · rendimiento
-              capturado hoy: {Number(product.yieldPercentage)}%
+              Compra: {formatMoney(Number(product.grossUnitCost), 2)} por {unidad} · rendimiento
+              capturado hoy: {Number(product.yieldPercentage)}% · costo aprovechable{" "}
+              {formatMoney(Number(product.currentUnitCost), 2)}
             </p>
           )}
         </div>
@@ -286,7 +288,7 @@ export default function PortioningForm({
                     {d.portions} × {d.name} — <b>{formatMoney(d.costoReal.toNumber(), 2)} por pieza</b>
                     <span className="text-neutral-500">
                       {" "}
-                      (sin merma costaria {formatMoney(d.costoTeorico.toNumber(), 2)}
+                      (la receta dice {formatMoney(d.costoTeorico.toNumber(), 2)}
                       {d.extra.gt(0) ? `, incluye ${formatMoney(d.extra.toNumber(), 2)} de otros ingredientes` : ""})
                     </span>
                   </p>
