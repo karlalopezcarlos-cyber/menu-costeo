@@ -167,9 +167,11 @@ export default function PortioningForm({
 
         {products.length === 0 ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            Todavia no hay nada que porcionar. Crea una receta en Recetas —por ejemplo
-            &quot;CAMARON 80 G&quot;, que rinde 1 PZA y lleva 80 g de camaron— y marca la casilla
-            &quot;Es una porcion&quot;.
+            Todavia no hay nada que porcionar.{" "}
+            <Link href="/portioning/portions/new" className="font-medium underline">
+              Crea tu primera porcion
+            </Link>{" "}
+            —por ejemplo CAMARON 20 G— y regresa aqui.
           </p>
         ) : (
           <>
