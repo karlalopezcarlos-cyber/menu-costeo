@@ -511,7 +511,9 @@ export type KardexMovement = {
     | "produccion_entrada"
     | "produccion_salida"
     | "requisicion_entrada"
-    | "requisicion_salida";
+    | "requisicion_salida"
+    | "porcionamiento_salida"
+    | "porcionamiento_entrada";
   label: string;
   qtyDelta: number;
   runningBalance: number;
@@ -592,6 +594,8 @@ export async function computeItemKardex(
     sales,
     requisicionesOut,
     requisicionesIn,
+    porcionamientosDeProducto,
+    porcionesProducidas,
     graph,
   ] = await Promise.all([
     itemType === "product"
@@ -638,6 +642,22 @@ export async function computeItemKardex(
           where: { destSubRecipeId: itemId, requisicion: { toSucursalId: sucursalId, date: dateFilter } },
           include: { requisicion: { include: { fromSucursal: { select: { name: true } } } } },
         }),
+    // Porcionar consume el producto a granel que entro...
+    itemType === "product"
+      ? prisma.portioningEntry.findMany({
+          where: { sucursalId, productId: itemId, date: dateFilter },
+          select: { date: true, initialQty: true, folio: true },
+        })
+      : Promise.resolve([]),
+    // ...y da de alta las porciones que salieron, que son recetas.
+    itemType === "subrecipe"
+      ? prisma.portioningOutput.findMany({
+          where: { recipeId: itemId, portioningEntry: { sucursalId, date: dateFilter } },
+          include: {
+            portioningEntry: { select: { date: true, folio: true, product: { select: { name: true } } } },
+          },
+        })
+      : Promise.resolve([]),
     loadOrgRecipeGraph(sucursalId),
   ]);
 
@@ -733,6 +753,32 @@ export async function computeItemKardex(
       runningBalance: 0,
       href: "/production",
       sortIndex: 3000 + index,
+    });
+  });
+
+  porcionamientosDeProducto.forEach((entry, index) => {
+    movements.push({
+      date: entry.date,
+      dateLabel: dateLabel(entry.date),
+      type: "porcionamiento_salida",
+      label: `Porcionamiento POR-${String(entry.folio).padStart(4, "0")}`,
+      qtyDelta: -Number(entry.initialQty),
+      runningBalance: 0,
+      href: "/portioning",
+      sortIndex: 3500 + index,
+    });
+  });
+
+  porcionesProducidas.forEach((output, index) => {
+    movements.push({
+      date: output.portioningEntry.date,
+      dateLabel: dateLabel(output.portioningEntry.date),
+      type: "porcionamiento_entrada",
+      label: `Porcionamiento de ${output.portioningEntry.product.name}`,
+      qtyDelta: output.portions,
+      runningBalance: 0,
+      href: "/portioning",
+      sortIndex: 3600 + index,
     });
   });
 

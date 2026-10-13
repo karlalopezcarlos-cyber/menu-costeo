@@ -6,6 +6,7 @@ export const PANEL_DEFS: { key: Panel; section: string; href: string; label: str
   { key: "WASTE", section: "waste", href: "/waste", label: "Mermas" },
   { key: "RECIPES", section: "recipes", href: "/recipes", label: "Recetas" },
   { key: "PRODUCTION", section: "production", href: "/production", label: "Produccion" },
+  { key: "PORTIONING", section: "portioning", href: "/portioning", label: "Porcionamiento" },
   { key: "INVENTORY", section: "inventory", href: "/inventory", label: "Inventario" },
   { key: "AUDIT", section: "audit", href: "/audit", label: "Auditoria" },
   { key: "ORDERS", section: "orders", href: "/orders", label: "Pedidos" },

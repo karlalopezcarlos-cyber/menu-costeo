@@ -32,6 +32,7 @@ enum Panel {
   REQUISITIONS
   PLANNING
   STORE_ORDERS
+  PORTIONING
 }
 
 /// Agrupador usado en el Estado de Resultados para desglosar ventas/costos en 3 columnas.
@@ -91,6 +92,9 @@ model Organization {
   nextRequisicionFolio Int @default(1)
   /// Siguiente folio a asignar a una produccion nueva (contador consecutivo por organizacion).
   nextProductionFolio Int @default(1)
+
+  /// Consecutivo de los porcionamientos (ej. POR-0001).
+  nextPortioningFolio Int @default(1)
   /// Siguiente folio a asignar a un ticket de venta nuevo (contador consecutivo por organizacion).
   nextSaleFolio Int @default(1)
   /// Siguiente folio a asignar a un pedido nuevo de la tienda en linea (contador consecutivo).
@@ -116,6 +120,7 @@ model Organization {
   wasteEntries      WasteEntry[]
   purchaseOrders    PurchaseOrder[]
   productionEntries ProductionEntry[]
+  portioningEntries PortioningEntry[]
   auditComments     AuditComment[]
   productPresentations ProductPresentation[]
   inventoryCountItemChanges InventoryCountItemChange[]
@@ -210,6 +215,7 @@ model Sucursal {
   inventoryCounts   InventoryCount[]
   wasteEntries      WasteEntry[]
   productionEntries ProductionEntry[]
+  portioningEntries PortioningEntry[]
   auditComments     AuditComment[]
   supplierPayments  SupplierPayment[]
   dishAliases       DishAlias[]
@@ -251,6 +257,7 @@ model User {
   wasteEntries      WasteEntry[]      @relation("WasteEntryCreatedBy")
   purchaseOrders    PurchaseOrder[]   @relation("PurchaseOrderCreatedBy")
   productionEntries ProductionEntry[] @relation("ProductionEntryCreatedBy")
+  portioningEntries PortioningEntry[] @relation("PortioningCreatedBy")
   auditComments     AuditComment[]    @relation("AuditCommentCreatedBy")
   inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
   supplierPayments  SupplierPayment[] @relation("SupplierPaymentCreatedBy")
@@ -318,6 +325,7 @@ model Product {
   inventoryCountItemChanges InventoryCountItemChange[]
   requisicionItems    RequisicionItem[]
   planningRunItems    PlanningRunItem[]
+  portioningEntries   PortioningEntry[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -492,6 +500,9 @@ model Recipe {
   yieldQty       Decimal      @db.Decimal(14, 4)
   yieldUnit      Unit
   isMenuItem     Boolean      @default(false)
+  /// Receta de porcion: define el gramaje de una porcion que sale de porcionar un producto
+  /// (ej. "Porcion camaron 20 g"). Se usa en el modulo Porcionamiento y no es platillo de menu.
+  isPortion      Boolean      @default(false)
   sellingPrice   Decimal?     @db.Decimal(12, 2)
   instructions   String?
   /// Descripcion para clientes en la tienda en linea (que es el platillo), distinta de
@@ -518,6 +529,7 @@ model Recipe {
   saleTicketItems          SaleTicketItem[]
   planningRunItems         PlanningRunItem[]
   storeOrderItems          StoreOrderItem[]
+  portioningOutputs        PortioningOutput[]
 
   @@unique([sucursalId, name])
   @@index([organizationId])
@@ -1102,4 +1114,64 @@ model RequisicionItem {
   @@index([subRecipeId])
   @@index([destSubRecipeId])
   @@map("requisicion_items")
+}
+
+
+/// Un evento de porcionamiento: se toma un producto a granel, se pesa al inicio, y de ahi salen
+/// porciones de una o varias recetas de porcion. La diferencia entre lo que entro y lo que salio
+/// es la merma real de ese corte, que es justo el dato que no existia en ningun lado.
+model PortioningEntry {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  /// Folio consecutivo por organizacion (ej. POR-0001).
+  folio           Int
+  date            DateTime     @db.Date
+  /// Producto a granel que se porciono (ej. CAMARON).
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id])
+  /// Peso o cantidad con la que se empezo, SIEMPRE en la unidad base del producto.
+  initialQty      Decimal      @db.Decimal(14, 4)
+  /// Costo unitario del producto al momento del porcionamiento, congelado para que el historico
+  /// no cambie cuando suba el precio del insumo.
+  unitCost        Decimal      @db.Decimal(14, 6)
+  /// Rendimiento real de este evento: lo porcionado entre lo que entro, en porcentaje.
+  realYieldPct    Decimal      @db.Decimal(5, 2)
+  comment         String?
+  createdByUserId String?
+  createdBy       User?        @relation("PortioningCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+
+  outputs PortioningOutput[]
+
+  @@index([organizationId, date])
+  @@index([organizationId, folio])
+  @@index([sucursalId, date])
+  @@index([organizationId, productId])
+  @@map("portioning_entries")
+}
+
+/// Cada tipo de porcion que salio de un porcionamiento. De 1 kg pueden salir 20 porciones de
+/// 20 g y 5 de 30 g: cada renglon es uno de esos tipos.
+model PortioningOutput {
+  id                 String          @id @default(cuid())
+  portioningEntryId  String
+  portioningEntry    PortioningEntry @relation(fields: [portioningEntryId], references: [id], onDelete: Cascade)
+  /// Receta marcada como porcion (isPortion).
+  recipeId           String
+  recipe             Recipe          @relation(fields: [recipeId], references: [id])
+  /// Cuantas porciones de este tipo salieron.
+  portions           Int
+  /// Peso de una porcion en la unidad base del producto, congelado del rendimiento de la receta.
+  portionQty         Decimal         @db.Decimal(14, 4)
+  /// Costo real de cada porcion: el costo total de lo que entro, repartido entre lo que salio
+  /// en proporcion al peso. Incluye la merma, a diferencia del costo teorico de la receta.
+  realUnitCost       Decimal         @db.Decimal(14, 6)
+  sortOrder          Int             @default(0)
+
+  @@index([portioningEntryId])
+  @@index([recipeId])
+  @@map("portioning_outputs")
 }

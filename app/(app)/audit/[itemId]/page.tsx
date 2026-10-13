@@ -9,6 +9,8 @@ const TYPE_LABELS: Record<string, string> = {
   venta: "Venta",
   produccion_entrada: "Produccion",
   produccion_salida: "Produccion (consumo)",
+  porcionamiento_salida: "Porcionamiento (consumo)",
+  porcionamiento_entrada: "Porcionamiento (entrada)",
   requisicion_entrada: "Requisicion (entrada)",
   requisicion_salida: "Requisicion (salida)",
 };

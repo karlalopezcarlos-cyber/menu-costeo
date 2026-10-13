@@ -63,6 +63,7 @@ async function cloneRecipeToOtherSucursales(
           yieldQty: source.yieldQty.toString(),
           yieldUnit: source.yieldUnit,
           isMenuItem: source.isMenuItem,
+          isPortion: source.isPortion,
           sellingPrice: source.sellingPrice?.toString() ?? null,
           instructions: source.instructions,
           // Solo se clonan ingredientes de tipo producto (compartido a nivel organizacion). Los de
@@ -101,6 +102,7 @@ export async function createRecipe(
     const yieldQty = new Decimal(String(formData.get("yieldQty") ?? "0"));
     const yieldUnit = parseUnit(formData.get("yieldUnit"));
     const isMenuItem = formData.get("isMenuItem") === "on";
+    const isPortion = formData.get("isPortion") === "on";
     const sellingPriceRaw = String(formData.get("sellingPrice") ?? "").trim();
 
     if (!name) throw new Error("El nombre es obligatorio.");
@@ -133,6 +135,7 @@ export async function createRecipe(
         yieldQty: yieldQty.toString(),
         yieldUnit,
         isMenuItem,
+        isPortion,
         sellingPrice: sellingPriceRaw ? new Decimal(sellingPriceRaw).toString() : null,
       },
     });
