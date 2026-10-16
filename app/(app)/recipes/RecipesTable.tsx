@@ -18,6 +18,8 @@ export type RecipeRow = {
   sellingPrice: number | null;
   costPct: number | null;
   itemCount: number;
+  /** Productos que consume la receta, incluidos los que vienen dentro de sus subrecetas. */
+  ingredients: { name: string; qtyLabel: string; direct: boolean }[];
 };
 
 type SortKey = "name" | "category" | "type" | "yield" | "cost" | "costPerUnit" | "sellingPrice" | "costPct";
@@ -57,6 +59,7 @@ function sortValue(row: RecipeRow, key: SortKey): string | number | null {
 
 export default function RecipesTable({ rows, showArchived = false }: { rows: RecipeRow[]; showArchived?: boolean }) {
   const [search, setSearch] = useState("");
+  const [ingredientSearch, setIngredientSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -69,13 +72,22 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
     }
   }
 
+  const ingredientTerm = ingredientSearch.trim().toLowerCase();
+
   const sortedRows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const filtered = term
+    let filtered = term
       ? rows.filter(
           (r) => r.name.toLowerCase().includes(term) || (r.categoryName?.toLowerCase().includes(term) ?? false),
         )
       : rows;
+
+    // Busqueda por insumo: deja las recetas que lo llevan, directo o dentro de una subreceta.
+    if (ingredientTerm) {
+      filtered = filtered.filter((r) =>
+        r.ingredients.some((i) => i.name.toLowerCase().includes(ingredientTerm)),
+      );
+    }
 
     if (!sortKey) return filtered;
     const dirMultiplier = sortDir === "asc" ? 1 : -1;
@@ -90,12 +102,12 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
       }
       return ((va as number) - (vb as number)) * dirMultiplier;
     });
-  }, [rows, search, sortKey, sortDir]);
+  }, [rows, search, ingredientTerm, sortKey, sortDir]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       {rows.length > 0 && (
-        <div className="border-b border-neutral-100 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 px-4 py-2">
           <input
             type="search"
             value={search}
@@ -103,6 +115,19 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
             placeholder="Buscar receta o categoria..."
             className="w-full max-w-xs rounded-md border border-neutral-200 px-2.5 py-1.5 text-sm"
           />
+          <input
+            type="search"
+            value={ingredientSearch}
+            onChange={(e) => setIngredientSearch(e.target.value)}
+            placeholder="Buscar por ingrediente (ej. cebolla)..."
+            className="w-full max-w-xs rounded-md border border-neutral-200 px-2.5 py-1.5 text-sm"
+          />
+          {ingredientTerm && (
+            <span className="text-xs text-neutral-500">
+              {sortedRows.length} {sortedRows.length === 1 ? "receta lleva" : "recetas llevan"} &quot;
+              {ingredientSearch.trim()}&quot;
+            </span>
+          )}
         </div>
       )}
       <table className="w-full text-sm">
@@ -148,6 +173,15 @@ export default function RecipesTable({ rows, showArchived = false }: { rows: Rec
                     {recipe.name}
                   </Link>
                 )}
+                {ingredientTerm &&
+                  recipe.ingredients
+                    .filter((i) => i.name.toLowerCase().includes(ingredientTerm))
+                    .map((i) => (
+                      <p key={i.name} className="mt-0.5 text-xs text-neutral-500">
+                        {i.name}: <span className="tabular-nums">{i.qtyLabel}</span>
+                        {!i.direct && <span className="text-neutral-400"> · dentro de una subreceta</span>}
+                      </p>
+                    ))}
                 {recipe.itemCount === 0 && (
                   <span
                     title="Esta receta todavia no tiene ingredientes capturados."

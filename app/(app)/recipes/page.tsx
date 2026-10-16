@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import { loadOrgRecipeGraph, getRecipeCost, getRecipeFlatProductUsage } from "@/lib/costing";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { parseRecipeTypeFilter, recipeTypeFilterToIsMenuItem } from "@/lib/recipes-filter";
 import RecipesTable, { type RecipeRow } from "./RecipesTable";
@@ -39,7 +39,15 @@ export default async function RecipesPage({
       },
     }),
   ]);
+  // Nombres de los productos, para poder buscar recetas por insumo ("que lleva cebolla").
+  const productCatalog = await prisma.product.findMany({
+    where: { organizationId: user.organizationId },
+    select: { id: true, name: true, baseUnit: true },
+  });
+  const productById = new Map(productCatalog.map((p) => [p.id, p]));
+
   const memo = new Map();
+  const usageMemo = new Map<string, Map<string, import("decimal.js").default>>();
 
   const rows: RecipeRow[] = recipes.map((recipe) => {
     let cost = null;
@@ -55,9 +63,34 @@ export default async function RecipesPage({
     const costPerUnit = cost !== null && yieldQty !== 0 ? cost / yieldQty : null;
     const costPct = cost !== null && sellingPrice && sellingPrice > 0 ? (cost / sellingPrice) * 100 : null;
 
+    // Ingredientes aplanados: incluye los que vienen dentro de una subreceta, porque la
+    // pregunta "que recetas llevan cebolla" no distingue niveles.
+    const directProductIds = new Set(
+      (graph.recipes.get(recipe.id)?.items ?? [])
+        .map((i) => i.productId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const flatUsage = getRecipeFlatProductUsage(recipe.id, graph, usageMemo);
+    const ingredients = [...flatUsage.entries()]
+      .map(([productId, qtyPerYieldUnit]) => {
+        const product = productById.get(productId);
+        if (!product) return null;
+        const total = qtyPerYieldUnit.times(recipe.yieldQty);
+        return {
+          name: product.name,
+          qtyLabel: `${total.toDecimalPlaces(4).toNumber().toLocaleString("es-MX", {
+            maximumFractionDigits: 4,
+          })} ${UNIT_LABELS[product.baseUnit as UnitValue]}`,
+          direct: directProductIds.has(productId),
+        };
+      })
+      .filter((i): i is { name: string; qtyLabel: string; direct: boolean } => i !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return {
       id: recipe.id,
       name: recipe.name,
+      ingredients,
       categoryName: recipe.category?.name ?? null,
       isMenuItem: recipe.isMenuItem,
       yieldQty,

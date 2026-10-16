@@ -318,3 +318,52 @@ export async function recalcProductCostsForYield(
 
   await recalcProductCurrentCost(productId);
 }
+
+/**
+ * Todos los productos que consume una receta, bajando por sus subrecetas.
+ *
+ * getRecipeUsagePerUnit se queda en el primer nivel porque sirve para descontar inventario (la
+ * subreceta tiene su propio renglon). Aqui es al reves: la pregunta es "que recetas llevan
+ * cebolla", y la respuesta correcta incluye las que la llevan dentro de una subreceta. Las
+ * cantidades son por 1 unidad del rendimiento y en la unidad base de cada producto.
+ */
+export function getRecipeFlatProductUsage(
+  recipeId: string,
+  graph: RecipeGraph,
+  memo: Map<string, Map<string, Decimal>> = new Map(),
+  stack: Set<string> = new Set(),
+  depth = 0,
+): Map<string, Decimal> {
+  const cached = memo.get(recipeId);
+  if (cached) return cached;
+  if (depth > MAX_DEPTH || stack.has(recipeId)) return new Map();
+
+  const recipe = graph.recipes.get(recipeId);
+  if (!recipe || recipe.yieldQty.isZero()) return new Map();
+
+  stack.add(recipeId);
+  const total = new Map<string, Decimal>();
+
+  for (const item of recipe.items) {
+    if (item.productId && item.product) {
+      const qtyInBase = convertQty(item.quantity, item.unit, item.product.baseUnit).dividedBy(
+        recipe.yieldQty,
+      );
+      addTo(total, item.productId, qtyInBase);
+    } else if (item.subRecipeId) {
+      const sub = graph.recipes.get(item.subRecipeId);
+      if (!sub) continue;
+      const subPorUnidad = convertQty(item.quantity, item.unit, sub.yieldUnit).dividedBy(
+        recipe.yieldQty,
+      );
+      const subUsage = getRecipeFlatProductUsage(item.subRecipeId, graph, memo, stack, depth + 1);
+      for (const [productId, qty] of subUsage) {
+        addTo(total, productId, qty.times(subPorUnidad));
+      }
+    }
+  }
+
+  stack.delete(recipeId);
+  memo.set(recipeId, total);
+  return total;
+}
