@@ -1,31 +1,24 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { loadPortioningOptions } from "@/lib/portioning-options";
-import PortioningForm from "./PortioningForm";
+import { loadTransformationProducts } from "@/lib/transformation-options";
+import TransformationForm from "./TransformationForm";
 
-export default async function NewPortioningPage() {
+export default async function NewTransformationPage() {
   const user = await requireSucursalContext();
-
-  const products = await prisma.product.findMany({
-    where: { organizationId: user.organizationId, archivedAt: null },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, baseUnit: true, currentUnitCost: true, yieldPercentage: true },
-  });
-
-  // Solo lo que de verdad se puede porcionar: productos que aparecen como ingrediente de alguna
-  // receta marcada como porcion.
-  const { products: portionable, options } = await loadPortioningOptions(user.sucursalId, products);
+  const products = await loadTransformationProducts(user.organizationId, user.sucursalId);
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-500">Operacion</p>
-          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">Nuevo porcionamiento</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Captura con cuanto producto empezaste y cuantas piezas salieron. El sistema calcula la
-            merma real y lo que de verdad cuesta cada pieza.
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">
+            Nueva transformacion
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-neutral-500">
+            Entra un producto y salen otros: limpiar camaron, porcionarlo, o las dos cosas en la
+            misma tanda. Cada transformacion vale por si sola — puedes porcionar el crudo directo
+            o el que ya limpiaste, segun lo que hayas hecho hoy.
           </p>
         </div>
         <Link href="/portioning" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
@@ -33,7 +26,13 @@ export default async function NewPortioningPage() {
         </Link>
       </div>
 
-      <PortioningForm products={portionable} options={options} />
+      {products.length === 0 ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Todavia no tienes productos en el catalogo.
+        </p>
+      ) : (
+        <TransformationForm products={products} />
+      )}
     </div>
   );
 }

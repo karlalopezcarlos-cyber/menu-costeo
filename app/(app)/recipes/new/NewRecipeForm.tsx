@@ -94,19 +94,6 @@ export default function NewRecipeForm({
         </label>
       </div>
 
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <input id="isPortion" name="isPortion" type="checkbox" className="h-4 w-4" />
-          <label htmlFor="isPortion" className="text-sm text-neutral-700">
-            Es una porcion (para el modulo de Porcionamiento)
-          </label>
-        </div>
-        <p className="pl-6 text-xs text-neutral-500">
-          Marca esto si la receta define el gramaje de una porcion que sale de porcionar un producto
-          a granel, por ejemplo &quot;Porcion camaron 20 g&quot;. El rendimiento de la receta es cuanto
-          pesa una porcion.
-        </p>
-      </div>
 
       <div className="space-y-1">
         <label htmlFor="sellingPrice" className="text-sm font-medium text-neutral-700">

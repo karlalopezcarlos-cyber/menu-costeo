@@ -597,6 +597,7 @@ export async function computeItemKardex(
     requisicionesIn,
     porcionamientosDeProducto,
     porcionesProducidas,
+    salidasDeTransformacion,
     limpiezasRecibidas,
     graph,
   ] = await Promise.all([
@@ -660,10 +661,28 @@ export async function computeItemKardex(
           },
         })
       : Promise.resolve([]),
-    // Lo que se obtuvo de limpiar otro producto (CAMARON LIMPIO sale de CAMARON).
+    // Lo que salio de transformar otro producto: porciones (CAMARON 20 G) o granel habilitado
+    // (CAMARON LIMPIO). Desde que las porciones son productos, las dos cosas viven aqui.
+    itemType === "product"
+      ? prisma.portioningOutput.findMany({
+          where: { productId: itemId, portioningEntry: { sucursalId, date: dateFilter } },
+          include: {
+            portioningEntry: { select: { date: true, folio: true, product: { select: { name: true } } } },
+          },
+        })
+      : Promise.resolve([]),
+    // Limpiezas viejas, de antes de que la salida se guardara como renglon: su producto de
+    // salida vivia en la entrada. Se piden solo las que no tienen renglones, para no contar dos
+    // veces las nuevas.
     itemType === "product"
       ? prisma.portioningEntry.findMany({
-          where: { sucursalId, type: "CLEANING", outputProductId: itemId, date: dateFilter },
+          where: {
+            sucursalId,
+            type: "CLEANING",
+            outputProductId: itemId,
+            date: dateFilter,
+            outputs: { none: {} },
+          },
           select: { date: true, outputQty: true, folio: true, product: { select: { name: true } } },
         })
       : Promise.resolve([]),
@@ -784,10 +803,23 @@ export async function computeItemKardex(
       dateLabel: dateLabel(output.portioningEntry.date),
       type: "porcionamiento_entrada",
       label: `Porcionamiento de ${output.portioningEntry.product.name}`,
-      qtyDelta: output.portions,
+      qtyDelta: output.portions ?? 0,
       runningBalance: 0,
       href: "/portioning",
       sortIndex: 3600 + index,
+    });
+  });
+
+  salidasDeTransformacion.forEach((output, index) => {
+    movements.push({
+      date: output.portioningEntry.date,
+      dateLabel: dateLabel(output.portioningEntry.date),
+      type: "porcionamiento_entrada",
+      label: `Transformacion de ${output.portioningEntry.product.name}`,
+      qtyDelta: Number(output.qty ?? 0),
+      runningBalance: 0,
+      href: "/portioning",
+      sortIndex: 3650 + index,
     });
   });
 
