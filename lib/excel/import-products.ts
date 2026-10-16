@@ -12,6 +12,7 @@ export type ParsedProductRow = {
   presentationUnitLabel: string | null;
   presentationUnitQty: string | null;
   targetStock: string;
+  supplierName: string | null;
 };
 
 export type RowError = { excelRow: number; message: string };
@@ -87,8 +88,10 @@ export async function parseProductsWorkbook(buffer: Buffer): Promise<ParseResult
     const presLabelRaw = cellText(row.getCell(5).value);
     const presQtyRaw = cellText(row.getCell(6).value);
     const targetRaw = cellText(row.getCell(7).value);
+    const supplierRaw = cellText(row.getCell(8).value);
 
-    const vacia = !name && !categoryRaw && !unitRaw && !yieldRaw && !presLabelRaw && !presQtyRaw && !targetRaw;
+    const vacia =
+      !name && !categoryRaw && !unitRaw && !yieldRaw && !presLabelRaw && !presQtyRaw && !targetRaw && !supplierRaw;
     if (vacia) return;
 
     const push = (message: string) => errors.push({ excelRow, message });
@@ -166,6 +169,7 @@ export async function parseProductsWorkbook(buffer: Buffer): Promise<ParseResult
       presentationUnitLabel,
       presentationUnitQty,
       targetStock: targetStock.toString(),
+      supplierName: supplierRaw || null,
     });
   });
 

@@ -14,6 +14,7 @@ export type ImportState = {
     actualizados: number;
     omitidos: { name: string; excelRow: number }[];
     categoriasNuevas: string[];
+    proveedoresNuevos: string[];
   };
 };
 
@@ -22,7 +23,8 @@ export type ImportState = {
  *
  * Es todo o nada: si una sola fila trae un error, no se guarda nada y se devuelven todos los
  * errores juntos, para que el usuario corrija una vez y vuelva a subir el mismo archivo en vez
- * de descubrir los problemas de uno en uno. Las categorias que no existen se crean.
+ * de descubrir los problemas de uno en uno. Las categorias y los proveedores que no existen se
+ * crean (el proveedor nada mas con el nombre: sus datos de contacto se completan despues).
  *
  * Las altas se hacen con un solo createMany y las actualizaciones en un $transaction por lotes:
  * con un catalogo de cientos de productos, insertarlos uno por uno dentro de una transaccion
@@ -80,6 +82,31 @@ export async function importProducts(
       for (const c of refrescadas) categoriaPorNombre.set(c.name.toUpperCase(), c);
     }
 
+    // --- Proveedores: igual que las categorias, se crean los que falten ---
+    const nombresProveedor = [
+      ...new Set(rows.map((r) => r.supplierName).filter((n): n is string => Boolean(n))),
+    ];
+
+    const proveedoresPrevios = await prisma.supplier.findMany({
+      where: { organizationId: user.organizationId },
+      select: { id: true, name: true },
+    });
+    const proveedorPorNombre = new Map(proveedoresPrevios.map((p) => [p.name.toUpperCase(), p]));
+
+    const proveedoresNuevos = nombresProveedor.filter((n) => !proveedorPorNombre.has(n.toUpperCase()));
+    if (proveedoresNuevos.length > 0) {
+      await prisma.supplier.createMany({
+        data: proveedoresNuevos.map((name) => ({ organizationId: user.organizationId, name })),
+        skipDuplicates: true,
+      });
+      const refrescados = await prisma.supplier.findMany({
+        where: { organizationId: user.organizationId },
+        select: { id: true, name: true },
+      });
+      proveedorPorNombre.clear();
+      for (const p of refrescados) proveedorPorNombre.set(p.name.toUpperCase(), p);
+    }
+
     // --- Separar altas de actualizaciones ---
     const existentes = await prisma.product.findMany({
       where: { organizationId: user.organizationId },
@@ -97,12 +124,19 @@ export async function importProducts(
       targetStock: string;
       presentationUnitLabel: string | null;
       presentationUnitQty: string | null;
+      defaultSupplierId: string | null;
     }[] = [];
     const porActualizar: { id: string; data: Record<string, unknown> }[] = [];
 
     for (const row of rows) {
       const categoryId = row.categoryName
         ? (categoriaPorNombre.get(row.categoryName.toUpperCase())?.id ?? null)
+        : null;
+
+      // Dejar la celda de proveedor vacia no desasigna al que ya tenia: quien quiera quitarlo lo
+      // hace en la pantalla de proveedor habitual, no por omision en un archivo.
+      const defaultSupplierId = row.supplierName
+        ? (proveedorPorNombre.get(row.supplierName.toUpperCase())?.id ?? null)
         : null;
 
       const datos = {
@@ -112,6 +146,7 @@ export async function importProducts(
         targetStock: row.targetStock,
         presentationUnitLabel: row.presentationUnitLabel,
         presentationUnitQty: row.presentationUnitQty,
+        ...(defaultSupplierId ? { defaultSupplierId } : {}),
       };
 
       const existente = existentePorNombre.get(row.name.toUpperCase());
@@ -124,7 +159,12 @@ export async function importProducts(
         continue;
       }
 
-      porCrear.push({ organizationId: user.organizationId, name: row.name, ...datos });
+      porCrear.push({
+        organizationId: user.organizationId,
+        name: row.name,
+        defaultSupplierId,
+        ...datos,
+      });
     }
 
     if (porCrear.length > 0) {
@@ -141,12 +181,14 @@ export async function importProducts(
     }
 
     revalidatePath("/products");
+    revalidatePath("/orders/new");
     return {
       result: {
         creados: porCrear.length,
         actualizados: porActualizar.length,
         omitidos,
         categoriasNuevas,
+        proveedoresNuevos,
       },
     };
   } catch (error) {

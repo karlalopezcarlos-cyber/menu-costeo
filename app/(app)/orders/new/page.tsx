@@ -13,7 +13,7 @@ export default async function NewOrderPage() {
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false, targetStock: { gt: 0 } },
       orderBy: { name: "asc" },
-      include: { category: true, presentations: true },
+      include: { category: true, presentations: true, defaultSupplier: { select: { id: true, name: true } } },
     }),
     getTheoreticalStock(user.organizationId, user.sucursalId),
     prisma.purchaseOrderItem.findMany({
@@ -27,6 +27,20 @@ export default async function NewOrderPage() {
     }),
     listSuppliersForCapture(user.organizationId),
   ]);
+
+  // Si un producto quedo amarrado a un proveedor que luego se desactivo, ese proveedor se sigue
+  // ofreciendo en el selector (marcado): de otra forma el renglon se veria "sin proveedor" sin
+  // que nadie lo haya quitado.
+  const asignadosInactivos = new Map<string, string>();
+  for (const product of products) {
+    if (!product.defaultSupplier) continue;
+    if (suppliers.some((s) => s.id === product.defaultSupplier!.id)) continue;
+    asignadosInactivos.set(product.defaultSupplier.id, product.defaultSupplier.name);
+  }
+  const supplierOptions = [
+    ...suppliers,
+    ...[...asignadosInactivos].map(([id, name]) => ({ id, name: `${name} (inactivo)` })),
+  ];
 
   const productIdsInOpenOrder = new Set(openOrderItems.map((i) => i.productId));
   const lastPresentationByProductId = new Map<string, string>();
@@ -50,6 +64,7 @@ export default async function NewOrderPage() {
         targetStock,
         shortfall,
         alreadyInOpenOrder: productIdsInOpenOrder.has(product.id),
+        defaultSupplierId: product.defaultSupplierId,
         defaultPresentation:
           lastPresentationByProductId.get(product.id) ?? UNIT_LABELS[product.baseUnit as UnitValue],
         presentations: [
@@ -81,10 +96,14 @@ export default async function NewOrderPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pedido sugerido</h1>
           <p className="text-sm text-neutral-500">
             Comparamos tu stock objetivo contra el inventario teorico a hoy
-            {stock.asOfLabel ? ` (a partir del conteo del ${stock.asOfLabel})` : ""}.
+            {stock.asOfLabel ? ` (a partir del conteo del ${stock.asOfLabel})` : ""}. Se crea un
+            pedido por proveedor, para mandarle a cada uno nada mas lo suyo.
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/products/suppliers" className="text-sm text-neutral-500 hover:underline">
+            Proveedor por producto
+          </Link>
           <Link href="/orders/stock" className="text-sm text-neutral-500 hover:underline">
             Configurar stock
           </Link>
@@ -101,7 +120,7 @@ export default async function NewOrderPage() {
         </p>
       )}
 
-      <ShortfallTable rows={rows} suppliers={suppliers} />
+      <ShortfallTable rows={rows} suppliers={supplierOptions} />
     </div>
   );
 }

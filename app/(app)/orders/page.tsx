@@ -11,17 +11,38 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; nuevos?: string }>;
 }) {
   const user = await requireSucursalContext();
-  const { view } = await searchParams;
+  const { view, nuevos } = await searchParams;
   const showReceived = view === "received";
 
-  const orders = await prisma.purchaseOrder.findMany({
-    where: { sucursalId: user.sucursalId, status: showReceived ? "RECEIVED" : "OPEN" },
-    orderBy: { folio: "desc" },
-    include: { items: true, supplier: true },
-  });
+  // Al crear un pedido por proveedor salen varios de un jalon: se listan arriba con su folio para
+  // poder abrir cada uno y mandarselo a su proveedor sin buscarlos en la tabla.
+  const nuevosIds = (nuevos ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+
+  const [orders, pedidosNuevos] = await Promise.all([
+    prisma.purchaseOrder.findMany({
+      where: { sucursalId: user.sucursalId, status: showReceived ? "RECEIVED" : "OPEN" },
+      orderBy: { folio: "desc" },
+      include: { items: true, supplier: true },
+    }),
+    nuevosIds.length > 0
+      ? prisma.purchaseOrder.findMany({
+          where: { id: { in: nuevosIds }, sucursalId: user.sucursalId },
+          orderBy: { folio: "asc" },
+          include: {
+            items: { select: { id: true } },
+            supplier: { select: { name: true, phone: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const sinContacto = pedidosNuevos.filter(
+    (order) => order.supplier && !order.supplier.phone && !order.supplier.email,
+  ).length;
+  const sinProveedor = pedidosNuevos.filter((order) => !order.supplier).length;
 
   return (
     <div className="space-y-6">
@@ -42,6 +63,55 @@ export default async function OrdersPage({
           </Link>
         </div>
       </div>
+      {pedidosNuevos.length > 0 && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">
+            {pedidosNuevos.length === 1
+              ? "Se creo 1 pedido"
+              : `Se crearon ${pedidosNuevos.length} pedidos, uno por proveedor`}
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-emerald-800">
+            {pedidosNuevos.map((order) => (
+              <li key={order.id} className="flex flex-wrap items-center gap-2">
+                <Link href={`/orders/${order.id}`} className="font-medium underline">
+                  {formatOrderFolio(order.folio)}
+                </Link>
+                <span>{order.supplier?.name ?? "Sin proveedor asignado"}</span>
+                <span className="text-emerald-700">
+                  · {order.items.length} producto{order.items.length === 1 ? "" : "s"}
+                </span>
+                {order.supplier && !order.supplier.phone && !order.supplier.email && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                    sin telefono ni correo
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-emerald-700">
+            Abre cada uno para mandarlo por WhatsApp o correo con los datos de su proveedor.
+            {sinContacto > 0 && (
+              <>
+                {" "}
+                <Link href="/settings/suppliers" className="font-medium underline">
+                  Completa el contacto
+                </Link>{" "}
+                de los proveedores que todavia no lo tienen.
+              </>
+            )}
+            {sinProveedor > 0 && (
+              <>
+                {" "}
+                <Link href="/products/suppliers" className="font-medium underline">
+                  Asigna el proveedor habitual
+                </Link>{" "}
+                de los productos que quedaron sueltos para que la proxima vez ya salgan separados.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       <p className="text-sm text-neutral-500">
         {showReceived
           ? "Pedidos ya recibidos por completo. Su historial de recepcion queda registrado en Compras."

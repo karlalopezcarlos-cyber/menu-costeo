@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       archivedAt: showArchived ? { not: null } : null,
     },
     orderBy: { name: "asc" },
-    include: { category: true },
+    include: { category: true, defaultSupplier: { select: { name: true } } },
   });
 
   const rows: ProductExportRow[] = products.map((product) => ({
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     yieldPercentage: product.yieldPercentage.toString(),
     currentUnitCost: product.currentUnitCost.toString(),
     hasPurchases: product.currentUnitCostUpdatedAt !== null,
+    supplierName: product.defaultSupplier?.name ?? null,
     archived: product.archivedAt !== null,
   }));
 

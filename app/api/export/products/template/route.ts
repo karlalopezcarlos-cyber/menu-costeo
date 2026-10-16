@@ -6,13 +6,23 @@ import { buildProductsTemplateWorkbook } from "@/lib/excel/export-products-templ
 export async function GET() {
   const user = await requireOrgSession();
 
-  const categories = await prisma.productCategory.findMany({
-    where: { organizationId: user.organizationId },
-    orderBy: { name: "asc" },
-    select: { name: true },
-  });
+  const [categories, suppliers] = await Promise.all([
+    prisma.productCategory.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      select: { name: true },
+    }),
+    prisma.supplier.findMany({
+      where: { organizationId: user.organizationId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { name: true },
+    }),
+  ]);
 
-  const buffer = await buildProductsTemplateWorkbook(categories.map((c) => c.name));
+  const buffer = await buildProductsTemplateWorkbook(
+    categories.map((c) => c.name),
+    suppliers.map((s) => s.name),
+  );
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

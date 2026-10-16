@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import type { UnitValue } from "@/lib/units";
+import { listSuppliersForCapture } from "@/lib/suppliers";
 import EditProductForm from "./EditProductForm";
 import ProductPresentationsManager from "./ProductPresentationsManager";
 
@@ -13,7 +14,7 @@ export default async function EditProductPage({
   const { productId } = await params;
   const user = await requireOrgSession();
 
-  const [product, categories, presentations] = await Promise.all([
+  const [product, categories, presentations, suppliers] = await Promise.all([
     prisma.product.findFirst({ where: { id: productId, organizationId: user.organizationId } }),
     prisma.productCategory.findMany({
       where: { organizationId: user.organizationId },
@@ -23,6 +24,7 @@ export default async function EditProductPage({
       where: { productId, organizationId: user.organizationId },
       orderBy: { createdAt: "asc" },
     }),
+    listSuppliersForCapture(user.organizationId),
   ]);
   if (!product) notFound();
 
@@ -38,8 +40,10 @@ export default async function EditProductPage({
           yieldPercentage: product.yieldPercentage.toString(),
           presentationUnitLabel: product.presentationUnitLabel,
           presentationUnitQty: product.presentationUnitQty ? product.presentationUnitQty.toString() : null,
+          defaultSupplierId: product.defaultSupplierId,
         }}
         categories={categories}
+        suppliers={suppliers}
       />
       <ProductPresentationsManager
         productId={product.id}

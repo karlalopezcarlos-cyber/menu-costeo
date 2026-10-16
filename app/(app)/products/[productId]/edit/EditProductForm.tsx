@@ -10,6 +10,7 @@ const initialState: { error?: string } = {};
 export default function EditProductForm({
   product,
   categories,
+  suppliers,
 }: {
   product: {
     id: string;
@@ -19,8 +20,10 @@ export default function EditProductForm({
     yieldPercentage: string;
     presentationUnitLabel: string | null;
     presentationUnitQty: string | null;
+    defaultSupplierId: string | null;
   };
   categories: { id: string; name: string }[];
+  suppliers: { id: string; name: string }[];
 }) {
   const updateProductWithId = updateProduct.bind(null, product.id);
   const [state, formAction, pending] = useActionState(updateProductWithId, initialState);
@@ -62,6 +65,30 @@ export default function EditProductForm({
         <Link href="/settings/categories" className="text-xs text-neutral-500 hover:underline">
           Administrar categorias
         </Link>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="defaultSupplierId" className="text-sm font-medium text-neutral-700">
+          Proveedor habitual (opcional)
+        </label>
+        <select
+          id="defaultSupplierId"
+          name="defaultSupplierId"
+          defaultValue={product.defaultSupplierId ?? ""}
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+        >
+          <option value="">Sin proveedor habitual</option>
+          {suppliers.map((supplier) => (
+            <option key={supplier.id} value={supplier.id}>
+              {supplier.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-neutral-500">
+          Con quien pides normalmente este producto. El pedido sugerido se desglosa con esto: un
+          pedido por proveedor, listo para mandarle a cada uno. No limita nada, en la compra
+          puedes capturar otro proveedor.
+        </p>
       </div>
 
       <div className="space-y-1">

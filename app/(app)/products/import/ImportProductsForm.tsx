@@ -10,7 +10,7 @@ export default function ImportProductsForm() {
   const [state, formAction, pending] = useActionState(importProducts, initialState);
 
   if (state.result) {
-    const { creados, actualizados, omitidos, categoriasNuevas } = state.result;
+    const { creados, actualizados, omitidos, categoriasNuevas, proveedoresNuevos } = state.result;
     return (
       <div className="space-y-5">
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
@@ -22,6 +22,15 @@ export default function ImportProductsForm() {
             )}
             {categoriasNuevas.length > 0 && (
               <li>{categoriasNuevas.length} categorias creadas: {categoriasNuevas.join(", ")}</li>
+            )}
+            {proveedoresNuevos.length > 0 && (
+              <li>
+                {proveedoresNuevos.length} proveedores creados: {proveedoresNuevos.join(", ")}.{" "}
+                <Link href="/settings/suppliers" className="font-medium underline">
+                  Completales telefono y correo
+                </Link>{" "}
+                para poder mandarles el pedido.
+              </li>
             )}
           </ul>
         </div>

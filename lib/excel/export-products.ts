@@ -8,6 +8,7 @@ export type ProductExportRow = {
   yieldPercentage: string;
   currentUnitCost: string;
   hasPurchases: boolean;
+  supplierName: string | null;
   archived: boolean;
 };
 
@@ -21,6 +22,7 @@ export async function buildProductsWorkbook(rows: ProductExportRow[]): Promise<B
     { header: "Unidad base", key: "baseUnit", width: 16 },
     { header: "Rendimiento %", key: "yieldPercentage", width: 14 },
     { header: "Costo vigente", key: "currentUnitCost", width: 16, style: { numFmt: '"$"#,##0.0000' } },
+    { header: "Proveedor habitual", key: "supplierName", width: 26 },
     { header: "Estado", key: "archived", width: 12 },
   ];
   sheet.getRow(1).font = { bold: true };
@@ -32,6 +34,7 @@ export async function buildProductsWorkbook(rows: ProductExportRow[]): Promise<B
       baseUnit: UNIT_LABELS[row.baseUnit],
       yieldPercentage: Number(row.yieldPercentage),
       currentUnitCost: row.hasPurchases ? Number(row.currentUnitCost) : "Sin compras",
+      supplierName: row.supplierName ?? "",
       archived: row.archived ? "Archivado" : "Activo",
     });
   }

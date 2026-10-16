@@ -5,11 +5,14 @@ import { UNITS, UNIT_LABELS } from "@/lib/units";
  * Plantilla para dar de alta productos en bloque.
  *
  * Trae tres hojas: la de captura (con dos ejemplos que se borran), una de instrucciones y una
- * de listas que alimenta los menus desplegables de Unidad base y Categoria. Las listas se
- * generan con las categorias que ya existen en la organizacion, pero el importador acepta
- * categorias nuevas y las crea, para no obligar a configurarlas antes de la carga.
+ * de listas que alimenta los menus desplegables de Unidad base, Categoria y Proveedor. Las
+ * listas se generan con las categorias y proveedores que ya existen en la organizacion, pero el
+ * importador acepta nombres nuevos y los crea, para no obligar a configurarlos antes de la carga.
  */
-export async function buildProductsTemplateWorkbook(categories: string[]): Promise<Buffer> {
+export async function buildProductsTemplateWorkbook(
+  categories: string[],
+  suppliers: string[] = [],
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
   // --- Hoja de captura ---
@@ -22,6 +25,7 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
     { header: "Presentacion: nombre", key: "presLabel", width: 22 },
     { header: "Presentacion: contenido", key: "presQty", width: 22 },
     { header: "Stock objetivo", key: "target", width: 15 },
+    { header: "Proveedor habitual", key: "supplier", width: 26 },
   ];
 
   const header = sheet.getRow(1);
@@ -33,8 +37,8 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
 
   // Dos ejemplos, en gris y en cursiva para que se note que hay que borrarlos.
   const ejemplos = [
-    { name: "ACEITE DE OLIVA", category: "ABARROTES", unit: "LT", yield: 100, presLabel: "Botella", presQty: 0.75, target: 12 },
-    { name: "MADERA 2X1", category: "MADERA", unit: "M", yield: 85, presLabel: "Pie tabla", presQty: 1.829, target: 0 },
+    { name: "ACEITE DE OLIVA", category: "ABARROTES", unit: "LT", yield: 100, presLabel: "Botella", presQty: 0.75, target: 12, supplier: "ABARROTERA DEL CENTRO" },
+    { name: "CAMARON", category: "PESCADOS Y MARISCOS", unit: "KG", yield: 100, presLabel: "", presQty: "", target: 8, supplier: "PESCADERIA EL MUELLE" },
   ];
   for (const ejemplo of ejemplos) {
     const row = sheet.addRow(ejemplo);
@@ -60,6 +64,14 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
         showErrorMessage: false, // se permite escribir una categoria nueva
       };
     }
+    if (suppliers.length > 0) {
+      sheet.getCell(`H${i}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`Listas!$C$2:$C$${suppliers.length + 1}`],
+        showErrorMessage: false, // se permite escribir un proveedor nuevo
+      };
+    }
   }
 
   // --- Hoja de instrucciones ---
@@ -81,6 +93,7 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
     ["Presentacion: nombre", "No", "Solo si lo compras por pieza con contenido fijo: Botella, Caja, Pie tabla, Saco. Dejalo vacio si compras directo en la unidad base."],
     ["Presentacion: contenido", "No", "Cuanto trae esa presentacion, EN LA UNIDAD BASE. Una botella de 750 ml con unidad base LT = 0.75. Un pie tabla de madera 2x1 con unidad base M = 1.829."],
     ["Stock objetivo", "No", "Cuanto quieres tener siempre en existencia, en la unidad base. Se usa para sugerir pedidos. Vacio o 0 = sin objetivo."],
+    ["Proveedor habitual", "No", "Con quien pides normalmente este producto. El pedido sugerido se desglosa con esto: un pedido por proveedor. Si escribes un proveedor que no existe, el sistema lo crea solo con el nombre y despues le completas telefono y correo en Configuracion > Proveedores."],
     ["", "", "Nota: los productos que se obtienen por proceso (ej. CAMARON LIMPIO) no se cargan aqui. Se crean en Productos marcando \"se obtiene por proceso\", porque su costo lo fija cada limpieza y no una compra."],
   ];
   for (const [col, req, desc] of filas) {
@@ -99,13 +112,15 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
   listas.columns = [
     { header: "Categorias existentes", key: "cat", width: 28 },
     { header: "Unidades validas", key: "unit", width: 18 },
+    { header: "Proveedores existentes", key: "supplier", width: 30 },
   ];
   listas.getRow(1).font = { bold: true };
-  const maxFilas = Math.max(categories.length, UNITS.length);
+  const maxFilas = Math.max(categories.length, UNITS.length, suppliers.length);
   for (let i = 0; i < maxFilas; i++) {
     listas.addRow({
       cat: categories[i] ?? "",
       unit: UNITS[i] ? UNIT_LABELS[UNITS[i]] : "",
+      supplier: suppliers[i] ?? "",
     });
   }
 

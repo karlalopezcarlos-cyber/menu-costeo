@@ -37,6 +37,18 @@ function parseCategoryId(value: FormDataEntryValue | null): string | null {
   return raw || null;
 }
 
+function parseSupplierId(value: FormDataEntryValue | null): string | null {
+  const raw = String(value ?? "").trim();
+  return raw || null;
+}
+
+/** El proveedor habitual tiene que ser de la misma organizacion; vacio es valido (sin proveedor). */
+async function assertSupplierBelongsToOrg(organizationId: string, supplierId: string | null) {
+  if (!supplierId) return;
+  const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, organizationId } });
+  if (!supplier) throw new Error("Proveedor no encontrado.");
+}
+
 /**
  * Presentacion de compra fija opcional (ej. "Botella" = 750 ML). Si el usuario capturo
  * cualquiera de los dos campos, exige ambos completos y validos; si dejo ambos vacios,
@@ -86,6 +98,7 @@ export async function createProduct(
     const baseUnit = parseUnit(formData.get("baseUnit"));
     const yieldPercentage = parseYieldPercentage(formData.get("yieldPercentage"));
     const presentation = parsePresentationUnit(formData);
+    const defaultSupplierId = parseSupplierId(formData.get("defaultSupplierId"));
 
     if (!name) throw new Error("El nombre es obligatorio.");
 
@@ -99,6 +112,8 @@ export async function createProduct(
       if (!category) throw new Error("Categoria no encontrada.");
     }
 
+    await assertSupplierBelongsToOrg(user.organizationId, defaultSupplierId);
+
     await prisma.product.create({
       data: {
         organizationId: user.organizationId,
@@ -108,6 +123,7 @@ export async function createProduct(
         yieldPercentage: yieldPercentage.toString(),
         presentationUnitLabel: presentation.label,
         presentationUnitQty: presentation.qty,
+        defaultSupplierId,
         isProcessed: formData.get("isProcessed") === "on",
       },
     });
@@ -132,6 +148,7 @@ export async function updateProduct(
     const baseUnit = parseUnit(formData.get("baseUnit"));
     const yieldPercentage = parseYieldPercentage(formData.get("yieldPercentage"));
     const presentation = parsePresentationUnit(formData);
+    const defaultSupplierId = parseSupplierId(formData.get("defaultSupplierId"));
     if (!name) throw new Error("El nombre es obligatorio.");
 
     const existing = await prisma.product.findFirst({
@@ -148,6 +165,8 @@ export async function updateProduct(
       });
       if (!category) throw new Error("Categoria no encontrada.");
     }
+
+    await assertSupplierBelongsToOrg(user.organizationId, defaultSupplierId);
 
     const baseUnitChanged = baseUnit !== existing.baseUnit;
     const yieldChanged = !yieldPercentage.equals(new Decimal(existing.yieldPercentage.toString()));
@@ -205,6 +224,7 @@ export async function updateProduct(
         yieldPercentage: yieldPercentage.toString(),
         presentationUnitLabel: presentation.label,
         presentationUnitQty: presentation.qty,
+        defaultSupplierId,
       },
     });
 
@@ -221,6 +241,7 @@ export async function updateProduct(
   revalidatePath("/products");
   revalidatePath("/purchases");
   revalidatePath("/recipes");
+  revalidatePath("/orders/new");
   redirect("/products");
 }
 

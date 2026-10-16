@@ -323,6 +323,11 @@ model Product {
   /// sale de CAMARON). Su costo lo fija cada limpieza, no una compra, y por eso no aparece
   /// como opcion al capturar compras ni en la plantilla de carga masiva.
   isProcessed              Boolean      @default(false)
+  /// Proveedor habitual: con quien se pide este producto por omision. Es una preferencia de
+  /// compra, no una restriccion: el pedido sugerido se desglosa con esto (un pedido por
+  /// proveedor) y se puede cambiar en el momento, y una compra puede capturarse con otro.
+  defaultSupplierId        String?
+  defaultSupplier          Supplier?    @relation("ProductDefaultSupplier", fields: [defaultSupplierId], references: [id])
   archivedAt               DateTime?
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
@@ -342,6 +347,7 @@ model Product {
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([defaultSupplierId])
   @@map("products")
 }
 
@@ -437,6 +443,7 @@ model Supplier {
   supplierPayments SupplierPayment[]
   phones           SupplierPhone[]
   emails           SupplierEmail[]
+  defaultForProducts Product[]       @relation("ProductDefaultSupplier")
 
   @@unique([organizationId, name])
   @@index([organizationId])
