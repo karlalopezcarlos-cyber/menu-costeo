@@ -8,6 +8,7 @@ import { updateRecipeInstructions, updateRecipeStoreDescription } from "../actio
 import AddRecipeItemForm from "./AddRecipeItemForm";
 import EditRecipeDetailsForm from "./EditRecipeDetailsForm";
 import RecipePhotoForm from "./RecipePhotoForm";
+import PriceSimulator from "./PriceSimulator";
 import RecipeIngredientsTable, { type IngredientRow } from "./RecipeIngredientsTable";
 import CopyIngredientsButton from "./CopyIngredientsButton";
 import type { RecipeGraph } from "@/lib/costing";
@@ -239,6 +240,11 @@ export default async function RecipeDetailPage({
                 {UNIT_LABELS[recipe.yieldUnit as UnitValue]}
               </p>
             )}
+            <PriceSimulator
+              recipeId={recipe.id}
+              totalCost={totalCost!.toNumber()}
+              savedPrice={sellingPrice}
+            />
           </>
         )}
       </div>
