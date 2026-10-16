@@ -6,7 +6,10 @@ export async function buildPurchasesWorkbook(rows: PurchaseRow[]): Promise<Buffe
   const sheet = workbook.addWorksheet("Compras");
 
   sheet.columns = [
-    { header: "Folio", key: "folio", width: 12 },
+    // Dos columnas separadas: el numero que viene en el papel del proveedor y el consecutivo
+    // interno. Quien filtra el Excel busca por el primero; quien rastrea un registro, por el segundo.
+    { header: "Folio factura", key: "invoiceFolio", width: 18 },
+    { header: "Folio sistema", key: "folio", width: 14 },
     { header: "Fecha", key: "date", width: 14 },
     { header: "Producto", key: "product", width: 28 },
     { header: "Cantidad", key: "quantity", width: 14 },
@@ -19,6 +22,7 @@ export async function buildPurchasesWorkbook(rows: PurchaseRow[]): Promise<Buffe
 
   for (const row of rows) {
     sheet.addRow({
+      invoiceFolio: row.invoiceFolio ?? "",
       folio: row.folioLabel,
       date: row.dateLabel,
       product: row.productName,
