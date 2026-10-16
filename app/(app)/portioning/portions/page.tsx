@@ -13,7 +13,11 @@ export default async function PortionsPage() {
   const portions = await prisma.product.findMany({
     where: { organizationId: user.organizationId, archivedAt: null, portionQty: { not: null } },
     orderBy: { name: "asc" },
-    include: { extrasRecipe: { select: { name: true } }, category: { select: { name: true } } },
+    include: {
+      extrasRecipe: { select: { name: true } },
+      category: { select: { name: true } },
+      defaultSourceProduct: { select: { name: true } },
+    },
   });
 
   return (
@@ -24,12 +28,20 @@ export default async function PortionsPage() {
           <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">Porciones</h1>
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">
             Cada porcion es un producto de tu catalogo. Su costo lo pone la transformacion del
-            dia: lo que entro entre las piezas que de verdad salieron.
+            dia: lo que entro entre las piezas que de verdad salieron. Los productos que salen de
+            limpiar (POLLO LIMPIO) se dan de alta como producto de proceso y luego se eligen aqui.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/portioning" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
             Transformaciones
+          </Link>
+          <Link
+            href="/products/new"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+            title="Para los productos que salen de limpiar, como POLLO LIMPIO: marca &quot;se obtiene por proceso&quot;"
+          >
+            Nuevo producto de proceso
           </Link>
           <Link
             href="/portioning/portions/new"
@@ -45,6 +57,7 @@ export default async function PortionsPage() {
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Porcion</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Sale de</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Lleva</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Agregados</th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
@@ -56,7 +69,7 @@ export default async function PortionsPage() {
           <tbody>
             {portions.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-neutral-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400">
                   Todavia no hay porciones. Crea una (ej. CAMARON 20 G) y despues registra la
                   transformacion que las produce.
                 </td>
@@ -73,6 +86,11 @@ export default async function PortionsPage() {
                   </Link>
                   {portion.category && (
                     <p className="text-xs text-neutral-500">{portion.category.name}</p>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-neutral-600">
+                  {portion.defaultSourceProduct?.name ?? (
+                    <span className="text-neutral-400">se elige al porcionar</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-neutral-600">

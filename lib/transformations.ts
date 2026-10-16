@@ -148,6 +148,8 @@ export type TransformationProduct = {
   /** Solo porciones: cuanto producto de origen lleva una porcion, y en que unidad se midio. */
   portionQty: string | null;
   portionUnit: UnitValue | null;
+  /** De que producto sale normalmente esta porcion. Solo sirve para ordenar la captura. */
+  defaultSourceProductId: string | null;
   /** Costo de los agregados de cada porcion, calculado hoy desde su receta. */
   extraCostPerUnit: string;
   extrasRecipeName: string | null;

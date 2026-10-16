@@ -14,7 +14,7 @@ export default async function EditPortionPage({
   const { productId } = await params;
   const user = await requireSucursalContext();
 
-  const [portion, categories, recipes] = await Promise.all([
+  const [portion, categories, recipes, sourceProducts] = await Promise.all([
     prisma.product.findFirst({ where: { id: productId, organizationId: user.organizationId } }),
     prisma.productCategory.findMany({
       where: { organizationId: user.organizationId },
@@ -25,6 +25,12 @@ export default async function EditPortionPage({
       where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    // Lo que puede ser origen de una porcion: cualquier producto que no sea otra porcion.
+    prisma.product.findMany({
+      where: { organizationId: user.organizationId, archivedAt: null, portionQty: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, isProcessed: true },
     }),
   ]);
   if (!portion) notFound();
@@ -47,9 +53,11 @@ export default async function EditPortionPage({
           portionUnit: (portion.portionUnit ?? "G") as UnitValue,
           extrasRecipeId: portion.extrasRecipeId,
           categoryId: portion.categoryId,
+          defaultSourceProductId: portion.defaultSourceProductId,
         }}
         categories={categories}
         recipes={recipes}
+        sourceProducts={sourceProducts.filter((p) => p.id !== portion.id)}
         submitLabel="Guardar cambios"
       />
     </div>

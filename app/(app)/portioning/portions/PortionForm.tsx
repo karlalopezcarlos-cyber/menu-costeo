@@ -14,6 +14,7 @@ export type PortionFormValues = {
   portionUnit: UnitValue;
   extrasRecipeId: string | null;
   categoryId: string | null;
+  defaultSourceProductId: string | null;
 };
 
 export default function PortionForm({
@@ -21,12 +22,14 @@ export default function PortionForm({
   values,
   categories,
   recipes,
+  sourceProducts,
   submitLabel,
 }: {
   action: (prev: PortionState | undefined, formData: FormData) => Promise<PortionState>;
   values?: PortionFormValues;
   categories: { id: string; name: string }[];
   recipes: { id: string; name: string }[];
+  sourceProducts: { id: string; name: string; isProcessed: boolean }[];
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -51,6 +54,35 @@ export default function PortionForm({
         />
         <p className="text-xs text-neutral-500">
           Va a quedar como un producto mas de tu catalogo, que se cuenta por pieza.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="defaultSourceProductId" className="text-sm font-medium text-neutral-700">
+          Sale normalmente de (opcional)
+        </label>
+        <select
+          id="defaultSourceProductId"
+          name="defaultSourceProductId"
+          defaultValue={values?.defaultSourceProductId ?? ""}
+          className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+        >
+          <option value="">Lo elijo cada vez</option>
+          {sourceProducts.map((product) => (
+            <option key={product.id} value={product.id}>
+              {product.name}
+              {product.isProcessed ? " (de proceso)" : ""}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-neutral-500">
+          De donde sale normalmente esta porcion: el producto crudo o el ya limpio (POLLO LIMPIO).
+          Solo sirve para que aparezca primero al registrar la transformacion. El dia que
+          porciones del crudo directo, eliges el crudo y ya.{" "}
+          <Link href="/products/new" className="text-brand-600 underline-offset-2 hover:underline">
+            ¿Falta el producto limpio? Crealo aqui
+          </Link>
+          , marcando &quot;se obtiene por proceso&quot;.
         </p>
       </div>
 

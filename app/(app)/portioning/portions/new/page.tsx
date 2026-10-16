@@ -7,7 +7,7 @@ import { createPortion } from "../actions";
 export default async function NewPortionPage() {
   const user = await requireSucursalContext();
 
-  const [categories, recipes] = await Promise.all([
+  const [categories, recipes, sourceProducts] = await Promise.all([
     prisma.productCategory.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
@@ -17,6 +17,12 @@ export default async function NewPortionPage() {
       where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    // Lo que puede ser origen de una porcion: cualquier producto que no sea otra porcion.
+    prisma.product.findMany({
+      where: { organizationId: user.organizationId, archivedAt: null, portionQty: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, isProcessed: true },
     }),
   ]);
 
@@ -32,6 +38,7 @@ export default async function NewPortionPage() {
         action={createPortion}
         categories={categories}
         recipes={recipes}
+        sourceProducts={sourceProducts}
         submitLabel="Crear porcion"
       />
     </div>

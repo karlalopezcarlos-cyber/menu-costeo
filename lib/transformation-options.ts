@@ -55,6 +55,7 @@ export async function loadTransformationProducts(
     yieldPercentage: product.yieldPercentage.toString(),
     portionQty: product.portionQty ? product.portionQty.toString() : null,
     portionUnit: product.portionUnit ? (product.portionUnit as UnitValue) : null,
+    defaultSourceProductId: product.defaultSourceProductId,
     extraCostPerUnit: extraCost(product.extrasRecipeId).toDecimalPlaces(6).toString(),
     extrasRecipeName: product.extrasRecipe?.name ?? null,
   }));

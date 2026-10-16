@@ -41,6 +41,18 @@ export default function TransformationForm({ products }: { products: Transformat
   const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const source = sourceId ? porId.get(sourceId) : undefined;
 
+  // Lo que normalmente sale de este producto va arriba y separado: es lo que se va a capturar el
+  // 90% de las veces. Lo demas sigue disponible, porque el dia que se porciona otra cosa no hay
+  // que pelear con la pantalla.
+  const { sugeridos, resto } = useMemo(() => {
+    const candidatos = products.filter((p) => p.id !== sourceId);
+    if (!sourceId) return { sugeridos: [], resto: candidatos };
+    return {
+      sugeridos: candidatos.filter((p) => p.defaultSourceProductId === sourceId),
+      resto: candidatos.filter((p) => p.defaultSourceProductId !== sourceId),
+    };
+  }, [products, sourceId]);
+
   /** Peso por unidad que se va a usar: el tecleado manda sobre el de la ficha. */
   function refDe(row: OutputRow): Decimal | null {
     const output = porId.get(row.productId);
@@ -172,6 +184,10 @@ export default function TransformationForm({ products }: { products: Transformat
               entre esas piezas.
             </p>
           </div>
+          <div className="flex items-center gap-3">
+          <Link href="/products/new" className="text-xs text-neutral-500 hover:underline">
+            ¿Falta el producto que sale?
+          </Link>
           <button
             type="button"
             onClick={() => setRows((prev) => [...prev, nuevaFila()])}
@@ -179,6 +195,7 @@ export default function TransformationForm({ products }: { products: Transformat
           >
             Agregar salida
           </button>
+          </div>
         </div>
 
         <table className="w-full text-sm">
@@ -211,14 +228,24 @@ export default function TransformationForm({ products }: { products: Transformat
                       className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
                     >
                       <option value="">Elige el producto</option>
-                      {products
-                        .filter((p) => p.id !== sourceId)
-                        .map((p) => (
+                      {sugeridos.length > 0 && (
+                        <optgroup label={`Sale normalmente de ${source?.name ?? ""}`}>
+                          {sugeridos.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                              {p.portionQty ? ` · porcion de ${p.portionQty} ${p.portionUnit ?? ""}` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label={sugeridos.length > 0 ? "Los demas productos" : "Productos"}>
+                        {resto.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                             {p.portionQty ? ` · porcion de ${p.portionQty} ${p.portionUnit ?? ""}` : ""}
                           </option>
                         ))}
+                      </optgroup>
                     </select>
                     {output?.extrasRecipeName && Number(output.extraCostPerUnit) > 0 && (
                       <p className="mt-1 text-xs text-neutral-500">

@@ -328,6 +328,12 @@ model Product {
   /// entro cuando de una misma transformacion salen varios tamanos, y para prellenar la captura.
   portionQty               Decimal?     @db.Decimal(14, 4)
   portionUnit              Unit?
+  /// Solo para porciones: de que producto salen normalmente (ej. POLLO PIEZA 50 G sale de
+  /// POLLO LIMPIO). Es una preferencia para prellenar la captura, no una restriccion: el dia
+  /// que se porcione el crudo directo, se elige el crudo en la transformacion y ya.
+  defaultSourceProductId   String?
+  defaultSourceProduct     Product?     @relation("ProductPortionSource", fields: [defaultSourceProductId], references: [id])
+  portionsFromThis         Product[]    @relation("ProductPortionSource")
   /// Receta opcional con lo que se le agrega a cada porcion (sal, limon, bolsa). Su costo se
   /// suma al de la porcion cuando se registra la transformacion.
   extrasRecipeId           String?
@@ -358,6 +364,7 @@ model Product {
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([defaultSupplierId])
+  @@index([defaultSourceProductId])
   @@map("products")
 }
 

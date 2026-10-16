@@ -27,6 +27,7 @@ function parsePortion(formData: FormData): {
   portionUnit: UnitValue;
   extrasRecipeId: string | null;
   categoryId: string | null;
+  defaultSourceProductId: string | null;
 } {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Ponle nombre a la porcion (ej. CAMARON 20 G).");
@@ -47,6 +48,7 @@ function parsePortion(formData: FormData): {
     portionUnit: portionUnitRaw as UnitValue,
     extrasRecipeId: String(formData.get("extrasRecipeId") ?? "").trim() || null,
     categoryId: String(formData.get("categoryId") ?? "").trim() || null,
+    defaultSourceProductId: String(formData.get("defaultSourceProductId") ?? "").trim() || null,
   };
 }
 
@@ -70,6 +72,7 @@ export async function createPortion(
         portionQty: datos.portionQty,
         portionUnit: datos.portionUnit,
         extrasRecipeId: datos.extrasRecipeId,
+        defaultSourceProductId: datos.defaultSourceProductId,
       },
     });
   } catch (error) {
@@ -106,6 +109,7 @@ export async function updatePortion(
         portionQty: datos.portionQty,
         portionUnit: datos.portionUnit,
         extrasRecipeId: datos.extrasRecipeId,
+        defaultSourceProductId: datos.defaultSourceProductId,
       },
     });
   } catch (error) {
