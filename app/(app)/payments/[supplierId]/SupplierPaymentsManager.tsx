@@ -280,6 +280,17 @@ export default function SupplierPaymentsManager({
     });
   }, [folioRows, fromValue, toValue, folioQuery, onlyUnpaid]);
 
+  const hayFiltro = Boolean(folioQuery || dateFrom || dateTo || onlyUnpaid);
+
+  // Las tarjetas siguen a lo que esta en pantalla. El total global se deja a la vista cuando hay
+  // un filtro puesto: el saldo del proveedor es una deuda real y no debe parecer menor solo
+  // porque se acoto el periodo.
+  const totales = useMemo(() => {
+    const comprado = filteredRows.reduce((sum, row) => sum + row.total, 0);
+    const pagado = filteredRows.reduce((sum, row) => sum + row.abonado, 0);
+    return { comprado, pagado, saldo: comprado - pagado };
+  }, [filteredRows]);
+
   const allFilteredSelected = filteredRows.length > 0 && filteredRows.every((row) => selected.has(row.folio));
 
   function toggleSelectAll() {
@@ -347,19 +358,40 @@ export default function SupplierPaymentsManager({
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-          <p className="text-xs font-medium text-neutral-500">Total comprado</p>
-          <p className="mt-1 text-xl font-semibold text-neutral-900">{money(totalPurchased)}</p>
-        </div>
-        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-          <p className="text-xs font-medium text-neutral-500">Total pagado</p>
-          <p className="mt-1 text-xl font-semibold text-neutral-900">{money(totalPaid)}</p>
-        </div>
-        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-          <p className="text-xs font-medium text-neutral-500">Saldo al proveedor</p>
-          <p className={`mt-1 text-xl font-semibold ${balance > 0.005 ? "text-red-600" : "text-green-700"}`}>
-            {money(balance)}
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-neutral-500">
+            {hayFiltro ? "Comprado en lo filtrado" : "Total comprado"}
           </p>
+          <p className="mt-1 text-xl font-semibold text-neutral-900">
+            {money(hayFiltro ? totales.comprado : totalPurchased)}
+          </p>
+          {hayFiltro && (
+            <p className="mt-0.5 text-xs text-neutral-400">Historico {money(totalPurchased)}</p>
+          )}
+        </div>
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-neutral-500">
+            {hayFiltro ? "Abonado a lo filtrado" : "Total pagado"}
+          </p>
+          <p className="mt-1 text-xl font-semibold text-neutral-900">
+            {money(hayFiltro ? totales.pagado : totalPaid)}
+          </p>
+          {hayFiltro && <p className="mt-0.5 text-xs text-neutral-400">Historico {money(totalPaid)}</p>}
+        </div>
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-neutral-500">
+            {hayFiltro ? "Pendiente de lo filtrado" : "Saldo al proveedor"}
+          </p>
+          <p
+            className={`mt-1 text-xl font-semibold ${
+              (hayFiltro ? totales.saldo : balance) > 0.005 ? "text-red-600" : "text-green-700"
+            }`}
+          >
+            {money(hayFiltro ? totales.saldo : balance)}
+          </p>
+          {hayFiltro && (
+            <p className="mt-0.5 text-xs text-neutral-400">Saldo total {money(balance)}</p>
+          )}
         </div>
       </div>
 
