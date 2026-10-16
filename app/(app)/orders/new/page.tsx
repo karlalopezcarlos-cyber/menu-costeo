@@ -11,7 +11,7 @@ export default async function NewOrderPage() {
 
   const [products, stock, openOrderItems, recentPurchases, suppliers] = await Promise.all([
     prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null, targetStock: { gt: 0 } },
+      where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false, targetStock: { gt: 0 } },
       orderBy: { name: "asc" },
       include: { category: true, presentations: true },
     }),

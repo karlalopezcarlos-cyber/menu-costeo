@@ -20,7 +20,7 @@ export default async function NewPurchasePage({
       select: { nextPurchaseFolio: true },
     }),
     prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false },
       orderBy: { name: "asc" },
       select: {
         id: true,

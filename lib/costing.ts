@@ -259,6 +259,14 @@ export function getRecipeUsagePerUnit(recipeId: string, graph: RecipeGraph): Rec
 
 /** Recalcula Product.currentUnitCost a partir de la compra con purchaseDate mas reciente. */
 export async function recalcProductCurrentCost(productId: string) {
+  // Los productos de proceso (CAMARON LIMPIO) no se compran: su costo lo fija cada limpieza.
+  // Recalcularlo desde compras lo dejaria en cero y tiraria el costeo de todas sus recetas.
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { isProcessed: true },
+  });
+  if (product?.isProcessed) return;
+
   const latest = await prisma.purchase.findFirst({
     where: { productId },
     orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],

@@ -81,6 +81,7 @@ export async function buildProductsTemplateWorkbook(categories: string[]): Promi
     ["Presentacion: nombre", "No", "Solo si lo compras por pieza con contenido fijo: Botella, Caja, Pie tabla, Saco. Dejalo vacio si compras directo en la unidad base."],
     ["Presentacion: contenido", "No", "Cuanto trae esa presentacion, EN LA UNIDAD BASE. Una botella de 750 ml con unidad base LT = 0.75. Un pie tabla de madera 2x1 con unidad base M = 1.829."],
     ["Stock objetivo", "No", "Cuanto quieres tener siempre en existencia, en la unidad base. Se usa para sugerir pedidos. Vacio o 0 = sin objetivo."],
+    ["", "", "Nota: los productos que se obtienen por proceso (ej. CAMARON LIMPIO) no se cargan aqui. Se crean en Productos marcando \"se obtiene por proceso\", porque su costo lo fija cada limpieza y no una compra."],
   ];
   for (const [col, req, desc] of filas) {
     const row = guia.addRow({ col, req, desc });

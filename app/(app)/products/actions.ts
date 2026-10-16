@@ -108,6 +108,7 @@ export async function createProduct(
         yieldPercentage: yieldPercentage.toString(),
         presentationUnitLabel: presentation.label,
         presentationUnitQty: presentation.qty,
+        isProcessed: formData.get("isProcessed") === "on",
       },
     });
   } catch (error) {

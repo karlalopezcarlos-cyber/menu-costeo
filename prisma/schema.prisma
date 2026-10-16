@@ -52,6 +52,14 @@ enum Unit {
   PIECE
 }
 
+/// Que clase de transformacion se registro.
+enum TransformationType {
+  /// Limpiar o habilitar: entra un producto y sale otro producto, con merma en el camino.
+  CLEANING
+  /// Porcionar: entra un producto y salen porciones contables.
+  PORTIONING
+}
+
 enum ImportBatchStatus {
   DRAFT
   PROCESSED
@@ -311,6 +319,10 @@ model Product {
   /// directo en la unidad base.
   presentationUnitLabel    String?
   presentationUnitQty      Decimal?     @db.Decimal(14, 4)
+  /// Producto que no se compra: se obtiene limpiando o procesando otro (ej. CAMARON LIMPIO
+  /// sale de CAMARON). Su costo lo fija cada limpieza, no una compra, y por eso no aparece
+  /// como opcion al capturar compras ni en la plantilla de carga masiva.
+  isProcessed              Boolean      @default(false)
   archivedAt               DateTime?
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
@@ -326,6 +338,7 @@ model Product {
   requisicionItems    RequisicionItem[]
   planningRunItems    PlanningRunItem[]
   portioningEntries   PortioningEntry[]
+  portioningOutputProduct PortioningEntry[] @relation("PortioningOutputProduct")
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1122,6 +1135,9 @@ model RequisicionItem {
 /// es la merma real de ese corte, que es justo el dato que no existia en ningun lado.
 model PortioningEntry {
   id              String       @id @default(cuid())
+  /// CLEANING: el resultado es otro producto (outputProduct). PORTIONING: el resultado son
+  /// porciones (outputs). Los dos miden lo mismo: cuanto entro, cuanto salio, cuanto se perdio.
+  type            TransformationType @default(PORTIONING)
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
   sucursalId      String
@@ -1139,6 +1155,10 @@ model PortioningEntry {
   unitCost        Decimal      @db.Decimal(14, 6)
   /// Rendimiento real de este evento: lo porcionado entre lo que entro, en porcentaje.
   realYieldPct    Decimal      @db.Decimal(5, 2)
+  /// Solo en CLEANING: producto que resulto de la limpieza y cuanto se obtuvo, en su unidad base.
+  outputProductId String?
+  outputProduct   Product?     @relation("PortioningOutputProduct", fields: [outputProductId], references: [id])
+  outputQty       Decimal?     @db.Decimal(14, 4)
   comment         String?
   createdByUserId String?
   createdBy       User?        @relation("PortioningCreatedBy", fields: [createdByUserId], references: [id])
@@ -1150,6 +1170,7 @@ model PortioningEntry {
   @@index([organizationId, folio])
   @@index([sucursalId, date])
   @@index([organizationId, productId])
+  @@index([organizationId, outputProductId])
   @@map("portioning_entries")
 }
 

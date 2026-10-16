@@ -91,6 +91,20 @@ export default function NewProductForm({
         </p>
       </div>
 
+      <div className="space-y-1 rounded-md border border-neutral-200 p-3">
+        <div className="flex items-center gap-2">
+          <input id="isProcessed" name="isProcessed" type="checkbox" className="h-4 w-4" />
+          <label htmlFor="isProcessed" className="text-sm font-medium text-neutral-700">
+            Se obtiene por proceso, no se compra
+          </label>
+        </div>
+        <p className="pl-6 text-xs text-neutral-500">
+          Para productos que salen de limpiar o habilitar otro, como CAMARON LIMPIO. Su costo lo
+          fija cada limpieza en Transformaciones, y no aparece como opcion al capturar compras.
+          Dejale el rendimiento en 100: su merma se mide en la limpieza, no aqui.
+        </p>
+      </div>
+
       <div className="space-y-2 rounded-md border border-neutral-200 p-3">
         <p className="text-sm font-medium text-neutral-700">Presentacion de compra fija (opcional)</p>
         <p className="text-xs text-neutral-500">

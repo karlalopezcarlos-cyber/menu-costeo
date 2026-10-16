@@ -513,7 +513,8 @@ export type KardexMovement = {
     | "requisicion_entrada"
     | "requisicion_salida"
     | "porcionamiento_salida"
-    | "porcionamiento_entrada";
+    | "porcionamiento_entrada"
+    | "limpieza_entrada";
   label: string;
   qtyDelta: number;
   runningBalance: number;
@@ -596,6 +597,7 @@ export async function computeItemKardex(
     requisicionesIn,
     porcionamientosDeProducto,
     porcionesProducidas,
+    limpiezasRecibidas,
     graph,
   ] = await Promise.all([
     itemType === "product"
@@ -656,6 +658,13 @@ export async function computeItemKardex(
           include: {
             portioningEntry: { select: { date: true, folio: true, product: { select: { name: true } } } },
           },
+        })
+      : Promise.resolve([]),
+    // Lo que se obtuvo de limpiar otro producto (CAMARON LIMPIO sale de CAMARON).
+    itemType === "product"
+      ? prisma.portioningEntry.findMany({
+          where: { sucursalId, type: "CLEANING", outputProductId: itemId, date: dateFilter },
+          select: { date: true, outputQty: true, folio: true, product: { select: { name: true } } },
         })
       : Promise.resolve([]),
     loadOrgRecipeGraph(sucursalId),
@@ -779,6 +788,19 @@ export async function computeItemKardex(
       runningBalance: 0,
       href: "/portioning",
       sortIndex: 3600 + index,
+    });
+  });
+
+  limpiezasRecibidas.forEach((entry, index) => {
+    movements.push({
+      date: entry.date,
+      dateLabel: dateLabel(entry.date),
+      type: "limpieza_entrada",
+      label: `Limpieza de ${entry.product.name}`,
+      qtyDelta: Number(entry.outputQty ?? 0),
+      runningBalance: 0,
+      href: "/portioning",
+      sortIndex: 3700 + index,
     });
   });
 

@@ -41,7 +41,7 @@ export default async function PurchaseDetailPage({
         })
       : null,
     prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, baseUnit: true, yieldPercentage: true },
     }),
