@@ -26,7 +26,7 @@ export default async function SupplierPaymentsPage({
     }),
     prisma.purchase.findMany({
       where: { sucursalId: user.sucursalId, supplierId },
-      select: { folio: true, purchaseDate: true, totalPrice: true },
+      select: { folio: true, purchaseDate: true, totalPrice: true, invoiceFolio: true },
     }),
     prisma.supplierPayment.findMany({
       where: { sucursalId: user.sucursalId, supplierId },
@@ -48,7 +48,10 @@ export default async function SupplierPaymentsPage({
     }
   }
 
-  const byFolio = new Map<number, { dateValue: number; dateLabel: string; total: number }>();
+  const byFolio = new Map<
+    number,
+    { dateValue: number; dateLabel: string; total: number; invoiceFolio: string | null }
+  >();
   for (const purchase of purchases) {
     const existing = byFolio.get(purchase.folio);
     const amount = Number(purchase.totalPrice);
@@ -59,6 +62,8 @@ export default async function SupplierPaymentsPage({
         dateValue: purchase.purchaseDate.getTime(),
         dateLabel: purchase.purchaseDate.toLocaleDateString("es-MX", { timeZone: "UTC" }),
         total: amount,
+        // Todos los renglones de un folio comparten la misma factura; basta el primero.
+        invoiceFolio: purchase.invoiceFolio,
       });
     }
   }
@@ -73,6 +78,7 @@ export default async function SupplierPaymentsPage({
       return {
         folio,
         folioLabel: formatPurchaseFolio(folio),
+        invoiceFolio: data.invoiceFolio,
         dateLabel: data.dateLabel,
         dateValue: data.dateValue,
         total: data.total,

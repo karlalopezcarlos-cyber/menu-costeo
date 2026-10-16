@@ -8,6 +8,8 @@ import { addFolioPayment, settleFolios, resetFolios, deleteAdvancePayment } from
 export type FolioRow = {
   folio: number;
   folioLabel: string;
+  /** Folio de la factura del proveedor: el numero que viene en el papel. */
+  invoiceFolio: string | null;
   dateLabel: string;
   dateValue: number;
   total: number;
@@ -155,7 +157,16 @@ function FolioPaymentRow({
             className="h-4 w-4 rounded border-neutral-300"
           />
         </td>
-        <td className="px-4 py-3 text-neutral-500">{row.folioLabel}</td>
+        <td className="px-4 py-3">
+          {row.invoiceFolio && row.invoiceFolio !== row.folioLabel ? (
+            <>
+              <span className="font-medium text-neutral-900">{row.invoiceFolio}</span>
+              <span className="mt-0.5 block text-xs text-neutral-400">{row.folioLabel}</span>
+            </>
+          ) : (
+            <span className="font-medium text-neutral-900">{row.folioLabel}</span>
+          )}
+        </td>
         <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
         <td className="px-4 py-3 text-right">{money(row.total)}</td>
         <td className="px-4 py-3 text-right text-neutral-500">
@@ -255,7 +266,13 @@ export default function SupplierPaymentsManager({
     return folioRows.filter((row) => {
       if (fromValue !== null && row.dateValue < fromValue) return false;
       if (toValue !== null && row.dateValue > toValue) return false;
-      if (folioQuery && !row.folioLabel.toLowerCase().includes(folioQuery) && !String(row.folio).includes(folioQuery)) {
+      // La busqueda cubre el folio de la factura y el consecutivo del sistema: el usuario
+      // teclea lo que trae en el papel sin saber cual es cual.
+      const coincide =
+        row.folioLabel.toLowerCase().includes(folioQuery) ||
+        String(row.folio).includes(folioQuery) ||
+        (row.invoiceFolio?.toLowerCase().includes(folioQuery) ?? false);
+      if (folioQuery && !coincide) {
         return false;
       }
       if (onlyUnpaid && row.isPaid) return false;
@@ -353,7 +370,7 @@ export default function SupplierPaymentsManager({
             type="text"
             value={folioSearch}
             onChange={(e) => setFolioSearch(e.target.value)}
-            placeholder="Buscar folio..."
+            placeholder="Buscar factura o folio..."
             className="w-full max-w-[10rem] rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
           <div className="space-y-1">
@@ -438,7 +455,7 @@ export default function SupplierPaymentsManager({
             <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
               <tr>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
-                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
+                <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Factura</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Total</th>
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-right">Abonado</th>
