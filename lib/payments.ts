@@ -95,3 +95,52 @@ export async function computeOverdueBySupplier(
   }
   return result;
 }
+
+export type SupplierDailyMovement = {
+  supplierId: string;
+  /** Dia en formato YYYY-MM-DD, para comparar contra los filtros de fecha sin lios de zona. */
+  day: string;
+  purchased: number;
+  paid: number;
+};
+
+/**
+ * Movimientos por proveedor y por dia, para que la lista de cuentas por pagar pueda recalcular
+ * sus totales en pantalla al cambiar el periodo, sin volver al servidor en cada tecla.
+ *
+ * Se agrupa por dia (no por movimiento) porque lo unico que necesita la lista son sumas: con un
+ * ano de operacion y diez proveedores son unos cuantos cientos de renglones, no miles.
+ */
+export async function loadSupplierDailyMovements(sucursalId: string): Promise<SupplierDailyMovement[]> {
+  const [purchaseGroups, paymentGroups] = await Promise.all([
+    prisma.purchase.groupBy({
+      by: ["supplierId", "purchaseDate"],
+      where: { sucursalId, supplierId: { not: null } },
+      _sum: { totalPrice: true },
+    }),
+    prisma.supplierPayment.groupBy({
+      by: ["supplierId", "paidDate"],
+      where: { sucursalId },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const porClave = new Map<string, SupplierDailyMovement>();
+  const dia = (d: Date) => d.toISOString().slice(0, 10);
+
+  const acumular = (supplierId: string, day: string, campo: "purchased" | "paid", valor: number) => {
+    const clave = `${supplierId}:${day}`;
+    const actual = porClave.get(clave) ?? { supplierId, day, purchased: 0, paid: 0 };
+    actual[campo] += valor;
+    porClave.set(clave, actual);
+  };
+
+  for (const g of purchaseGroups) {
+    acumular(g.supplierId as string, dia(g.purchaseDate), "purchased", Number(g._sum.totalPrice ?? 0));
+  }
+  for (const g of paymentGroups) {
+    acumular(g.supplierId, dia(g.paidDate), "paid", Number(g._sum.amount ?? 0));
+  }
+
+  return [...porClave.values()];
+}

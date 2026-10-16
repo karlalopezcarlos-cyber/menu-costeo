@@ -1,7 +1,11 @@
 import PaymentsSupplierList, { type SupplierBalanceRow } from "./PaymentsSupplierList";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeAllSupplierBalances, computeOverdueBySupplier } from "@/lib/payments";
+import {
+  computeAllSupplierBalances,
+  computeOverdueBySupplier,
+  loadSupplierDailyMovements,
+} from "@/lib/payments";
 
 export default async function PaymentsPage() {
   const user = await requireSucursalContext();
@@ -14,6 +18,16 @@ export default async function PaymentsPage() {
     }),
     computeAllSupplierBalances(user.sucursalId),
   ]);
+
+  const movements = await loadSupplierDailyMovements(user.sucursalId);
+
+  // El periodo por omision es el mes en curso. Se calcula en el servidor para que el valor
+  // inicial del filtro sea el mismo en el HTML y en el navegador.
+  const hoy = new Date();
+  const primerDiaDelMes = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), 1))
+    .toISOString()
+    .slice(0, 10);
+  const hoyValor = hoy.toISOString().slice(0, 10);
 
   const overdue = await computeOverdueBySupplier(
     user.sucursalId,
@@ -38,7 +52,12 @@ export default async function PaymentsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Pagos a proveedores</h1>
-      <PaymentsSupplierList rows={rows} />
+      <PaymentsSupplierList
+        rows={rows}
+        movements={movements}
+        defaultFrom={primerDiaDelMes}
+        defaultTo={hoyValor}
+      />
     </div>
   );
 }
