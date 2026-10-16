@@ -59,6 +59,12 @@ export async function updatePurchase(
   });
   if (!purchase) return { error: "Compra no encontrada." };
 
+  // Una compra ya abonada no se edita: cambiarle el importe dejaria el pago sin corresponder.
+  const blockedByPayment = await findBlockingPayment(user.sucursalId, purchase.supplierId, purchase.folio);
+  if (blockedByPayment) {
+    return { error: blockedByPayment.error?.replace("antes de eliminarla", "antes de editarla") };
+  }
+
   try {
     const purchaseDateRaw = String(formData.get("purchaseDate") ?? "");
     if (!purchaseDateRaw) throw new Error("Indica la fecha de compra.");
@@ -258,4 +264,70 @@ export async function deletePurchaseGroup(
   revalidatePath("/payments");
   if (recipeId) revalidatePath(`/recipes/${recipeId}`);
   redirect(recipeId ? `/recipes/${recipeId}` : "/purchases");
+}
+
+/**
+ * Edita los datos de la factura completa: proveedor, fecha y folio de factura.
+ *
+ * Estos tres datos son del documento, no de cada renglon: una compra con tres productos tiene
+ * un solo proveedor y una sola fecha. Por eso se actualizan todos los renglones del folio a la
+ * vez; editarlos por renglon dejaria la misma compra con dos proveedores distintos.
+ *
+ * Se bloquea si el folio ya tiene abonos registrados: cambiarle el proveedor a una compra ya
+ * pagada movería el saldo de dos proveedores a la vez y dejaría el pago apuntando a quien no es.
+ */
+export async function updatePurchaseHeader(
+  _prevState: { error?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const user = await requireSucursalContext();
+  const folio = Number(formData.get("folio"));
+  if (!Number.isInteger(folio)) return { error: "Folio invalido." };
+
+  const purchases = await prisma.purchase.findMany({
+    where: { sucursalId: user.sucursalId, folio },
+    select: { id: true, supplierId: true },
+  });
+  if (purchases.length === 0) return { error: "Compra no encontrada." };
+
+  const blocked = await findBlockingPayment(user.sucursalId, purchases[0].supplierId, folio);
+  if (blocked) {
+    return {
+      error: blocked.error?.replace("antes de eliminarla", "antes de editarla"),
+    };
+  }
+
+  try {
+    const purchaseDateRaw = String(formData.get("purchaseDate") ?? "");
+    if (!purchaseDateRaw) throw new Error("Indica la fecha de compra.");
+
+    const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
+    const supplierId = supplierIdRaw || null;
+    if (supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: supplierId, organizationId: user.organizationId },
+        select: { id: true },
+      });
+      if (!supplier) throw new Error("Proveedor no encontrado.");
+    }
+
+    const invoiceFolioRaw = String(formData.get("invoiceFolio") ?? "").trim().slice(0, 60);
+    const invoiceFolio = invoiceFolioRaw || formatPurchaseFolio(folio);
+
+    await prisma.purchase.updateMany({
+      where: { sucursalId: user.sucursalId, folio },
+      data: {
+        purchaseDate: new Date(`${purchaseDateRaw}T00:00:00.000Z`),
+        supplierId,
+        invoiceFolio,
+      },
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo actualizar la compra." };
+  }
+
+  revalidatePath("/purchases");
+  revalidatePath(`/purchases/${folio}`);
+  revalidatePath("/payments");
+  return {};
 }

@@ -8,6 +8,11 @@ import type { UnitValue } from "@/lib/units";
 import PurchaseEditForm from "./PurchaseEditForm";
 import PurchaseGroupManager from "./PurchaseGroupManager";
 import AddPurchaseItemForm from "./AddPurchaseItemForm";
+import PurchaseHeaderForm from "./PurchaseHeaderForm";
+
+function firstPurchaseSupplierId(purchases: { supplierId: string | null }[]): string | null {
+  return purchases[0]?.supplierId ?? null;
+}
 
 export default async function PurchaseDetailPage({
   params,
@@ -55,15 +60,20 @@ export default async function PurchaseDetailPage({
     select: { id: true, name: true },
   });
 
+  // Un folio ya abonado no se edita: cambiarle proveedor o importe descuadraria el pago.
+  const paidAggregate = firstPurchaseSupplierId(purchases)
+    ? await prisma.supplierPayment.aggregate({
+        where: { sucursalId: user.sucursalId, supplierId: firstPurchaseSupplierId(purchases)!, folio },
+        _sum: { amount: true },
+      })
+    : null;
+  const paidAmount = Number(paidAggregate?._sum.amount ?? 0);
+
   const backHref = recipe ? `/recipes/${recipe.id}` : "/purchases";
   const backLabel = recipe ? `← Volver a "${recipe.name}"` : "← Compras";
   const folioLabel = formatPurchaseFolio(folio);
   const [firstPurchase] = purchases;
   const totalAmount = purchases.reduce((sum, p) => sum + Number(p.totalPrice), 0);
-  const supplierName = firstPurchase.supplierId
-    ? (suppliers.find((s) => s.id === firstPurchase.supplierId)?.name ?? "Proveedor")
-    : "Sin proveedor";
-  const dateLabel = firstPurchase.purchaseDate.toLocaleDateString("es-MX", { timeZone: "UTC" });
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -78,20 +88,21 @@ export default async function PurchaseDetailPage({
         {purchases.length > 1 && (
           <p className="mt-1 text-sm text-neutral-500">{purchases.length} productos en esta compra.</p>
         )}
-        <dl className="mt-3 grid grid-cols-3 gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm px-4 py-3 text-sm">
-          <div>
-            <dt className="text-neutral-500">Proveedor</dt>
-            <dd className="font-medium text-neutral-900">{supplierName}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Fecha</dt>
-            <dd className="font-medium text-neutral-900">{dateLabel}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Total de la compra</dt>
-            <dd className="font-medium text-neutral-900">{formatMoney(totalAmount)}</dd>
-          </div>
-        </dl>
+        <p className="mt-2 text-sm text-neutral-500">
+          Total de la compra: <b className="text-neutral-900">{formatMoney(totalAmount)}</b>
+        </p>
+
+        <div className="mt-3">
+          <PurchaseHeaderForm
+            folio={folio}
+            purchaseDate={firstPurchase.purchaseDate.toISOString().slice(0, 10)}
+            supplierId={firstPurchase.supplierId ?? ""}
+            invoiceFolio={firstPurchase.invoiceFolio ?? folioLabel}
+            suppliers={suppliers}
+            paidAmountLabel={paidAmount > 0 ? formatMoney(paidAmount) : null}
+            paymentHref={firstPurchase.supplierId ? `/payments/${firstPurchase.supplierId}` : null}
+          />
+        </div>
       </div>
 
       {purchases.length === 1 ? (
