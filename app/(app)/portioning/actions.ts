@@ -88,9 +88,12 @@ export async function createTransformation(
         if (tecleada.gt(0)) refQty = tecleada;
       }
       refQty ??= resolveRefQtyPerUnit(source.baseUnit, output);
+      // Con una sola salida el gramaje da igual: todo lo que entro se va a esa salida se mida
+      // como se mida. Solo hace falta cuando hay varias y hay que repartir entre ellas.
+      if (!refQty && capturadas.length === 1) refQty = new Decimal(1);
       if (!refQty) {
         return {
-          error: `Falta cuanto ${source.baseUnitLabel} de ${source.name} lleva cada ${output.name}. Capturalo en el renglon o en la ficha de la porcion.`,
+          error: `Como de esta tanda salieron varias cosas, necesito cuanto ${source.baseUnitLabel} de ${source.name} lleva cada ${output.name}, para repartir el costo. Capturalo en el renglon.`,
         };
       }
 

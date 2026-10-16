@@ -11,7 +11,10 @@ import { Prisma } from "@/generated/prisma/client";
 export type PortionState = { error?: string };
 
 /**
- * Una porcion es un producto mas del catalogo (CAMARON 20 G), no una receta.
+ * Todo lo que sale de una transformacion es un producto mas del catalogo: el granel ya
+ * habilitado (CAMARON SIN CASCARA KG) y las porciones (CAMARON 20 G). Los dos se dan de alta
+ * aqui, porque los dos tienen lo mismo en comun: su costo no sale de una compra sino de lo que
+ * entro entre lo que salio.
  *
  * Esa es la diferencia de fondo con la version anterior: como producto, su costo lo fija la
  * transformacion del dia —lo que entro entre lo que salio— igual que pasa con CAMARON LIMPIO.
@@ -23,29 +26,43 @@ export type PortionState = { error?: string };
  */
 function parsePortion(formData: FormData): {
   name: string;
-  portionQty: string;
-  portionUnit: UnitValue;
+  baseUnit: UnitValue;
+  portionQty: string | null;
+  portionUnit: UnitValue | null;
   extrasRecipeId: string | null;
   categoryId: string | null;
   defaultSourceProductId: string | null;
 } {
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Ponle nombre a la porcion (ej. CAMARON 20 G).");
+  if (!name) throw new Error("Ponle nombre al producto (ej. CAMARON 20 G, CAMARON SIN CASCARA KG).");
 
-  const portionUnitRaw = String(formData.get("portionUnit") ?? "");
-  if (!(UNITS as readonly string[]).includes(portionUnitRaw)) {
-    throw new Error("Elige la unidad en la que mides la porcion.");
+  const baseUnitRaw = String(formData.get("baseUnit") ?? "");
+  if (!(UNITS as readonly string[]).includes(baseUnitRaw)) {
+    throw new Error("Elige en que se cuenta este producto.");
   }
 
-  const portionQty = new Decimal(String(formData.get("portionQty") ?? "0") || "0");
-  if (portionQty.lte(0)) {
-    throw new Error("Captura cuanto producto lleva una porcion (ej. 20 gramos).");
+  // El peso por unidad es opcional a proposito: nadie tiene que saber de antemano cuanto rinde
+  // un kilo. Un granel no lo necesita (un kilo limpio es un kilo), y una porcion solo lo usa
+  // para repartir el costo cuando de la misma tanda salen varios tamanos.
+  const portionQtyRaw = String(formData.get("portionQty") ?? "").trim();
+  const portionUnitRaw = String(formData.get("portionUnit") ?? "");
+  let portionQty: string | null = null;
+  let portionUnit: UnitValue | null = null;
+  if (portionQtyRaw) {
+    const qty = new Decimal(portionQtyRaw);
+    if (qty.lte(0)) throw new Error("Lo que lleva cada unidad debe ser mayor a cero.");
+    if (!(UNITS as readonly string[]).includes(portionUnitRaw)) {
+      throw new Error("Elige la unidad de lo que lleva cada unidad.");
+    }
+    portionQty = qty.toString();
+    portionUnit = portionUnitRaw as UnitValue;
   }
 
   return {
     name,
-    portionQty: portionQty.toString(),
-    portionUnit: portionUnitRaw as UnitValue,
+    baseUnit: baseUnitRaw as UnitValue,
+    portionQty,
+    portionUnit,
     extrasRecipeId: String(formData.get("extrasRecipeId") ?? "").trim() || null,
     categoryId: String(formData.get("categoryId") ?? "").trim() || null,
     defaultSourceProductId: String(formData.get("defaultSourceProductId") ?? "").trim() || null,
@@ -65,8 +82,8 @@ export async function createPortion(
         organizationId: user.organizationId,
         name: datos.name,
         categoryId: datos.categoryId,
-        // Las porciones se cuentan por pieza y su costo lo pone la transformacion, no una compra.
-        baseUnit: "PIECE",
+        // Su costo lo pone la transformacion, no una compra: por eso no aparece en Compras.
+        baseUnit: datos.baseUnit,
         isProcessed: true,
         yieldPercentage: "100",
         portionQty: datos.portionQty,
@@ -106,6 +123,7 @@ export async function updatePortion(
       data: {
         name: datos.name,
         categoryId: datos.categoryId,
+        baseUnit: datos.baseUnit,
         portionQty: datos.portionQty,
         portionUnit: datos.portionUnit,
         extrasRecipeId: datos.extrasRecipeId,

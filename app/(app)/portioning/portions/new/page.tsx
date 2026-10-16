@@ -29,7 +29,9 @@ export default async function NewPortionPage() {
   return (
     <div className="max-w-xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Nueva porcion</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+          Nuevo producto de proceso
+        </h1>
         <Link href="/portioning/portions" className="text-sm text-neutral-500 hover:underline">
           Volver
         </Link>
@@ -39,7 +41,7 @@ export default async function NewPortionPage() {
         categories={categories}
         recipes={recipes}
         sourceProducts={sourceProducts}
-        submitLabel="Crear porcion"
+        submitLabel="Crear producto"
       />
     </div>
   );

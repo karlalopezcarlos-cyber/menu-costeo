@@ -85,13 +85,17 @@ export default function TransformationForm({ products }: { products: Transformat
     }
     if (qty.lte(0)) return {};
 
+    const capturadas = rows.filter((r) => r.productId && r.qty);
     const outputs = [];
-    for (const row of rows) {
+    for (const row of capturadas) {
       const output = porId.get(row.productId);
-      if (!output || !row.qty) continue;
-      const ref = refDe(row);
+      if (!output) continue;
+      // Con una sola salida el gramaje no cambia nada: todo lo que entro se va ahi.
+      const ref = refDe(row) ?? (capturadas.length === 1 ? new Decimal(1) : null);
       if (!ref) {
-        return { error: `Falta cuantos ${source.baseUnitLabel} lleva cada ${output.name}.` };
+        return {
+          error: `Como salieron varias cosas de esta tanda, dime cuantos ${source.baseUnitLabel} lleva cada ${output.name} para poder repartir el costo.`,
+        };
       }
       outputs.push({
         productId: output.id,
@@ -185,7 +189,7 @@ export default function TransformationForm({ products }: { products: Transformat
             </p>
           </div>
           <div className="flex items-center gap-3">
-          <Link href="/products/new" className="text-xs text-neutral-500 hover:underline">
+          <Link href="/portioning/portions/new" className="text-xs text-neutral-500 hover:underline">
             ¿Falta el producto que sale?
           </Link>
           <button
@@ -204,7 +208,7 @@ export default function TransformationForm({ products }: { products: Transformat
               <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em]">Producto</th>
               <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em]">Cuanto salio</th>
               <th className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Lleva cada uno {source && <span className="normal-case">({source.baseUnitLabel})</span>}
+                Lleva c/u {source && <span className="normal-case">({source.baseUnitLabel})</span>}
               </th>
               <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">Costo c/u</th>
               <th className="px-4 py-2"></th>
@@ -280,7 +284,7 @@ export default function TransformationForm({ products }: { products: Transformat
                       onChange={(e) =>
                         setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, ref: e.target.value } : r)))
                       }
-                      placeholder={refSugerida(row) || "capturalo"}
+                      placeholder={refSugerida(row) || (rows.filter((r) => r.productId && r.qty).length > 1 ? "capturalo" : "no hace falta")}
                       className="w-28 rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
                     />
                   </td>
