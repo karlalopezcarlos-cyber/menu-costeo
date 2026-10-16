@@ -81,10 +81,16 @@ export default async function PurchaseDetailPage({
         <Link href={backHref} className="text-sm text-neutral-500 hover:underline">
           {backLabel}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-neutral-900">
-          Compra {folioLabel}
+        {/* Igual que en el listado: manda el folio de la factura del proveedor. */}
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-900">
+          {firstPurchase.invoiceFolio && firstPurchase.invoiceFolio !== folioLabel
+            ? `Factura ${firstPurchase.invoiceFolio}`
+            : `Compra ${folioLabel}`}
           {purchases.length === 1 ? ` - ${firstPurchase.product.name}` : ""}
         </h1>
+        {firstPurchase.invoiceFolio && firstPurchase.invoiceFolio !== folioLabel && (
+          <p className="text-xs text-neutral-400">Registro {folioLabel}</p>
+        )}
         {purchases.length > 1 && (
           <p className="mt-1 text-sm text-neutral-500">{purchases.length} productos en esta compra.</p>
         )}

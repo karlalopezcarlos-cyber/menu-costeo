@@ -31,7 +31,7 @@ export type PurchaseListFilterValues = {
 };
 
 const COLUMNS: { key: PurchaseSortKey; label: string }[] = [
-  { key: "folio", label: "Folio" },
+  { key: "folio", label: "Factura" },
   { key: "date", label: "Fecha" },
   { key: "product", label: "Producto" },
   { key: "quantity", label: "Cantidad" },
@@ -297,12 +297,26 @@ export default function PurchasesTable({
             )}
             {sortedRows.map((purchase) => (
               <tr key={purchase.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
-                <td className="px-4 py-3 text-neutral-500">
-                  <Link href={`/purchases/${purchase.folio}`} className="text-neutral-700 hover:underline">
-                    {purchase.folioLabel}
-                  </Link>
-                  {purchase.invoiceFolio && purchase.invoiceFolio !== purchase.folioLabel && (
-                    <p className="mt-0.5 text-xs text-neutral-400">Factura {purchase.invoiceFolio}</p>
+                <td className="px-4 py-3">
+                  {/* El folio de la factura manda: es el que el usuario trae en el papel. El
+                      consecutivo del sistema queda abajo, para poder rastrear el registro. */}
+                  {purchase.invoiceFolio && purchase.invoiceFolio !== purchase.folioLabel ? (
+                    <>
+                      <Link
+                        href={`/purchases/${purchase.folio}`}
+                        className="font-medium text-neutral-900 transition-colors hover:text-brand-600"
+                      >
+                        {purchase.invoiceFolio}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-neutral-400">{purchase.folioLabel}</p>
+                    </>
+                  ) : (
+                    <Link
+                      href={`/purchases/${purchase.folio}`}
+                      className="font-medium text-neutral-900 transition-colors hover:text-brand-600"
+                    >
+                      {purchase.folioLabel}
+                    </Link>
                   )}
                 </td>
                 <td className="px-4 py-3 text-neutral-500">{purchase.dateLabel}</td>
