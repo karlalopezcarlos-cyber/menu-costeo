@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import type { PortionState } from "../actions";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
+import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
 export type ProductOption = { id: string; name: string; baseUnit: UnitValue };
 
@@ -48,7 +49,7 @@ export default function PortionForm({
   const parentUnits = unitsFor(parent);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
       <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="space-y-1">
           <label htmlFor="name" className="text-sm font-medium text-neutral-700">

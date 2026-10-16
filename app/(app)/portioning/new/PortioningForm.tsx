@@ -6,6 +6,7 @@ import Decimal from "decimal.js";
 import { createPortioning, type PortioningState } from "../actions";
 import type { PortionableProduct, PortionOption } from "@/lib/portioning-options";
 import { formatMoney } from "@/lib/format";
+import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
 type Renglon = { key: number; recipeId: string; portions: string };
 
@@ -91,7 +92,7 @@ export default function PortioningForm({
   const unidad = product?.baseUnitLabel ?? "";
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
       <input type="hidden" name="productId" value={productId} />
 
       <div className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:grid-cols-3">

@@ -7,6 +7,7 @@ import PresentationQuantityInput, {
 } from "../../_components/PresentationQuantityInput";
 import type { UnitValue } from "@/lib/units";
 import { formatMoney } from "@/lib/format";
+import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
 export type CostBasis = "net" | "gross";
 
@@ -189,7 +190,7 @@ export default function InventoryCaptureTable({
   const visibleCount = sortedRows.filter(matchesFilter).length;
 
   return (
-    <form action={boundSave} className="space-y-3">
+    <form action={boundSave} onKeyDown={blockEnterSubmit} className="space-y-3">
       <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div>
           <p className="text-sm text-neutral-500">Valor de inventario</p>

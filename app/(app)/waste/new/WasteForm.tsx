@@ -6,6 +6,7 @@ import { convertQty, removeYieldFactor, UNITS, UNIT_LABELS, UNIT_META, type Unit
 import { createWasteEntries } from "../actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 import { formatMoney } from "@/lib/format";
+import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
 type CostBasis = "net" | "gross";
 type ItemType = "product" | "subrecipe";
@@ -152,7 +153,7 @@ export default function WasteForm({
   );
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
       <input type="hidden" name="rows" value={rowsPayload} />
 
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">

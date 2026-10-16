@@ -17,6 +17,7 @@ import { deletePurchaseOrder } from "../../orders/[orderId]/actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 import type { PresentationOption } from "../../_components/PresentationQuantityInput";
 import { formatMoney } from "@/lib/format";
+import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
 type ProductOption = {
   id: string;
@@ -306,7 +307,7 @@ export default function PurchaseForm({
   );
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
       <input type="hidden" name="rows" value={rowsPayload} />
       <input type="hidden" name="purchaseOrderId" value={selectedPedidoId} />
 
