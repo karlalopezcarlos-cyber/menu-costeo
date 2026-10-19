@@ -57,6 +57,10 @@ export default function InventoryCaptureTable({
     Object.fromEntries(rows.map((r) => [r.key, r.initialCostBasis])),
   );
 
+  function serializar(entry: InventoryCaptureEntry): string {
+    return `${entry.quantity.trim()}|${entry.costBasis ?? ""}`;
+  }
+
   function buildEntries(qtys: Record<string, string>, basis: Record<string, CostBasis>): InventoryCaptureEntry[] {
     return rows.map((row) => ({
       type: row.type === "Producto" ? "product" : "subrecipe",
@@ -67,29 +71,58 @@ export default function InventoryCaptureTable({
   }
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const lastSentRef = useRef<string>(JSON.stringify(buildEntries(quantities, costBasis)));
+  /** Lo que ya quedo guardado en el servidor, por renglon. Contra esto se saca lo pendiente. */
+  const guardadoRef = useRef<Map<string, string>>(
+    new Map(buildEntries(quantities, costBasis).map((e) => [`${e.type}:${e.id}`, serializar(e)])),
+  );
+  const enVueloRef = useRef(false);
+  const erroresSeguidosRef = useRef(0);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
-    const entries = buildEntries(quantities, costBasis);
-    const snapshot = JSON.stringify(entries);
-    if (snapshot === lastSentRef.current) return;
+    // Solo viaja lo que cambio desde el ultimo guardado, no el conteo completo. Antes se mandaban
+    // los cientos de renglones en cada vuelta, y el autoguardado se iba haciendo mas pesado
+    // conforme avanzaba la captura hasta que tronaba.
+    const pendientes = buildEntries(quantities, costBasis).filter(
+      (e) => guardadoRef.current.get(`${e.type}:${e.id}`) !== serializar(e),
+    );
+    if (pendientes.length === 0 || enVueloRef.current) return;
+    if (erroresSeguidosRef.current >= 3) return; // ya no se insiste solo: queda el boton de Guardar
 
     const timer = setTimeout(async () => {
-      lastSentRef.current = snapshot;
+      enVueloRef.current = true;
       setAutoSaveStatus("saving");
-      const result = await autoSaveInventoryCount(countId, entries);
-      if ("error" in result) {
+      try {
+        const result = await autoSaveInventoryCount(countId, pendientes);
+        if ("error" in result) {
+          erroresSeguidosRef.current += 1;
+          setAutoSaveError(result.error);
+          setAutoSaveStatus("error");
+        } else {
+          for (const entry of pendientes) {
+            guardadoRef.current.set(`${entry.type}:${entry.id}`, serializar(entry));
+          }
+          erroresSeguidosRef.current = 0;
+          setAutoSaveError(null);
+          setAutoSaveStatus("saved");
+          setLastSavedAt(new Date(result.savedAt));
+        }
+      } catch (error) {
+        erroresSeguidosRef.current += 1;
+        setAutoSaveError(error instanceof Error ? error.message : "Se corto la conexion.");
         setAutoSaveStatus("error");
-      } else {
-        setAutoSaveStatus("saved");
-        setLastSavedAt(new Date(result.savedAt));
+      } finally {
+        enVueloRef.current = false;
+        // Lo que se haya capturado mientras se guardaba sale en la siguiente vuelta.
+        setIntento((n) => n + 1);
       }
     }, 2000);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quantities, costBasis, countId]);
+  }, [quantities, costBasis, countId, intento]);
 
   const categoryOptions = useMemo(() => {
     const names = new Set<string>();
@@ -207,8 +240,10 @@ export default function InventoryCaptureTable({
             </span>
           )}
           {autoSaveStatus === "error" && (
-            <span className="text-xs text-red-600" title="No se pudo autoguardar. Revisa tu conexion.">
-              Error al autoguardar
+            <span className="max-w-xs text-right text-xs text-red-600" title={autoSaveError ?? undefined}>
+              No se pudo autoguardar
+              {autoSaveError ? `: ${autoSaveError}` : ""}. Lo capturado no se pierde: dale a
+              &quot;Guardar conteo&quot;.
             </span>
           )}
           <button

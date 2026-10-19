@@ -42,11 +42,37 @@ async function persistInventoryCount(
 ) {
   const count = await getCount(countId, sucursalId);
 
+  // Solo se carga lo que tocan estas entradas, no el catalogo entero.
+  //
+  // Esto importa porque el autoguardado corre cada par de segundos mientras se captura: cargar
+  // todos los productos, todas sus compras historicas y el grafo completo de recetas en cada
+  // vuelta hacia que el conteo se volviera mas lento conforme crecia, hasta tronar con "error al
+  // autoguardar" justo cuando ya llevabas media captura hecha.
+  const productIds = [...new Set(entries.filter((e) => e.type === "product").map((e) => e.id))];
+  const subRecipeIds = [...new Set(entries.filter((e) => e.type === "subrecipe").map((e) => e.id))];
+
   const [products, subRecipes, graph, existingItems] = await Promise.all([
-    prisma.product.findMany({ where: { organizationId, archivedAt: null } }),
-    prisma.recipe.findMany({ where: { sucursalId, archivedAt: null, isMenuItem: false } }),
-    loadOrgRecipeGraph(sucursalId),
-    prisma.inventoryCountItem.findMany({ where: { inventoryCountId: count.id } }),
+    productIds.length
+      ? prisma.product.findMany({
+          where: { organizationId, archivedAt: null, id: { in: productIds } },
+        })
+      : Promise.resolve([]),
+    subRecipeIds.length
+      ? prisma.recipe.findMany({
+          where: { sucursalId, archivedAt: null, isMenuItem: false, id: { in: subRecipeIds } },
+        })
+      : Promise.resolve([]),
+    // El grafo de recetas solo hace falta para costear subrecetas.
+    subRecipeIds.length ? loadOrgRecipeGraph(sucursalId) : Promise.resolve(null),
+    prisma.inventoryCountItem.findMany({
+      where: {
+        inventoryCountId: count.id,
+        OR: [
+          ...(productIds.length ? [{ productId: { in: productIds } }] : []),
+          ...(subRecipeIds.length ? [{ subRecipeId: { in: subRecipeIds } }] : []),
+        ],
+      },
+    }),
   ]);
   const productCosts = await getSucursalProductCosts(
     sucursalId,
@@ -132,7 +158,7 @@ async function persistInventoryCount(
     }
   }
 
-  await prisma.$transaction([
+  const operaciones = [
     ...toUpsertProduct.map(({ id, quantity, costBasis }) => {
       const product = productById.get(id)!;
       const netCost = productCosts.get(id) ?? new Decimal(0);
@@ -153,7 +179,7 @@ async function persistInventoryCount(
     }),
     ...toUpsertSubRecipe.map(({ id, quantity }) => {
       const subRecipe = subRecipeById.get(id)!;
-      const unitCost = subRecipeUnitCost(graph, memo, id);
+      const unitCost = graph ? subRecipeUnitCost(graph, memo, id) : new Decimal(0);
       return prisma.inventoryCountItem.upsert({
         where: { inventoryCountId_subRecipeId: { inventoryCountId: count.id, subRecipeId: id } },
         create: {
@@ -194,7 +220,10 @@ async function persistInventoryCount(
         },
       }),
     ),
-  ]);
+  ];
+
+  if (operaciones.length === 0) return;
+  await prisma.$transaction(operaciones);
 }
 
 export async function saveInventoryCount(countId: string, formData: FormData) {
@@ -235,6 +264,9 @@ export async function autoSaveInventoryCount(
     await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
     return { savedAt: new Date().toISOString() };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "No se pudo autoguardar." };
+    console.error("autoSaveInventoryCount error:", error);
+    return {
+      error: error instanceof Error ? error.message.slice(0, 200) : "No se pudo autoguardar.",
+    };
   }
 }
