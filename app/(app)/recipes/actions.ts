@@ -6,7 +6,7 @@ import Decimal from "decimal.js";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { UNITS, UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { loadOrgRecipeGraph, wouldCreateCycle } from "@/lib/costing";
 import { logRecipeActivity, describeQuantity } from "@/lib/recipe-activity";
 
@@ -218,6 +218,33 @@ export async function copyIngredientsFromSource(recipeId: string): Promise<{ err
   return {};
 }
 
+/**
+ * Rechaza capturar un ingrediente en una unidad que no se puede convertir a la del destino.
+ *
+ * Sin esto, agregar una subreceta que rinde en litros capturando "0.015 PZA" se guardaba sin
+ * chistar, y el error aparecia despues: la receta no costeaba y la pantalla de Recetas se caia
+ * entera al intentar convertir. El mejor momento para atrapar eso es cuando se captura, que es
+ * cuando la persona todavia sabe que quiso decir.
+ */
+function assertUnidadCompatible(
+  unit: UnitValue,
+  unidadDestino: UnitValue,
+  nombre: string,
+  queEs: "producto" | "subreceta",
+) {
+  if (UNIT_META[unit].type === UNIT_META[unidadDestino].type) return;
+
+  const compatibles = UNITS.filter(
+    (u) => UNIT_META[u].type === UNIT_META[unidadDestino].type,
+  ).map((u) => UNIT_LABELS[u]);
+
+  throw new Error(
+    `No se puede agregar "${nombre}" en ${UNIT_LABELS[unit]}: ${
+      queEs === "producto" ? "ese producto se mide en" : "esa subreceta rinde en"
+    } ${UNIT_LABELS[unidadDestino]}. Captura la cantidad en ${compatibles.join(" o ")}.`,
+  );
+}
+
 export async function addRecipeItem(
   recipeId: string,
   _prevState: { error?: string } | undefined,
@@ -243,6 +270,8 @@ export async function addRecipeItem(
         where: { id: productId, organizationId: user.organizationId },
       });
       if (!product) throw new Error("Producto no encontrado.");
+
+      assertUnidadCompatible(unit, product.baseUnit as UnitValue, product.name, "producto");
 
       // Si el producto ya esta en la receta, se sobrescribe cantidad/unidad del renglon existente
       // en vez de crear un duplicado.
@@ -276,6 +305,8 @@ export async function addRecipeItem(
         where: { id: subRecipeId, sucursalId: user.sucursalId },
       });
       if (!subRecipe) throw new Error("Subreceta no encontrada.");
+
+      assertUnidadCompatible(unit, subRecipe.yieldUnit as UnitValue, subRecipe.name, "subreceta");
 
       const graph = await loadOrgRecipeGraph(user.sucursalId);
       if (wouldCreateCycle(recipe.id, subRecipe.id, graph)) {
@@ -392,6 +423,33 @@ export async function updateRecipeDetails(
       where: { id: recipeId },
       data: { name, yieldQty: yieldQty.toString(), yieldUnit },
     });
+
+    // Pasar el rendimiento a otro tipo de unidad (de piezas a litros) deja colgadas a las
+    // recetas que ya usaban esta como ingrediente: su cantidad quedo capturada en una unidad
+    // que ya no se puede convertir. Eso no tronaba aqui, tronaba despues al costear, y hasta
+    // tumbaba la lista de Recetas. Se reacomodan igual que ya se hace al cambiarle la unidad
+    // base a un producto.
+    if (UNIT_META[recipe.yieldUnit as UnitValue].type !== UNIT_META[yieldUnit].type) {
+      const usos = await prisma.recipeItem.findMany({
+        where: { subRecipeId: recipeId },
+        include: { recipe: { select: { id: true, name: true } } },
+      });
+      const aCorregir = usos.filter(
+        (item) => UNIT_META[item.unit as UnitValue].type !== UNIT_META[yieldUnit].type,
+      );
+
+      if (aCorregir.length > 0) {
+        await prisma.recipeItem.updateMany({
+          where: { id: { in: aCorregir.map((i) => i.id) } },
+          data: { unit: yieldUnit },
+        });
+
+        const nombres = [...new Set(aCorregir.map((i) => i.recipe.name))];
+        changes.push(
+          `y con eso quedaron en ${UNIT_LABELS[yieldUnit]} los ${aCorregir.length} renglones que la usaban (${nombres.slice(0, 5).join(", ")}${nombres.length > 5 ? "..." : ""}): revisa que las cantidades sigan teniendo sentido`,
+        );
+      }
+    }
 
     if (changes.length > 0) {
       await logRecipeActivity({
