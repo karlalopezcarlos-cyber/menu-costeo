@@ -110,6 +110,16 @@ export default function TemplateForm({
               Elige el producto en la lista. Si de la misma tanda salen varios (porciones de 20 g
               y de 40 g), agrega un renglon por cada uno.
             </p>
+            <p className="text-xs text-neutral-500">
+              ¿No esta CAMARON LIMPIO o CAMARON 20 G en la lista? Se dan de alta primero en{" "}
+              <Link
+                href="/portioning/portions/new"
+                className="font-medium text-brand-600 underline-offset-2 hover:underline"
+              >
+                Productos de proceso
+              </Link>
+              : son productos cuyo costo lo pone la transformacion, no una compra.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {hayCategoriasMarcadas && !verTodos && (
