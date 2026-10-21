@@ -87,57 +87,58 @@ enum RecipeActivityType {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
   /// Siguiente folio a asignar a un pedido nuevo (contador consecutivo por organizacion).
-  nextOrderFolio Int @default(1)
+  nextOrderFolio       Int      @default(1)
   /// Siguiente folio a asignar a una compra nueva (contador consecutivo por organizacion).
-  nextPurchaseFolio Int @default(1)
+  nextPurchaseFolio    Int      @default(1)
   /// Siguiente folio a asignar a una requisicion nueva (contador consecutivo por organizacion).
-  nextRequisicionFolio Int @default(1)
+  nextRequisicionFolio Int      @default(1)
   /// Siguiente folio a asignar a una produccion nueva (contador consecutivo por organizacion).
-  nextProductionFolio Int @default(1)
+  nextProductionFolio  Int      @default(1)
 
   /// Consecutivo de los porcionamientos (ej. POR-0001).
-  nextPortioningFolio Int @default(1)
+  nextPortioningFolio Int     @default(1)
   /// Siguiente folio a asignar a un ticket de venta nuevo (contador consecutivo por organizacion).
-  nextSaleFolio Int @default(1)
+  nextSaleFolio       Int     @default(1)
   /// Siguiente folio a asignar a un pedido nuevo de la tienda en linea (contador consecutivo).
-  nextStoreOrderFolio Int @default(1)
+  nextStoreOrderFolio Int     @default(1)
   /// Logo de la empresa, usado como marca de agua de fondo en todos los PDFs exportados. Se
   /// normaliza siempre a PNG (preserva transparencia) al subirlo, nunca JPEG como las fotos de
   /// receta, porque un fondo solido detras del logo se veria mal encima del contenido del PDF.
-  logo             Bytes?
-  logoMimeType     String?
+  logo                Bytes?
+  logoMimeType        String?
 
-  users             User[]
-  products          Product[]
-  productCategories ProductCategory[]
-  recipeCategories  RecipeCategory[]
-  purchases         Purchase[]
-  suppliers         Supplier[]
-  recipes           Recipe[]
-  dishAliases       DishAlias[]
-  dailySales        DailySale[]
-  importBatches     ImportBatch[]
-  recipeActivities  RecipeActivity[]
-  inventoryCounts   InventoryCount[]
-  wasteEntries      WasteEntry[]
-  purchaseOrders    PurchaseOrder[]
-  productionEntries ProductionEntry[]
-  portioningEntries PortioningEntry[]
-  auditComments     AuditComment[]
-  productPresentations ProductPresentation[]
+  users                     User[]
+  products                  Product[]
+  productCategories         ProductCategory[]
+  recipeCategories          RecipeCategory[]
+  purchases                 Purchase[]
+  suppliers                 Supplier[]
+  recipes                   Recipe[]
+  dishAliases               DishAlias[]
+  dailySales                DailySale[]
+  importBatches             ImportBatch[]
+  recipeActivities          RecipeActivity[]
+  inventoryCounts           InventoryCount[]
+  wasteEntries              WasteEntry[]
+  purchaseOrders            PurchaseOrder[]
+  productionEntries         ProductionEntry[]
+  portioningEntries         PortioningEntry[]
+  auditComments             AuditComment[]
+  productPresentations      ProductPresentation[]
+  dailySaleChanges          DailySaleChange[]
   inventoryCountItemChanges InventoryCountItemChange[]
-  supplierPayments  SupplierPayment[]
-  sucursales        Sucursal[]
-  requisiciones     Requisicion[]
-  saleTickets       SaleTicket[]
-  planningRuns      PlanningRun[]
-  storeOrders       StoreOrder[]
+  supplierPayments          SupplierPayment[]
+  sucursales                Sucursal[]
+  requisiciones             Requisicion[]
+  saleTickets               SaleTicket[]
+  planningRuns              PlanningRun[]
+  storeOrders               StoreOrder[]
 
   @@map("organizations")
 }
@@ -177,66 +178,67 @@ model RecipeCategory {
 /// Organization. El CEDIS es una sucursal mas, marcada con isCentral=true (no una entidad aparte),
 /// para que las Requisiciones puedan ir de cualquier sucursal a cualquier otra sin caso especial.
 model Sucursal {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  name           String
+  id                   String       @id @default(cuid())
+  organizationId       String
+  organization         Organization @relation(fields: [organizationId], references: [id])
+  name                 String
   /// Sucursal "matriz"/CEDIS de la organizacion. Se crea una automaticamente para cada
   /// organizacion existente al migrar; sirve como destino por default y para el backfill.
-  isCentral      Boolean      @default(false)
-  isActive       Boolean      @default(true)
+  isCentral            Boolean      @default(false)
+  isActive             Boolean      @default(true)
   /// Slug unico (global, no solo por organizacion) para la URL publica de la tienda en linea de
   /// esta sucursal (ej. /store/mi-dark-kitchen). Nulo mientras no se configure.
-  storeSlug      String?      @unique
+  storeSlug            String?      @unique
   /// Si la tienda en linea esta habilitada para recibir pedidos publicos ahorita mismo.
-  storeEnabled   Boolean      @default(false)
+  storeEnabled         Boolean      @default(false)
   /// Direccion de origen para calcular km de envio a domicilio (geocodificada a lat/lng al
   /// guardarse en Configuracion).
-  businessAddress String?
-  businessLat     Decimal?     @db.Decimal(10, 6)
-  businessLng     Decimal?     @db.Decimal(10, 6)
+  businessAddress      String?
+  businessLat          Decimal?     @db.Decimal(10, 6)
+  businessLng          Decimal?     @db.Decimal(10, 6)
   /// Cuota fija de envio, independiente de la distancia.
-  deliveryBaseFee     Decimal  @default(0) @db.Decimal(10, 2)
+  deliveryBaseFee      Decimal      @default(0) @db.Decimal(10, 2)
   /// Precio por km recorrido (ruta real, no linea recta) que se suma a deliveryBaseFee.
-  deliveryPricePerKm  Decimal  @default(0) @db.Decimal(10, 2)
+  deliveryPricePerKm   Decimal      @default(0) @db.Decimal(10, 2)
   /// Pedido minimo (subtotal de platillos, sin contar el envio) para poder pedir a domicilio.
-  deliveryMinOrder    Decimal  @default(0) @db.Decimal(12, 2)
+  deliveryMinOrder     Decimal      @default(0) @db.Decimal(12, 2)
   /// Distancia maxima (km, ruta real) a la que se acepta enviar a domicilio. 0 = sin limite.
-  deliveryMaxKm       Decimal  @default(0) @db.Decimal(6, 2)
+  deliveryMaxKm        Decimal      @default(0) @db.Decimal(6, 2)
   /// Horarios de entrega (opcional): si deliverySlotsCount > 0, el cliente debe elegir uno de los
   /// horarios generados a partir de deliveryStartTime + deliverySlotMinutes x deliverySlotsCount
   /// (ej. inicio "14:00", cada 30 min, 4 horarios -> 14:00, 14:30, 15:00, 15:30). Cada horario
   /// admite hasta deliverySlotCapacity pedidos antes de bloquearse para nuevos clientes.
   deliveryStartTime    String?
-  deliverySlotMinutes  Int      @default(30)
-  deliverySlotsCount   Int      @default(0)
-  deliverySlotCapacity Int      @default(1)
+  deliverySlotMinutes  Int          @default(30)
+  deliverySlotsCount   Int          @default(0)
+  deliverySlotCapacity Int          @default(1)
   /// Dias minimos de anticipacion que debe tener una fecha de StoreDeliveryDate para que el
   /// cliente la pueda elegir (ej. 7 = solo se puede pedir con una semana de anticipacion).
-  deliveryLeadDays     Int      @default(0)
-  createdAt      DateTime     @default(now())
+  deliveryLeadDays     Int          @default(0)
+  createdAt            DateTime     @default(now())
 
-  purchases         Purchase[]
-  purchaseOrders    PurchaseOrder[]
-  dailySales        DailySale[]
-  recipes           Recipe[]
-  inventoryCounts   InventoryCount[]
-  wasteEntries      WasteEntry[]
-  productionEntries ProductionEntry[]
-  portioningEntries PortioningEntry[]
-  auditComments     AuditComment[]
-  supplierPayments  SupplierPayment[]
-  dishAliases       DishAlias[]
-  importBatches     ImportBatch[]
-  recipeActivities  RecipeActivity[]
+  purchases                 Purchase[]
+  purchaseOrders            PurchaseOrder[]
+  dailySales                DailySale[]
+  recipes                   Recipe[]
+  inventoryCounts           InventoryCount[]
+  wasteEntries              WasteEntry[]
+  productionEntries         ProductionEntry[]
+  portioningEntries         PortioningEntry[]
+  auditComments             AuditComment[]
+  supplierPayments          SupplierPayment[]
+  dishAliases               DishAlias[]
+  importBatches             ImportBatch[]
+  recipeActivities          RecipeActivity[]
+  dailySaleChanges          DailySaleChange[]
   inventoryCountItemChanges InventoryCountItemChange[]
-  requisicionesEnviadas   Requisicion[] @relation("RequisicionFrom")
-  requisicionesRecibidas  Requisicion[] @relation("RequisicionTo")
-  userAccess        UserSucursal[]
-  saleTickets       SaleTicket[]
-  planningRuns      PlanningRun[]
-  storeOrders       StoreOrder[]
-  storeDeliveryDates StoreDeliveryDate[]
+  requisicionesEnviadas     Requisicion[]              @relation("RequisicionFrom")
+  requisicionesRecibidas    Requisicion[]              @relation("RequisicionTo")
+  userAccess                UserSucursal[]
+  saleTickets               SaleTicket[]
+  planningRuns              PlanningRun[]
+  storeOrders               StoreOrder[]
+  storeDeliveryDates        StoreDeliveryDate[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -258,23 +260,25 @@ model User {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  purchasesCreated  Purchase[]        @relation("PurchaseCreatedBy")
-  importBatches     ImportBatch[]     @relation("ImportBatchUploadedBy")
-  recipeActivities  RecipeActivity[]
-  inventoryCounts   InventoryCount[]  @relation("InventoryCountCreatedBy")
-  wasteEntries      WasteEntry[]      @relation("WasteEntryCreatedBy")
-  purchaseOrders    PurchaseOrder[]   @relation("PurchaseOrderCreatedBy")
-  productionEntries ProductionEntry[] @relation("ProductionEntryCreatedBy")
-  portioningEntries PortioningEntry[] @relation("PortioningCreatedBy")
-  auditComments     AuditComment[]    @relation("AuditCommentCreatedBy")
+  purchasesCreated          Purchase[]                 @relation("PurchaseCreatedBy")
+  importBatches             ImportBatch[]              @relation("ImportBatchUploadedBy")
+  recipeActivities          RecipeActivity[]
+  inventoryCounts           InventoryCount[]           @relation("InventoryCountCreatedBy")
+  wasteEntries              WasteEntry[]               @relation("WasteEntryCreatedBy")
+  purchaseOrders            PurchaseOrder[]            @relation("PurchaseOrderCreatedBy")
+  productionEntries         ProductionEntry[]          @relation("ProductionEntryCreatedBy")
+  portioningEntries         PortioningEntry[]          @relation("PortioningCreatedBy")
+  auditComments             AuditComment[]             @relation("AuditCommentCreatedBy")
   inventoryCountItemChanges InventoryCountItemChange[] @relation("InventoryCountItemChangeChangedBy")
-  supplierPayments  SupplierPayment[] @relation("SupplierPaymentCreatedBy")
-  requisiciones     Requisicion[] @relation("RequisicionCreatedBy")
-  saleTickets       SaleTicket[]  @relation("SaleTicketCreatedBy")
+  supplierPayments          SupplierPayment[]          @relation("SupplierPaymentCreatedBy")
+  requisiciones             Requisicion[]              @relation("RequisicionCreatedBy")
+  saleTickets               SaleTicket[]               @relation("SaleTicketCreatedBy")
+  dailySales                DailySale[]                @relation("DailySaleCreatedBy")
+  dailySaleChanges          DailySaleChange[]          @relation("DailySaleChangeChangedBy")
   /// Sucursales a las que este usuario tiene acceso cuando role = STAFF (puede entrar y cambiar
   /// entre ellas con el mismo selector que usa OWNER). Un OWNER ignora esta lista: siempre ve
   /// todas las sucursales de su organizacion sin importar que haya filas aqui.
-  sucursales        UserSucursal[]
+  sucursales                UserSucursal[]
 
   @@index([organizationId])
   @@map("users")
@@ -298,7 +302,7 @@ model UserSucursal {
 }
 
 model Product {
-  id                       String       @id @default(cuid())
+  id                       String           @id @default(cuid())
   organizationId           String
   organization             Organization     @relation(fields: [organizationId], references: [id])
   name                     String
@@ -307,59 +311,59 @@ model Product {
   baseUnit                 Unit
   /// % de rendimiento neto (100 = sin merma). Ej. cilantro con 20% de merma -> 80.
   /// El costo unitario de cada compra se divide entre este factor para costear con el neto aprovechable.
-  yieldPercentage          Decimal      @default(100) @db.Decimal(5, 2)
-  currentUnitCost          Decimal      @default(0) @db.Decimal(14, 6)
+  yieldPercentage          Decimal          @default(100) @db.Decimal(5, 2)
+  currentUnitCost          Decimal          @default(0) @db.Decimal(14, 6)
   currentUnitCostUpdatedAt DateTime?
   /// Stock objetivo (par level) en la unidad base del producto. 0 = sin objetivo configurado,
   /// no aparece en la seccion de pedidos sugeridos.
-  targetStock              Decimal      @default(0) @db.Decimal(14, 4)
+  targetStock              Decimal          @default(0) @db.Decimal(14, 4)
   /// Presentacion de compra fija opcional (ej. "Botella" = 750 ML, en la unidad base del
   /// producto). Permite comprar/contar por pieza (1 botella) mientras el sistema seguro sigue
   /// costeando e inventariando en la unidad base (ml). Null = no aplica, se compra/cuenta
   /// directo en la unidad base.
   presentationUnitLabel    String?
-  presentationUnitQty      Decimal?     @db.Decimal(14, 4)
+  presentationUnitQty      Decimal?         @db.Decimal(14, 4)
   /// Producto que no se compra: se obtiene limpiando o procesando otro (ej. CAMARON LIMPIO
   /// sale de CAMARON). Su costo lo fija cada limpieza, no una compra, y por eso no aparece
   /// como opcion al capturar compras ni en la plantilla de carga masiva.
-  isProcessed              Boolean      @default(false)
+  isProcessed              Boolean          @default(false)
   /// Solo para productos porcion (ej. CAMARON 20 G): cuanto del producto de origen representa
   /// UNA porcion. No es una restriccion ni un costo: sirve para repartir el costo de lo que
   /// entro cuando de una misma transformacion salen varios tamanos, y para prellenar la captura.
-  portionQty               Decimal?     @db.Decimal(14, 4)
+  portionQty               Decimal?         @db.Decimal(14, 4)
   portionUnit              Unit?
   /// Solo para porciones: de que producto salen normalmente (ej. POLLO PIEZA 50 G sale de
   /// POLLO LIMPIO). Es una preferencia para prellenar la captura, no una restriccion: el dia
   /// que se porcione el crudo directo, se elige el crudo en la transformacion y ya.
   defaultSourceProductId   String?
-  defaultSourceProduct     Product?     @relation("ProductPortionSource", fields: [defaultSourceProductId], references: [id])
-  portionsFromThis         Product[]    @relation("ProductPortionSource")
+  defaultSourceProduct     Product?         @relation("ProductPortionSource", fields: [defaultSourceProductId], references: [id])
+  portionsFromThis         Product[]        @relation("ProductPortionSource")
   /// Receta opcional con lo que se le agrega a cada porcion (sal, limon, bolsa). Su costo se
   /// suma al de la porcion cuando se registra la transformacion.
   extrasRecipeId           String?
-  extrasRecipe             Recipe?      @relation("ProductPortionExtras", fields: [extrasRecipeId], references: [id])
+  extrasRecipe             Recipe?          @relation("ProductPortionExtras", fields: [extrasRecipeId], references: [id])
   /// Proveedor habitual: con quien se pide este producto por omision. Es una preferencia de
   /// compra, no una restriccion: el pedido sugerido se desglosa con esto (un pedido por
   /// proveedor) y se puede cambiar en el momento, y una compra puede capturarse con otro.
   defaultSupplierId        String?
-  defaultSupplier          Supplier?    @relation("ProductDefaultSupplier", fields: [defaultSupplierId], references: [id])
+  defaultSupplier          Supplier?        @relation("ProductDefaultSupplier", fields: [defaultSupplierId], references: [id])
   archivedAt               DateTime?
-  createdAt                DateTime     @default(now())
-  updatedAt                DateTime     @updatedAt
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
-  purchases           Purchase[]
-  recipeItems         RecipeItem[]
-  inventoryCountItems InventoryCountItem[]
-  wasteEntries        WasteEntry[]
-  purchaseOrderItems  PurchaseOrderItem[]
-  auditComments       AuditComment[]
-  presentations       ProductPresentation[]
+  purchases                 Purchase[]
+  recipeItems               RecipeItem[]
+  inventoryCountItems       InventoryCountItem[]
+  wasteEntries              WasteEntry[]
+  purchaseOrderItems        PurchaseOrderItem[]
+  auditComments             AuditComment[]
+  presentations             ProductPresentation[]
   inventoryCountItemChanges InventoryCountItemChange[]
-  requisicionItems    RequisicionItem[]
-  planningRunItems    PlanningRunItem[]
-  portioningEntries   PortioningEntry[]
-  portioningOutputProduct PortioningEntry[] @relation("PortioningOutputProduct")
-  transformationOutputs   PortioningOutput[]
+  requisicionItems          RequisicionItem[]
+  planningRunItems          PlanningRunItem[]
+  portioningEntries         PortioningEntry[]
+  portioningOutputProduct   PortioningEntry[]          @relation("PortioningOutputProduct")
+  transformationOutputs     PortioningOutput[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -455,12 +459,12 @@ model Supplier {
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
 
-  purchases        Purchase[]
-  purchaseOrders   PurchaseOrder[]
-  supplierPayments SupplierPayment[]
-  phones           SupplierPhone[]
-  emails           SupplierEmail[]
-  defaultForProducts Product[]       @relation("ProductDefaultSupplier")
+  purchases          Purchase[]
+  purchaseOrders     PurchaseOrder[]
+  supplierPayments   SupplierPayment[]
+  phones             SupplierPhone[]
+  emails             SupplierEmail[]
+  defaultForProducts Product[]         @relation("ProductDefaultSupplier")
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -519,55 +523,56 @@ model SupplierPayment {
 }
 
 model Recipe {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization    @relation(fields: [organizationId], references: [id])
-  sucursalId     String
-  sucursal       Sucursal        @relation(fields: [sucursalId], references: [id])
+  id               String          @id @default(cuid())
+  organizationId   String
+  organization     Organization    @relation(fields: [organizationId], references: [id])
+  sucursalId       String
+  sucursal         Sucursal        @relation(fields: [sucursalId], references: [id])
   /// Cuando esta receta se creo por clonado automatico desde la receta de la sucursal principal
   /// (ver createRecipe), apunta a esa receta original. Puramente informativo/de rastro: nunca se
   /// usa para recalcular ni resincronizar; una vez clonada, cada copia es independiente y editable
   /// sin afectar al original ni a las demas copias.
-  sourceRecipeId String?
-  sourceRecipe   Recipe?         @relation("RecipeSource", fields: [sourceRecipeId], references: [id], onDelete: SetNull)
-  copies         Recipe[]        @relation("RecipeSource")
-  name           String
-  categoryId     String?
-  category       RecipeCategory? @relation(fields: [categoryId], references: [id])
-  yieldQty       Decimal      @db.Decimal(14, 4)
-  yieldUnit      Unit
-  isMenuItem     Boolean      @default(false)
+  sourceRecipeId   String?
+  sourceRecipe     Recipe?         @relation("RecipeSource", fields: [sourceRecipeId], references: [id], onDelete: SetNull)
+  copies           Recipe[]        @relation("RecipeSource")
+  name             String
+  categoryId       String?
+  category         RecipeCategory? @relation(fields: [categoryId], references: [id])
+  yieldQty         Decimal         @db.Decimal(14, 4)
+  yieldUnit        Unit
+  isMenuItem       Boolean         @default(false)
   /// Historico: cuando las porciones eran recetas. Hoy una porcion es un producto con
   /// portionQty capturado, y este campo solo sobrevive para no perder las recetas ya creadas.
-  isPortion      Boolean      @default(false)
-  sellingPrice   Decimal?     @db.Decimal(12, 2)
-  instructions   String?
+  isPortion        Boolean         @default(false)
+  sellingPrice     Decimal?        @db.Decimal(12, 2)
+  instructions     String?
   /// Descripcion para clientes en la tienda en linea (que es el platillo), distinta de
   /// `instructions` (que es el procedimiento interno de cocina).
   storeDescription String?
-  photo          Bytes?
-  photoMimeType  String?
-  archivedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  photo            Bytes?
+  photoMimeType    String?
+  archivedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  items               RecipeItem[]          @relation("RecipeItems")
-  usedAsIngredient    RecipeItem[]          @relation("SubRecipeUsage")
-  dishAliases         DishAlias[]
-  dailySales          DailySale[]
-  activities          RecipeActivity[]
-  inventoryCountItems InventoryCountItem[]
-  productionEntries   ProductionEntry[]
-  auditComments       AuditComment[]
+  items                     RecipeItem[]               @relation("RecipeItems")
+  usedAsIngredient          RecipeItem[]               @relation("SubRecipeUsage")
+  dishAliases               DishAlias[]
+  dailySales                DailySale[]
+  activities                RecipeActivity[]
+  inventoryCountItems       InventoryCountItem[]
+  productionEntries         ProductionEntry[]
+  auditComments             AuditComment[]
   inventoryCountItemChanges InventoryCountItemChange[]
-  requisicionItemsAsOrigin RequisicionItem[] @relation("RequisicionItemSubRecipe")
-  requisicionItemsAsDest   RequisicionItem[] @relation("RequisicionItemDestSubRecipe")
-  wasteEntries             WasteEntry[]
-  saleTicketItems          SaleTicketItem[]
-  planningRunItems         PlanningRunItem[]
-  storeOrderItems          StoreOrderItem[]
-  portioningOutputs        PortioningOutput[]
-  portionExtrasFor         Product[]         @relation("ProductPortionExtras")
+  requisicionItemsAsOrigin  RequisicionItem[]          @relation("RequisicionItemSubRecipe")
+  requisicionItemsAsDest    RequisicionItem[]          @relation("RequisicionItemDestSubRecipe")
+  wasteEntries              WasteEntry[]
+  saleTicketItems           SaleTicketItem[]
+  planningRunItems          PlanningRunItem[]
+  storeOrderItems           StoreOrderItem[]
+  portioningOutputs         PortioningOutput[]
+  portionExtrasFor          Product[]                  @relation("ProductPortionExtras")
+  dailySaleChanges          DailySaleChange[]
 
   @@unique([sucursalId, name])
   @@index([organizationId])
@@ -637,26 +642,65 @@ model DishAlias {
 
 /// Una venta por dia y por receta (reemplaza el antiguo agregado mensual). "source" distingue
 /// captura manual de datos venidos de una importacion de Excel.
+/// Bitacora de la venta diaria: quien la capturo, quien la corrigio y que tenia antes.
+///
+/// Guarda receta y fecha ademas del id de la venta para que el registro sobreviva cuando la
+/// venta se borra: si alguien elimina la venta de un dia, la bitacora tiene que seguir diciendo
+/// quien la borro y que decia.
+model DailySaleChange {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  sucursalId       String
+  sucursal         Sucursal     @relation(fields: [sucursalId], references: [id])
+  dailySaleId      String?
+  recipeId         String
+  recipe           Recipe       @relation(fields: [recipeId], references: [id])
+  date             DateTime     @db.Date
+  /// "create" | "update" | "delete"
+  action           String
+  previousQuantity Decimal?     @db.Decimal(12, 2)
+  newQuantity      Decimal?     @db.Decimal(12, 2)
+  previousPrice    Decimal?     @db.Decimal(12, 2)
+  newPrice         Decimal?     @db.Decimal(12, 2)
+  /// De donde venia la venta al momento del cambio: manual, import, pos.
+  source           String       @default("manual")
+  changedByUserId  String?
+  changedBy        User?        @relation("DailySaleChangeChangedBy", fields: [changedByUserId], references: [id])
+  createdAt        DateTime     @default(now())
+
+  @@index([sucursalId, createdAt])
+  @@index([organizationId, date])
+  @@index([recipeId, date])
+  @@map("daily_sale_changes")
+}
+
 model DailySale {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  sucursalId     String
-  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id])
-  recipeId       String
-  recipe         Recipe       @relation(fields: [recipeId], references: [id])
-  date           DateTime     @db.Date
-  quantitySold   Decimal      @db.Decimal(12, 2)
-  unitPrice      Decimal      @db.Decimal(12, 2)
-  source         String       @default("manual")
-  importBatchId  String?
-  importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  recipeId        String
+  recipe          Recipe       @relation(fields: [recipeId], references: [id])
+  date            DateTime     @db.Date
+  quantitySold    Decimal      @db.Decimal(12, 2)
+  unitPrice       Decimal      @db.Decimal(12, 2)
+  source          String       @default("manual")
+  importBatchId   String?
+  importBatch     ImportBatch? @relation(fields: [importBatchId], references: [id])
+  /// Quien dejo esta venta como esta: quien la capturo a mano, quien subio el archivo que la
+  /// trajo o quien cerro el ticket. Se actualiza con cada cambio; el detalle de que cambio y
+  /// cuando vive en DailySaleChange.
+  createdByUserId String?
+  createdBy       User?        @relation("DailySaleCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@unique([organizationId, recipeId, date])
   @@index([organizationId, date])
   @@index([sucursalId, date])
+  @@index([createdByUserId])
   @@map("daily_sales")
 }
 
@@ -665,16 +709,16 @@ model DailySale {
 /// suma al agregado diario en DailySale (recipe+fecha), para que Ingenieria de menu y Estado de
 /// Resultados sigan funcionando sin cambios sobre ese mismo dato ya existente.
 model SaleTicket {
-  id              String       @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  sucursalId      String
-  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
-  folio           Int
-  date            DateTime     @db.Date
-  createdByUserId String?
-  createdBy       User?        @relation("SaleTicketCreatedBy", fields: [createdByUserId], references: [id])
-  createdAt       DateTime     @default(now())
+  id                  String       @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  sucursalId          String
+  sucursal            Sucursal     @relation(fields: [sucursalId], references: [id])
+  folio               Int
+  date                DateTime     @db.Date
+  createdByUserId     String?
+  createdBy           User?        @relation("SaleTicketCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt           DateTime     @default(now())
   /// Link de cobro generado en Mercado Pago (Checkout Pro) para mandarle al cliente. Se genera bajo
   /// demanda (boton "Generar link de pago" en el detalle del ticket) y se guarda aqui para no crear
   /// una preferencia nueva cada vez que se vuelve a abrir el ticket.
@@ -756,48 +800,48 @@ model PlanningRunItem {
 /// interno "Pedidos en linea" para que el staff lo vaya marcando como atendido, y sus renglones se
 /// pueden cargar como punto de partida en la Proyeccion por PLU.
 model StoreOrder {
-  id              String       @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  sucursalId      String
-  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
-  folio           Int
-  customerName    String
-  customerPhone   String?
+  id                    String       @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  sucursalId            String
+  sucursal              Sucursal     @relation(fields: [sucursalId], references: [id])
+  folio                 Int
+  customerName          String
+  customerPhone         String?
   /// "pickup" (unico disponible en Fase 1) o "delivery" (fase posterior, con costo por km).
-  fulfillmentType String       @default("pickup")
+  fulfillmentType       String       @default("pickup")
   /// "pending" (recien llegado) | "fulfilled" (ya se atendio) | "cancelled".
-  status          String       @default("pending")
+  status                String       @default("pending")
   /// "pickup_cash" (paga al recoger) o "card_online" (pago con tarjeta en linea via Mercado Pago).
-  paymentMethod   String       @default("pickup_cash")
+  paymentMethod         String       @default("pickup_cash")
   /// "unpaid" (paga al recoger, no aplica) | "pending" (link generado, esperando confirmacion del
   /// webhook) | "paid" (Mercado Pago confirmo el cobro) | "failed".
-  paymentStatus   String       @default("unpaid")
-  paymentPreferenceId String?
-  paymentLink     String?
+  paymentStatus         String       @default("unpaid")
+  paymentPreferenceId   String?
+  paymentLink           String?
   /// Solo cuando fulfillmentType = "delivery": direccion capturada por el cliente, geocodificada,
   /// distancia real por calles desde el negocio, y la cuota de envio ya calculada (incluida en
   /// total). requestedDeliveryDate es la fecha que el cliente eligio de las disponibles.
-  deliveryAddress     String?
-  deliveryLat         Decimal?  @db.Decimal(10, 6)
-  deliveryLng         Decimal?  @db.Decimal(10, 6)
-  deliveryDistanceKm  Decimal?  @db.Decimal(8, 2)
-  deliveryFee         Decimal   @default(0) @db.Decimal(10, 2)
-  requestedDeliveryDate DateTime? @db.Date
+  deliveryAddress       String?
+  deliveryLat           Decimal?     @db.Decimal(10, 6)
+  deliveryLng           Decimal?     @db.Decimal(10, 6)
+  deliveryDistanceKm    Decimal?     @db.Decimal(8, 2)
+  deliveryFee           Decimal      @default(0) @db.Decimal(10, 2)
+  requestedDeliveryDate DateTime?    @db.Date
   /// Horario elegido dentro de los generados por la config de la sucursal (ej. "14:30"), si esa
   /// sucursal tiene horarios de entrega configurados.
   requestedDeliveryTime String?
-  total           Decimal      @db.Decimal(12, 2)
-  createdAt       DateTime     @default(now())
+  total                 Decimal      @db.Decimal(12, 2)
+  createdAt             DateTime     @default(now())
   /// Cuando el staff le dio click a "Confirmar pedido" (envia WhatsApp al cliente avisando que se
   /// recibio su pedido). Distinto de status="fulfilled", que es cuando el pedido ya se completo.
-  confirmedAt     DateTime?
+  confirmedAt           DateTime?
   /// Comentarios generales del cliente (instrucciones especiales, alergias, etc).
-  comment         String?
+  comment               String?
   /// Como se reparte el pedido si es para varias personas, ej. "MARIANA: 2 de camaron + 1 de
   /// pollo\nJORGE: 5 de camaron". Texto libre, se muestra aparte de comment para que el staff lo
   /// vea claro al armar los paquetes.
-  packagingNotes  String?
+  packagingNotes        String?
 
   items StoreOrderItem[]
 
@@ -883,16 +927,16 @@ model ImportRow {
 /// costo unitario vigente AL MOMENTO DEL CONTEO (no se recalcula despues), igual que el costo
 /// de una compra: es un valor historico, no una vista en vivo.
 model InventoryCount {
-  id              String   @id @default(cuid())
+  id              String       @id @default(cuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
   sucursalId      String
-  sucursal        Sucursal @relation(fields: [sucursalId], references: [id])
-  date            DateTime @db.Date
+  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  date            DateTime     @db.Date
   createdByUserId String?
-  createdBy       User?    @relation("InventoryCountCreatedBy", fields: [createdByUserId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdBy       User?        @relation("InventoryCountCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   items         InventoryCountItem[]
   auditComments AuditComment[]
@@ -1043,22 +1087,22 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id              String        @id @default(cuid())
-  purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  productId       String
-  product         Product       @relation(fields: [productId], references: [id])
+  id                String        @id @default(cuid())
+  purchaseOrderId   String
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product       @relation(fields: [productId], references: [id])
   /// Texto libre, autogenerado a partir de la presentacion elegida al capturar la cantidad (o de
   /// la unidad base si se captura libre). Ya no se edita a mano, ver Cantidad en la UI.
   presentationLabel String
-  quantity        Decimal       @db.Decimal(14, 4)
+  quantity          Decimal       @db.Decimal(14, 4)
   /// Cantidad que realmente llego al marcar el pedido como recibido. Null mientras el pedido siga
   /// abierto, o en pedidos recibidos antes de que existiera este campo (se asumen completos).
-  receivedQuantity Decimal?     @db.Decimal(14, 4)
+  receivedQuantity  Decimal?      @db.Decimal(14, 4)
   /// Nota opcional por renglon (ej. "marca X", "urgente").
-  comment         String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  comment           String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   @@unique([purchaseOrderId, productId])
   @@index([purchaseOrderId])
@@ -1102,20 +1146,20 @@ model ProductionEntry {
 /// (sin confirmacion posterior) — descuenta el inventario teorico de fromSucursal y lo suma al de
 /// toSucursal en la Auditoria/Kardex de cada una.
 model Requisicion {
-  id              String            @id @default(cuid())
+  id              String       @id @default(cuid())
   organizationId  String
-  organization    Organization      @relation(fields: [organizationId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
   /// Folio consecutivo por organizacion (ej. 7 -> "REQ-0007"), asignado atomicamente al crear.
   folio           Int
   fromSucursalId  String
-  fromSucursal    Sucursal          @relation("RequisicionFrom", fields: [fromSucursalId], references: [id])
+  fromSucursal    Sucursal     @relation("RequisicionFrom", fields: [fromSucursalId], references: [id])
   toSucursalId    String
-  toSucursal      Sucursal          @relation("RequisicionTo", fields: [toSucursalId], references: [id])
-  date            DateTime          @db.Date
+  toSucursal      Sucursal     @relation("RequisicionTo", fields: [toSucursalId], references: [id])
+  date            DateTime     @db.Date
   note            String?
   createdByUserId String?
-  createdBy       User?             @relation("RequisicionCreatedBy", fields: [createdByUserId], references: [id])
-  createdAt       DateTime          @default(now())
+  createdBy       User?        @relation("RequisicionCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
 
   items RequisicionItem[]
 
@@ -1126,11 +1170,11 @@ model Requisicion {
 }
 
 model RequisicionItem {
-  id            String      @id @default(cuid())
-  requisicionId String
-  requisicion   Requisicion @relation(fields: [requisicionId], references: [id], onDelete: Cascade)
-  productId     String?
-  product       Product?    @relation(fields: [productId], references: [id])
+  id              String      @id @default(cuid())
+  requisicionId   String
+  requisicion     Requisicion @relation(fields: [requisicionId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?    @relation(fields: [productId], references: [id])
   /// Subreceta de la sucursal ORIGEN cuyo inventario se descuenta (mutuamente excluyente con
   /// productId). Cada sucursal tiene su propia copia independiente de cada subreceta, por eso
   /// tambien se guarda `destSubRecipeId` con la copia equivalente en la sucursal destino.
@@ -1141,11 +1185,11 @@ model RequisicionItem {
   /// renglon es un producto (el catalogo de productos ya es compartido entre sucursales).
   destSubRecipeId String?
   destSubRecipe   Recipe?     @relation("RequisicionItemDestSubRecipe", fields: [destSubRecipeId], references: [id])
-  quantity      Decimal     @db.Decimal(14, 4)
-  unit          Unit
+  quantity        Decimal     @db.Decimal(14, 4)
+  unit            Unit
   /// Costo unitario congelado al momento de enviar (de la sucursal de origen), mismo patron que
   /// Purchase/WasteEntry/ProductionEntry: nunca se recalcula despues.
-  unitCost      Decimal     @db.Decimal(14, 6)
+  unitCost        Decimal     @db.Decimal(14, 6)
 
   @@index([requisicionId])
   @@index([productId])
@@ -1154,40 +1198,39 @@ model RequisicionItem {
   @@map("requisicion_items")
 }
 
-
 /// Un evento de porcionamiento: se toma un producto a granel, se pesa al inicio, y de ahi salen
 /// porciones de una o varias recetas de porcion. La diferencia entre lo que entro y lo que salio
 /// es la merma real de ese corte, que es justo el dato que no existia en ningun lado.
 model PortioningEntry {
-  id              String       @id @default(cuid())
+  id              String             @id @default(cuid())
   /// CLEANING: el resultado es otro producto (outputProduct). PORTIONING: el resultado son
   /// porciones (outputs). Los dos miden lo mismo: cuanto entro, cuanto salio, cuanto se perdio.
   type            TransformationType @default(PORTIONING)
   organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  organization    Organization       @relation(fields: [organizationId], references: [id])
   sucursalId      String
-  sucursal        Sucursal     @relation(fields: [sucursalId], references: [id])
+  sucursal        Sucursal           @relation(fields: [sucursalId], references: [id])
   /// Folio consecutivo por organizacion (ej. POR-0001).
   folio           Int
-  date            DateTime     @db.Date
+  date            DateTime           @db.Date
   /// Producto a granel que se porciono (ej. CAMARON).
   productId       String
-  product         Product      @relation(fields: [productId], references: [id])
+  product         Product            @relation(fields: [productId], references: [id])
   /// Peso o cantidad con la que se empezo, SIEMPRE en la unidad base del producto.
-  initialQty      Decimal      @db.Decimal(14, 4)
+  initialQty      Decimal            @db.Decimal(14, 4)
   /// Costo unitario del producto al momento del porcionamiento, congelado para que el historico
   /// no cambie cuando suba el precio del insumo.
-  unitCost        Decimal      @db.Decimal(14, 6)
+  unitCost        Decimal            @db.Decimal(14, 6)
   /// Rendimiento real de este evento: lo porcionado entre lo que entro, en porcentaje.
-  realYieldPct    Decimal      @db.Decimal(5, 2)
+  realYieldPct    Decimal            @db.Decimal(5, 2)
   /// Solo en CLEANING: producto que resulto de la limpieza y cuanto se obtuvo, en su unidad base.
   outputProductId String?
-  outputProduct   Product?     @relation("PortioningOutputProduct", fields: [outputProductId], references: [id])
-  outputQty       Decimal?     @db.Decimal(14, 4)
+  outputProduct   Product?           @relation("PortioningOutputProduct", fields: [outputProductId], references: [id])
+  outputQty       Decimal?           @db.Decimal(14, 4)
   comment         String?
   createdByUserId String?
-  createdBy       User?        @relation("PortioningCreatedBy", fields: [createdByUserId], references: [id])
-  createdAt       DateTime     @default(now())
+  createdBy       User?              @relation("PortioningCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime           @default(now())
 
   outputs PortioningOutput[]
 
@@ -1202,29 +1245,29 @@ model PortioningEntry {
 /// Cada tipo de porcion que salio de un porcionamiento. De 1 kg pueden salir 20 porciones de
 /// 20 g y 5 de 30 g: cada renglon es uno de esos tipos.
 model PortioningOutput {
-  id                 String          @id @default(cuid())
-  portioningEntryId  String
-  portioningEntry    PortioningEntry @relation(fields: [portioningEntryId], references: [id], onDelete: Cascade)
+  id                String          @id @default(cuid())
+  portioningEntryId String
+  portioningEntry   PortioningEntry @relation(fields: [portioningEntryId], references: [id], onDelete: Cascade)
   /// Producto que salio: una porcion (CAMARON 20 G) o un granel habilitado (CAMARON LIMPIO).
-  productId          String?
-  product            Product?        @relation(fields: [productId], references: [id])
+  productId         String?
+  product           Product?        @relation(fields: [productId], references: [id])
   /// Cuanto salio, en la unidad base del producto de salida (piezas, kilos...).
-  qty                Decimal?        @db.Decimal(14, 4)
+  qty               Decimal?        @db.Decimal(14, 4)
   /// Cuanto del producto de ORIGEN representa una unidad de salida. Es lo unico que se usa para
   /// repartir el costo entre varias salidas; no limita cuanto puede salir.
-  refQtyPerUnit      Decimal?        @db.Decimal(14, 6)
+  refQtyPerUnit     Decimal?        @db.Decimal(14, 6)
   /// Costo de los agregados de cada unidad (sal, limon, bolsa), congelado del dia.
-  extraCostPerUnit   Decimal         @default(0) @db.Decimal(14, 6)
+  extraCostPerUnit  Decimal         @default(0) @db.Decimal(14, 6)
   /// Campos de las transformaciones viejas, cuando la porcion era una receta. Se conservan para
   /// no perder el historial ya capturado; lo nuevo se guarda en productId/qty.
-  recipeId           String?
-  recipe             Recipe?         @relation(fields: [recipeId], references: [id])
-  portions           Int?
-  portionQty         Decimal?        @db.Decimal(14, 4)
+  recipeId          String?
+  recipe            Recipe?         @relation(fields: [recipeId], references: [id])
+  portions          Int?
+  portionQty        Decimal?        @db.Decimal(14, 4)
   /// Costo real de cada porcion: el costo total de lo que entro, repartido entre lo que salio
   /// en proporcion al peso. Incluye la merma, a diferencia del costo teorico de la receta.
-  realUnitCost       Decimal         @db.Decimal(14, 6)
-  sortOrder          Int             @default(0)
+  realUnitCost      Decimal         @db.Decimal(14, 6)
+  sortOrder         Int             @default(0)
 
   @@index([portioningEntryId])
   @@index([recipeId])

@@ -40,8 +40,20 @@ export default function SaleForm({
   return (
     <form
       action={formAction}
-      className="grid grid-cols-[9rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4"
+      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
     >
+      <div className="mb-3 border-b border-neutral-100 pb-3">
+        <p className="text-sm font-semibold text-neutral-900">
+          {editing ? "Editando una venta" : "Capturar una venta a mano"}
+        </p>
+        <p className="mt-0.5 text-xs text-neutral-500">
+          {editing
+            ? "Guarda el cambio o cancela para dejarla como estaba. La correccion queda registrada en la bitacora."
+            : "Para lo que no entra por archivo ni por ticket. Si ya hay una venta de ese platillo en esa fecha, se reemplaza."}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-[9rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3">
       <div className="space-y-1">
         <label htmlFor="date" className="text-sm font-medium text-neutral-700">
           Fecha
@@ -127,6 +139,7 @@ export default function SaleForm({
       </div>
 
       {state?.error && <p className="col-span-5 text-sm text-red-600">{state.error}</p>}
+      </div>
     </form>
   );
 }

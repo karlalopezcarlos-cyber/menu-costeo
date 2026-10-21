@@ -7,6 +7,50 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { createPaymentPreference } from "@/lib/mercadopago";
 
+type CambioDeVenta = {
+  dailySaleId: string | null;
+  recipeId: string;
+  date: Date;
+  action: "create" | "update" | "delete";
+  previousQuantity?: Decimal | null;
+  newQuantity?: Decimal | null;
+  previousPrice?: Decimal | null;
+  newPrice?: Decimal | null;
+  source: string;
+};
+
+/**
+ * Deja constancia de quien movio una venta y que decia antes.
+ *
+ * Una venta diaria se puede capturar a mano, llegar de un archivo o salir de un ticket, y
+ * despues cualquiera con acceso puede corregirla. Sin esto, el numero cambiaba y no quedaba
+ * rastro de quien ni de que habia antes, que es justo lo que se necesita cuando el costo de un
+ * mes no cuadra.
+ */
+async function registrarCambioDeVenta(
+  organizationId: string,
+  sucursalId: string,
+  userId: string | null,
+  cambio: CambioDeVenta,
+) {
+  await prisma.dailySaleChange.create({
+    data: {
+      organizationId,
+      sucursalId,
+      dailySaleId: cambio.dailySaleId,
+      recipeId: cambio.recipeId,
+      date: cambio.date,
+      action: cambio.action,
+      previousQuantity: cambio.previousQuantity?.toString() ?? null,
+      newQuantity: cambio.newQuantity?.toString() ?? null,
+      previousPrice: cambio.previousPrice?.toString() ?? null,
+      newPrice: cambio.newPrice?.toString() ?? null,
+      source: cambio.source,
+      changedByUserId: userId,
+    },
+  });
+}
+
 export async function upsertDailySale(
   _prevState: { error?: string } | undefined,
   formData: FormData,
@@ -32,7 +76,15 @@ export async function upsertDailySale(
     const date = new Date(`${dateRaw}T00:00:00Z`);
     if (Number.isNaN(date.getTime())) throw new Error("Fecha invalida.");
 
-    await prisma.dailySale.upsert({
+    // Lo que habia antes se lee primero: es lo unico que permite contar la correccion en la
+    // bitacora ("pasaron 10 a 12"), no solo el valor final.
+    const anterior = await prisma.dailySale.findUnique({
+      where: {
+        organizationId_recipeId_date: { organizationId: user.organizationId, recipeId: recipe.id, date },
+      },
+    });
+
+    const venta = await prisma.dailySale.upsert({
       where: {
         organizationId_recipeId_date: { organizationId: user.organizationId, recipeId: recipe.id, date },
       },
@@ -44,12 +96,26 @@ export async function upsertDailySale(
         quantitySold: quantitySold.toString(),
         unitPrice: unitPrice.toString(),
         source: "manual",
+        createdByUserId: user.id,
       },
       update: {
         quantitySold: quantitySold.toString(),
         unitPrice: unitPrice.toString(),
         source: "manual",
+        createdByUserId: user.id,
       },
+    });
+
+    await registrarCambioDeVenta(user.organizationId, user.sucursalId, user.id, {
+      dailySaleId: venta.id,
+      recipeId: recipe.id,
+      date,
+      action: anterior ? "update" : "create",
+      previousQuantity: anterior ? new Decimal(anterior.quantitySold.toString()) : null,
+      newQuantity: quantitySold,
+      previousPrice: anterior ? new Decimal(anterior.unitPrice.toString()) : null,
+      newPrice: unitPrice,
+      source: anterior?.source ?? "manual",
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo registrar la venta." };
@@ -110,7 +176,20 @@ export async function updateDailySale(
         quantitySold: quantitySold.toString(),
         unitPrice: unitPrice.toString(),
         source: "manual",
+        createdByUserId: user.id,
       },
+    });
+
+    await registrarCambioDeVenta(user.organizationId, user.sucursalId, user.id, {
+      dailySaleId: sale.id,
+      recipeId,
+      date,
+      action: "update",
+      previousQuantity: new Decimal(sale.quantitySold.toString()),
+      newQuantity: quantitySold,
+      previousPrice: new Decimal(sale.unitPrice.toString()),
+      newPrice: unitPrice,
+      source: sale.source,
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar la venta." };
@@ -129,6 +208,20 @@ export async function deleteDailySale(saleId: string): Promise<void> {
   if (!sale) throw new Error("Venta no encontrada.");
 
   await prisma.dailySale.delete({ where: { id: sale.id } });
+
+  // La bitacora se escribe despues de borrar y a proposito no apunta a la venta (ya no existe):
+  // por eso guarda la receta y la fecha, para poder decir que se borro y que decia.
+  await registrarCambioDeVenta(user.organizationId, user.sucursalId, user.id, {
+    dailySaleId: null,
+    recipeId: sale.recipeId,
+    date: sale.date,
+    action: "delete",
+    previousQuantity: new Decimal(sale.quantitySold.toString()),
+    newQuantity: null,
+    previousPrice: new Decimal(sale.unitPrice.toString()),
+    newPrice: null,
+    source: sale.source,
+  });
 
   revalidatePath("/sales");
   revalidatePath("/menu-engineering");
@@ -238,6 +331,7 @@ export async function createSaleTicket(
               quantitySold: item.quantity.toString(),
               unitPrice: item.unitPrice.toString(),
               source: "pos",
+              createdByUserId: user.id,
             },
           });
         } else {
@@ -254,6 +348,7 @@ export async function createSaleTicket(
               quantitySold: newQty.toString(),
               unitPrice: newPrice.toString(),
               source: "pos",
+              createdByUserId: user.id,
             },
           });
         }

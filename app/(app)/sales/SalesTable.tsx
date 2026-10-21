@@ -18,6 +18,11 @@ export type SaleRow = {
   source: string;
   /** Ticket(s) de venta (mini POS) que aportaron a este renglon agregado del dia. */
   tickets: { id: string; folioLabel: string }[];
+  /** Quien dejo la venta como esta: la capturo, subio el archivo o cerro el ticket. */
+  capturedBy: string | null;
+  /** Cuantas veces se ha corregido a mano despues de registrada. */
+  edits: number;
+  lastEditLabel: string | null;
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -26,7 +31,7 @@ const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
 };
 
-type SortKey = "date" | "recipe" | "quantity" | "price" | "total" | "source";
+type SortKey = "date" | "recipe" | "quantity" | "price" | "total" | "source" | "captured";
 type SortDir = "asc" | "desc";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
@@ -36,6 +41,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "price", label: "Precio" },
   { key: "total", label: "Total" },
   { key: "source", label: "Origen" },
+  { key: "captured", label: "Capturo" },
 ];
 
 function sortValue(row: SaleRow, key: SortKey): string | number {
@@ -52,6 +58,8 @@ function sortValue(row: SaleRow, key: SortKey): string | number {
       return row.quantitySold * row.unitPrice;
     case "source":
       return row.source;
+    case "captured":
+      return (row.capturedBy ?? "").toLowerCase();
   }
 }
 
@@ -64,6 +72,7 @@ export default function SalesTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [search, setSearch] = useState("");
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -74,9 +83,30 @@ export default function SalesTable({
     }
   }
 
+  // El buscador filtra por platillo y por quien capturo, que es como se busca de verdad: "todo
+  // lo que subio Gera" o "todo lo del affogato".
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (row) =>
+        row.recipeName.toLowerCase().includes(q) ||
+        (row.capturedBy ?? "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  const totales = useMemo(
+    () => ({
+      renglones: filteredRows.length,
+      unidades: filteredRows.reduce((sum, r) => sum + r.quantitySold, 0),
+      importe: filteredRows.reduce((sum, r) => sum + r.quantitySold * r.unitPrice, 0),
+    }),
+    [filteredRows],
+  );
+
   const sortedRows = useMemo(() => {
     const dirMultiplier = sortDir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       const va = sortValue(a, sortKey);
       const vb = sortValue(b, sortKey);
       if (typeof va === "string" && typeof vb === "string") {
@@ -84,9 +114,47 @@ export default function SalesTable({
       }
       return ((va as number) - (vb as number)) * dirMultiplier;
     });
-  }, [rows, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir]);
 
   return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar platillo o quien capturo..."
+          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="text-sm text-neutral-500 hover:underline"
+          >
+            Quitar filtro
+          </button>
+        )}
+        <div className="ml-auto flex items-center gap-6">
+          <div className="text-right">
+            <p className="text-xs font-medium text-neutral-500">Venta</p>
+            <p className="text-lg font-semibold tabular-nums text-neutral-900">
+              {formatMoney(totales.importe)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-medium text-neutral-500">Unidades</p>
+            <p className="text-lg font-semibold tabular-nums text-neutral-900">
+              {totales.unidades.toLocaleString("es-MX", { maximumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-medium text-neutral-500">Renglones</p>
+            <p className="text-lg font-semibold tabular-nums text-neutral-900">{totales.renglones}</p>
+          </div>
+        </div>
+      </div>
+
     <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
         <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
@@ -109,8 +177,10 @@ export default function SalesTable({
         <tbody>
           {sortedRows.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-4 py-6 text-center text-neutral-400">
-                No hay ventas capturadas en este periodo.
+              <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
+                {search
+                  ? "Ninguna venta coincide con la busqueda."
+                  : "No hay ventas capturadas en este periodo."}
               </td>
             </tr>
           )}
@@ -135,6 +205,17 @@ export default function SalesTable({
                       </Link>
                     ))}
                   </div>
+                )}
+              </td>
+              <td className="px-4 py-3 text-neutral-500">
+                {row.capturedBy ?? <span className="text-neutral-300">—</span>}
+                {row.edits > 0 && (
+                  <p
+                    className="mt-0.5 text-xs text-amber-600"
+                    title={row.lastEditLabel ? `Ultima correccion: ${row.lastEditLabel}` : undefined}
+                  >
+                    Editada {row.edits} {row.edits === 1 ? "vez" : "veces"}
+                  </p>
                 )}
               </td>
               <td className="px-4 py-3 text-right">
@@ -163,6 +244,7 @@ export default function SalesTable({
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

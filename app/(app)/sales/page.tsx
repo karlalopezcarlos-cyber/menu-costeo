@@ -5,6 +5,8 @@ import { formatSaleFolio } from "@/lib/sales/folio";
 import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
 import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
+import SalesLogTable, { type SaleLogRow } from "./SalesLogTable";
+import PeriodFilter from "./PeriodFilter";
 import type { IvaMode } from "@/lib/menu-engineering";
 
 function toDateInputValue(d: Date): string {
@@ -20,6 +22,7 @@ export default async function SalesPage({
   const user = await requireSucursalContext();
 
   const vistaDiaria = params.vista === "dia";
+  const vistaBitacora = params.vista === "bitacora";
   const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
   const now = new Date();
@@ -29,7 +32,7 @@ export default async function SalesPage({
   const from = params.from ? new Date(`${params.from}T00:00:00Z`) : defaultFrom;
   const to = params.to ? new Date(`${params.to}T00:00:00Z`) : defaultTo;
 
-  const [recipes, sales, tickets] = await Promise.all([
+  const [recipes, sales, tickets, ediciones] = await Promise.all([
     prisma.recipe.findMany({
       where: { sucursalId: user.sucursalId, isMenuItem: true, archivedAt: null },
       orderBy: { name: "asc" },
@@ -37,12 +40,24 @@ export default async function SalesPage({
     }),
     prisma.dailySale.findMany({
       where: { sucursalId: user.sucursalId, date: { gte: from, lte: to } },
-      include: { recipe: true },
+      include: { recipe: true, createdBy: { select: { name: true, email: true } } },
       orderBy: { date: "desc" },
     }),
     prisma.saleTicket.findMany({
       where: { sucursalId: user.sucursalId, date: { gte: from, lte: to } },
       include: { items: true },
+    }),
+    // Correcciones hechas a mano sobre las ventas del periodo: cuantas y cuando fue la ultima.
+    prisma.dailySaleChange.groupBy({
+      by: ["dailySaleId"],
+      where: {
+        sucursalId: user.sucursalId,
+        action: "update",
+        date: { gte: from, lte: to },
+        dailySaleId: { not: null },
+      },
+      _count: { _all: true },
+      _max: { createdAt: true },
     }),
   ]);
 
@@ -60,9 +75,40 @@ export default async function SalesPage({
     }
   }
 
+  const bitacora = vistaBitacora
+    ? await prisma.dailySaleChange.findMany({
+        where: { sucursalId: user.sucursalId, date: { gte: from, lte: to } },
+        orderBy: { createdAt: "desc" },
+        take: 300,
+        include: {
+          recipe: { select: { name: true } },
+          changedBy: { select: { name: true, email: true } },
+        },
+      })
+    : [];
+
+  const bitacoraRows: SaleLogRow[] = bitacora.map((cambio) => ({
+    id: cambio.id,
+    whenLabel: cambio.createdAt.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    saleDateLabel: cambio.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+    recipeName: cambio.recipe.name,
+    action: cambio.action,
+    previousQuantity: cambio.previousQuantity ? Number(cambio.previousQuantity) : null,
+    newQuantity: cambio.newQuantity ? Number(cambio.newQuantity) : null,
+    previousPrice: cambio.previousPrice ? Number(cambio.previousPrice) : null,
+    newPrice: cambio.newPrice ? Number(cambio.newPrice) : null,
+    source: cambio.source,
+    userName: cambio.changedBy?.name ?? cambio.changedBy?.email ?? null,
+  }));
+
+  const edicionesPorVenta = new Map(
+    ediciones.map((e) => [e.dailySaleId as string, { veces: e._count._all, ultima: e._max.createdAt }]),
+  );
+
   const rows: SaleRow[] = sales.map((sale) => {
     const dateKey = sale.date.toISOString().slice(0, 10);
     const tickets = ticketsByRecipeDate.get(`${sale.recipeId}|${dateKey}`) ?? [];
+    const edicion = edicionesPorVenta.get(sale.id);
     return {
       id: sale.id,
       recipeId: sale.recipeId,
@@ -74,6 +120,11 @@ export default async function SalesPage({
       unitPrice: Number(sale.unitPrice),
       source: sale.source,
       tickets,
+      capturedBy: sale.createdBy?.name ?? sale.createdBy?.email ?? null,
+      edits: edicion?.veces ?? 0,
+      lastEditLabel: edicion?.ultima
+        ? edicion.ultima.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+        : null,
     };
   });
 
@@ -143,7 +194,7 @@ export default async function SalesPage({
         <Link
           href={`/sales?${periodoQuery}`}
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-            vistaDiaria
+            vistaDiaria || vistaBitacora
               ? "border-transparent text-neutral-500 hover:text-neutral-800"
               : "border-neutral-900 text-neutral-900"
           }`}
@@ -160,41 +211,20 @@ export default async function SalesPage({
         >
           Ventas por dia
         </Link>
+        <Link
+          href={`/sales?${periodoQuery}&vista=bitacora`}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            vistaBitacora
+              ? "border-neutral-900 text-neutral-900"
+              : "border-transparent text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          Bitacora
+        </Link>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3">
-        {vistaDiaria && <input type="hidden" name="vista" value="dia" />}
-        {vistaDiaria && <input type="hidden" name="iva" value={ivaMode} />}
-        <div className="space-y-1">
-          <label htmlFor="from" className="text-sm font-medium text-neutral-700">
-            Desde
-          </label>
-          <input
-            id="from"
-            name="from"
-            type="date"
-            defaultValue={toDateInputValue(from)}
-            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="to" className="text-sm font-medium text-neutral-700">
-            Hasta
-          </label>
-          <input
-            id="to"
-            name="to"
-            type="date"
-            defaultValue={toDateInputValue(to)}
-            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          />
-        </div>
-        <button
-          type="submit"
-          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-        >
-          Ver
-        </button>
+      <div className="flex flex-wrap items-end gap-3">
+        <PeriodFilter from={toDateInputValue(from)} to={toDateInputValue(to)} />
 
         {vistaDiaria && (
           <div className="ml-auto inline-flex overflow-hidden rounded-md border border-neutral-200">
@@ -216,9 +246,11 @@ export default async function SalesPage({
             </Link>
           </div>
         )}
-      </form>
+      </div>
 
-      {vistaDiaria ? (
+      {vistaBitacora ? (
+        <SalesLogTable rows={bitacoraRows} />
+      ) : vistaDiaria ? (
         <DailySalesTable days={dias} iva={ivaMode} />
       ) : (
         <>

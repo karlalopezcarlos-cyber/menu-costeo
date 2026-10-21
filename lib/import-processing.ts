@@ -192,7 +192,7 @@ export async function recomputeDailySale(
       quantitySold: true,
       unitPrice: true,
       importBatchId: true,
-      importBatch: { select: { createdAt: true } },
+      importBatch: { select: { createdAt: true, uploadedByUserId: true } },
     },
   });
 
@@ -232,12 +232,15 @@ export async function recomputeDailySale(
       unitPrice: precio.toDecimalPlaces(2).toString(),
       source: "import",
       importBatchId: ultimo.importBatchId,
+      // La venta importada queda a nombre de quien subio el archivo que la trajo.
+      createdByUserId: ultimo.importBatch.uploadedByUserId,
     },
     update: {
       quantitySold: cantidad.toString(),
       unitPrice: precio.toDecimalPlaces(2).toString(),
       source: "import",
       importBatchId: ultimo.importBatchId,
+      createdByUserId: ultimo.importBatch.uploadedByUserId,
     },
   });
 }
