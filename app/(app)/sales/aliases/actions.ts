@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
+import { recomputeDailySale } from "@/lib/import-processing";
 
 /**
  * Una vinculacion de venta amarra el nombre que escupe el punto de venta ("AFFOGATO ESP.") con
@@ -42,74 +44,18 @@ export async function updateAliasRecipe(aliasId: string, recipeId: string, mover
   });
 
   if (moverVentas) {
-    const filas = await prisma.importRow.findMany({
+    // Las fechas se sacan ANTES de reapuntar los renglones, para saber que dias hay que rearmar
+    // en los dos platillos: el nuevo y el que se queda sin esas ventas.
+    const fechas = await prisma.importRow.findMany({
       where: {
         normalizedName: alias.normalizedName,
         status: "MATCHED",
         date: { not: null },
         importBatch: { sucursalId: user.sucursalId },
       },
-      orderBy: { createdAt: "asc" },
-      select: { date: true, quantitySold: true, unitPrice: true, importBatchId: true },
+      select: { date: true },
+      distinct: ["date"],
     });
-
-    // Si el mismo nombre aparece dos veces en la misma fecha, gana la ultima: es la misma regla
-    // que usa la importacion al guardar la venta del dia.
-    const porFecha = new Map<string, (typeof filas)[number]>();
-    for (const fila of filas) porFecha.set(fila.date!.toISOString(), fila);
-
-    for (const fila of porFecha.values()) {
-      const date = fila.date!;
-      await prisma.dailySale.upsert({
-        where: {
-          organizationId_recipeId_date: {
-            organizationId: user.organizationId,
-            recipeId: recipe.id,
-            date,
-          },
-        },
-        create: {
-          organizationId: user.organizationId,
-          sucursalId: user.sucursalId,
-          recipeId: recipe.id,
-          date,
-          quantitySold: fila.quantitySold.toString(),
-          unitPrice: fila.unitPrice.toString(),
-          source: "import",
-          importBatchId: fila.importBatchId,
-        },
-        update: {
-          quantitySold: fila.quantitySold.toString(),
-          unitPrice: fila.unitPrice.toString(),
-          source: "import",
-          importBatchId: fila.importBatchId,
-        },
-      });
-
-      // La venta del platillo anterior se borra solo si ningun otro nombre la alimentaba ese
-      // dia: dos nombres distintos pueden caer en el mismo platillo.
-      if (anterior) {
-        const otros = await prisma.importRow.count({
-          where: {
-            matchedRecipeId: anterior,
-            status: "MATCHED",
-            date,
-            normalizedName: { not: alias.normalizedName },
-            importBatch: { sucursalId: user.sucursalId },
-          },
-        });
-        if (otros === 0) {
-          await prisma.dailySale.deleteMany({
-            where: {
-              organizationId: user.organizationId,
-              recipeId: anterior,
-              date,
-              source: "import",
-            },
-          });
-        }
-      }
-    }
 
     await prisma.importRow.updateMany({
       where: {
@@ -119,6 +65,17 @@ export async function updateAliasRecipe(aliasId: string, recipeId: string, mover
       },
       data: { matchedRecipeId: recipe.id },
     });
+
+    // Rearmar cada dia desde los renglones deja todo cuadrado solo: el platillo nuevo suma lo
+    // que le llega, y el anterior se queda con lo que le siga entrando de otros nombres, o sin
+    // venta si ya no le entra nada.
+    for (const { date } of fechas) {
+      if (!date) continue;
+      await recomputeDailySale(user.organizationId, user.sucursalId, recipe.id, date);
+      if (anterior && anterior !== recipe.id) {
+        await recomputeDailySale(user.organizationId, user.sucursalId, anterior, date);
+      }
+    }
   }
 
   revalidatePath("/sales/aliases");
@@ -149,4 +106,160 @@ export async function deleteAlias(aliasId: string) {
   await prisma.dishAlias.delete({ where: { id: alias.id } });
 
   revalidatePath("/sales/aliases");
+}
+
+/**
+ * Rearma de una vez todas las ventas importadas de la sucursal.
+ *
+ * Sirve para reparar lo que ya se importo cuando dos nombres caian en el mismo platillo el mismo
+ * dia: antes el segundo pisaba al primero y esas ventas se perdieron. Esto las devuelve sumando
+ * los renglones de los archivos originales, que si quedaron guardados.
+ *
+ * Se hace en memoria y de corrido —una lectura, escrituras por lotes— porque recalcular dia por
+ * dia con una consulta cada uno no aguanta un ano de ventas.
+ */
+export async function recomputeAllImportedSales(): Promise<{
+  revisados: number;
+  corregidos: number;
+}> {
+  const user = await requireSucursalContext();
+
+  const filas = await prisma.importRow.findMany({
+    where: {
+      status: "MATCHED",
+      date: { not: null },
+      matchedRecipeId: { not: null },
+      importBatch: { sucursalId: user.sucursalId },
+    },
+    select: {
+      matchedRecipeId: true,
+      date: true,
+      quantitySold: true,
+      unitPrice: true,
+      importBatchId: true,
+      importBatch: { select: { createdAt: true } },
+    },
+  });
+
+  type Acumulado = {
+    recipeId: string;
+    date: Date;
+    batchId: string;
+    batchCreatedAt: Date;
+    cantidad: Decimal;
+    dinero: Decimal;
+  };
+  const porPlatilloYDia = new Map<string, Acumulado>();
+
+  for (const fila of filas) {
+    const recipeId = fila.matchedRecipeId!;
+    const date = fila.date!;
+    const clave = `${recipeId}|${date.toISOString()}`;
+    const qty = new Decimal(fila.quantitySold.toString());
+    const dinero = qty.times(new Decimal(fila.unitPrice.toString()));
+    const actual = porPlatilloYDia.get(clave);
+
+    if (!actual) {
+      porPlatilloYDia.set(clave, {
+        recipeId,
+        date,
+        batchId: fila.importBatchId,
+        batchCreatedAt: fila.importBatch.createdAt,
+        cantidad: qty,
+        dinero,
+      });
+      continue;
+    }
+
+    // Misma regla que al importar: solo cuenta la importacion mas reciente que traiga ese dia.
+    // Una mas nueva reemplaza lo acumulado; una mas vieja no se suma encima.
+    if (fila.importBatch.createdAt > actual.batchCreatedAt) {
+      actual.batchId = fila.importBatchId;
+      actual.batchCreatedAt = fila.importBatch.createdAt;
+      actual.cantidad = qty;
+      actual.dinero = dinero;
+    } else if (fila.importBatchId === actual.batchId) {
+      actual.cantidad = actual.cantidad.plus(qty);
+      actual.dinero = actual.dinero.plus(dinero);
+    }
+  }
+
+  const existentes = await prisma.dailySale.findMany({
+    where: { sucursalId: user.sucursalId, source: "import" },
+    select: { id: true, recipeId: true, date: true, quantitySold: true, unitPrice: true },
+  });
+  const existentePorClave = new Map(
+    existentes.map((v) => [`${v.recipeId}|${v.date.toISOString()}`, v]),
+  );
+
+  const porCrear: {
+    organizationId: string;
+    sucursalId: string;
+    recipeId: string;
+    date: Date;
+    quantitySold: string;
+    unitPrice: string;
+    source: string;
+    importBatchId: string;
+  }[] = [];
+  const porActualizar: { id: string; quantitySold: string; unitPrice: string; importBatchId: string }[] = [];
+
+  for (const [clave, acumulado] of porPlatilloYDia) {
+    const cantidad = acumulado.cantidad;
+    const precio = cantidad.isZero()
+      ? new Decimal(0)
+      : acumulado.dinero.dividedBy(cantidad).toDecimalPlaces(2);
+    const existente = existentePorClave.get(clave);
+
+    if (!existente) {
+      porCrear.push({
+        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
+        recipeId: acumulado.recipeId,
+        date: acumulado.date,
+        quantitySold: cantidad.toString(),
+        unitPrice: precio.toString(),
+        source: "import",
+        importBatchId: acumulado.batchId,
+      });
+      continue;
+    }
+
+    const mismaCantidad = new Decimal(existente.quantitySold.toString()).equals(cantidad);
+    const mismoPrecio = new Decimal(existente.unitPrice.toString()).equals(precio);
+    if (mismaCantidad && mismoPrecio) continue;
+
+    porActualizar.push({
+      id: existente.id,
+      quantitySold: cantidad.toString(),
+      unitPrice: precio.toString(),
+      importBatchId: acumulado.batchId,
+    });
+  }
+
+  if (porCrear.length > 0) {
+    await prisma.dailySale.createMany({ data: porCrear, skipDuplicates: true });
+  }
+
+  const TAMANO_LOTE = 25;
+  for (let i = 0; i < porActualizar.length; i += TAMANO_LOTE) {
+    const lote = porActualizar.slice(i, i + TAMANO_LOTE);
+    await prisma.$transaction(
+      lote.map((v) =>
+        prisma.dailySale.update({
+          where: { id: v.id },
+          data: {
+            quantitySold: v.quantitySold,
+            unitPrice: v.unitPrice,
+            importBatchId: v.importBatchId,
+          },
+        }),
+      ),
+    );
+  }
+
+  revalidatePath("/sales");
+  revalidatePath("/sales/aliases");
+
+  return { revisados: porPlatilloYDia.size, corregidos: porCrear.length + porActualizar.length };
 }

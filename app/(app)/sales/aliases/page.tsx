@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import AliasTable, { type AliasRow } from "./AliasTable";
+import RecomputeSalesButton from "./RecomputeSalesButton";
 
 export default async function SalesAliasesPage() {
   const user = await requireSucursalContext();
@@ -53,9 +54,12 @@ export default async function SalesAliasesPage() {
             importaciones siguientes salen bien.
           </p>
         </div>
-        <Link href="/sales" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
-          Volver a ventas
-        </Link>
+        <div className="flex items-center gap-3">
+          <RecomputeSalesButton />
+          <Link href="/sales" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
+            Volver a ventas
+          </Link>
+        </div>
       </div>
 
       {sinVincular > 0 && (

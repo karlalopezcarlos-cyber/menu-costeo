@@ -125,15 +125,8 @@ export async function processBatchRows(
     }
 
     if (alias?.recipeId) {
-      await upsertSaleForRow(
-        organizationId,
-        sucursalId,
-        alias.recipeId,
-        date,
-        qty.toString(),
-        price.toString(),
-        batchId,
-      );
+      // El renglon se guarda primero: el recalculo suma todos los que ya existen para ese
+      // platillo y ese dia, y este tiene que estar entre ellos.
       await prisma.importRow.create({
         data: {
           importBatchId: batchId,
@@ -146,6 +139,7 @@ export async function processBatchRows(
           matchedRecipeId: alias.recipeId,
         },
       });
+      await recomputeDailySale(organizationId, sucursalId, alias.recipeId, date);
       rowsMatched += 1;
       continue;
     }
@@ -167,15 +161,64 @@ export async function processBatchRows(
   return { rowsMatched, rowsPending };
 }
 
-async function upsertSaleForRow(
+/**
+ * Rearma la venta de un platillo en un dia a partir de los renglones importados.
+ *
+ * Varios nombres del punto de venta pueden caer en el mismo platillo ("AFFOGATO" y
+ * "AFFOGATO ESP."): esas lineas se SUMAN, porque las dos son ventas de lo mismo. Antes la
+ * segunda pisaba a la primera y esas ventas simplemente desaparecian del sistema.
+ *
+ * Sumar no puede ser a ciegas: volver a subir un dia ya importado tiene que reemplazarlo, no
+ * apilarse encima. Por eso solo cuenta la importacion mas reciente que traiga ese platillo ese
+ * dia, y se recalcula desde cero cada vez en vez de ir acumulando.
+ *
+ * El precio que queda es el promedio ponderado, para que cantidad x precio siga dando el dinero
+ * que de verdad entro cuando los nombres se vendieron a precios distintos.
+ */
+export async function recomputeDailySale(
   organizationId: string,
   sucursalId: string,
   recipeId: string,
   date: Date,
-  quantitySold: string,
-  unitPrice: string,
-  importBatchId: string,
 ) {
+  const filas = await prisma.importRow.findMany({
+    where: {
+      matchedRecipeId: recipeId,
+      status: "MATCHED",
+      date,
+      importBatch: { sucursalId },
+    },
+    select: {
+      quantitySold: true,
+      unitPrice: true,
+      importBatchId: true,
+      importBatch: { select: { createdAt: true } },
+    },
+  });
+
+  if (filas.length === 0) {
+    // Ya no queda ningun renglon importado para ese dia: la venta que habian dejado se va con
+    // ellos. Una venta capturada a mano no se toca.
+    await prisma.dailySale.deleteMany({
+      where: { organizationId, recipeId, date, source: "import" },
+    });
+    return;
+  }
+
+  const ultimo = filas.reduce((a, b) =>
+    b.importBatch.createdAt > a.importBatch.createdAt ? b : a,
+  );
+  const delUltimo = filas.filter((f) => f.importBatchId === ultimo.importBatchId);
+
+  let cantidad = new Decimal(0);
+  let dinero = new Decimal(0);
+  for (const fila of delUltimo) {
+    const qty = new Decimal(fila.quantitySold.toString());
+    cantidad = cantidad.plus(qty);
+    dinero = dinero.plus(qty.times(new Decimal(fila.unitPrice.toString())));
+  }
+  const precio = cantidad.isZero() ? new Decimal(0) : dinero.dividedBy(cantidad);
+
   await prisma.dailySale.upsert({
     where: {
       organizationId_recipeId_date: { organizationId, recipeId, date },
@@ -185,12 +228,17 @@ async function upsertSaleForRow(
       sucursalId,
       recipeId,
       date,
-      quantitySold,
-      unitPrice,
+      quantitySold: cantidad.toString(),
+      unitPrice: precio.toDecimalPlaces(2).toString(),
       source: "import",
-      importBatchId,
+      importBatchId: ultimo.importBatchId,
     },
-    update: { quantitySold, unitPrice, source: "import", importBatchId },
+    update: {
+      quantitySold: cantidad.toString(),
+      unitPrice: precio.toDecimalPlaces(2).toString(),
+      source: "import",
+      importBatchId: ultimo.importBatchId,
+    },
   });
 }
 
@@ -225,20 +273,12 @@ export async function linkRowToRecipe(
     update: { recipeId, ignored: false },
   });
 
-  await upsertSaleForRow(
-    organizationId,
-    sucursalId,
-    recipeId,
-    row.date,
-    row.quantitySold.toString(),
-    row.unitPrice.toString(),
-    row.importBatchId,
-  );
-
   await prisma.importRow.update({
     where: { id: row.id },
     data: { status: "MATCHED", matchedRecipeId: recipeId },
   });
+
+  await recomputeDailySale(organizationId, sucursalId, recipeId, row.date);
 }
 
 /** Crea una receta nueva (platillo de menu) a partir de un ImportRow pendiente y la vincula. */
