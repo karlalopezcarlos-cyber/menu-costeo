@@ -55,6 +55,8 @@ export default function TransformationForm({
   // es el trabajo mas lento de la captura. Por omision solo se ofrece lo que aparece en alguna
   // plantilla, que es lo que de verdad se transforma; el resto sigue a un clic de distancia.
   const [soloPlantillas, setSoloPlantillas] = useState(true);
+  /** Rendimiento tecleado. Vacio = el que sale de las cantidades capturadas. */
+  const [rendimiento, setRendimiento] = useState("");
 
   /**
    * Aplicar una plantilla rellena el que entra y los que salen, y deja las cantidades vacias a
@@ -157,6 +159,50 @@ export default function TransformationForm({
     if (!source || !output) return "";
     const ref = resolveRefQtyPerUnit(source.baseUnit, output);
     return ref ? ref.toDecimalPlaces(6).toString() : "";
+  }
+
+  /**
+   * Del rendimiento a las piezas, en vez de al reves.
+   *
+   * Quien corta sabe lo que rinde su producto mucho antes de contar las piezas: tecleando 80%
+   * sale cuantas porciones tendrian que salir de lo que entro. Si luego cuenta y salieron
+   * otras, cambia la cantidad y el rendimiento se vuelve a calcular solo: los dos campos son
+   * el mismo dato visto por los dos lados.
+   *
+   * Solo aplica con una salida: con dos tamanos a la vez no hay forma de saber cuanto del
+   * rendimiento le toca a cada uno sin inventarlo.
+   */
+  const filasUsables = rows.filter((r) => r.productId);
+  const puedeDespejar = Boolean(source) && filasUsables.length === 1 && Number(initialQty) > 0;
+
+  function aplicarRendimiento(raw: string) {
+    setRendimiento(raw);
+    if (!raw || !puedeDespejar || !source) return;
+
+    let pct: Decimal;
+    try {
+      pct = new Decimal(raw);
+    } catch {
+      return;
+    }
+    // Tolera que se capture 0.8 en vez de 80, que es como se dice en cocina.
+    if (pct.gt(0) && pct.lte(1)) pct = pct.times(100);
+    if (pct.lte(0)) return;
+
+    const fila = filasUsables[0];
+    const ref = refDe(fila);
+    if (!ref || ref.lte(0)) return;
+
+    const aprovechado = new Decimal(initialQty).times(pct).dividedBy(100);
+    const cantidad = aprovechado.dividedBy(ref);
+    const output = porId.get(fila.productId);
+    // Las piezas son enteras: 54.3 porciones no existen.
+    const valor =
+      output?.baseUnit === "PIECE"
+        ? cantidad.floor().toString()
+        : cantidad.toDecimalPlaces(3).toString();
+
+    setRows((prev) => prev.map((r) => (r.key === fila.key ? { ...r, qty: valor } : r)));
   }
 
   const calculo = useMemo((): { result?: TransformationResult; error?: string } => {
@@ -419,9 +465,12 @@ export default function TransformationForm({
                         step="any"
                         min="0"
                         value={row.qty}
-                        onChange={(e) =>
-                          setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, qty: e.target.value } : r)))
-                        }
+                        onChange={(e) => {
+                          setRendimiento("");
+                          setRows((prev) =>
+                            prev.map((r) => (r.key === row.key ? { ...r, qty: e.target.value } : r)),
+                          );
+                        }}
                         placeholder="0"
                         className="w-24 rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
                       />
@@ -488,11 +537,27 @@ export default function TransformationForm({
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-neutral-500">Salio</p>
-              <p className="text-lg font-semibold tabular-nums text-neutral-900">
-                {resultado.outputQtyInSource.toDecimalPlaces(3).toString()} {source.baseUnitLabel}
+              <label htmlFor="rendimiento" className="text-xs font-medium text-neutral-500">
+                Rendimiento
+              </label>
+              <div className="flex items-baseline gap-1">
+                <input
+                  id="rendimiento"
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={rendimiento || resultado.realYieldPct.toFixed(2)}
+                  onChange={(e) => aplicarRendimiento(e.target.value)}
+                  disabled={!puedeDespejar}
+                  className="w-24 rounded-md border border-neutral-200 px-2 py-1 text-lg font-semibold tabular-nums text-neutral-900 disabled:border-transparent disabled:bg-transparent disabled:px-0"
+                />
+                <span className="text-lg font-semibold text-neutral-900">%</span>
+              </div>
+              <p className="text-xs text-neutral-500">
+                {puedeDespejar
+                  ? `Teclealo y se llena la cantidad · ${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel}`
+                  : `${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel} equivalente`}
               </p>
-              <p className="text-xs text-neutral-500">equivalente de producto</p>
             </div>
             <div>
               <p className="text-xs font-medium text-neutral-500">
@@ -510,11 +575,17 @@ export default function TransformationForm({
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-neutral-500">Rendimiento real</p>
+              <p className="text-xs font-medium text-neutral-500">Costo por unidad</p>
               <p className="text-lg font-semibold tabular-nums text-neutral-900">
-                {resultado.realYieldPct.toFixed(2)}%
+                {resultado.outputs.length === 1
+                  ? formatMoney(resultado.outputs[0].unitCost.toNumber(), 2)
+                  : "varios"}
               </p>
-              <p className="text-xs text-neutral-500">de este corte</p>
+              <p className="text-xs text-neutral-500">
+                {resultado.outputs.length === 1
+                  ? `de ${resultado.outputs[0].productName}`
+                  : "ve el detalle en cada renglon"}
+              </p>
             </div>
           </div>
 
