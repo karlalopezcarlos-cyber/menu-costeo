@@ -1,11 +1,19 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { loadTransformationProducts } from "@/lib/transformation-options";
 import TransformationForm from "./TransformationForm";
 
 export default async function NewTransformationPage() {
   const user = await requireSucursalContext();
-  const products = await loadTransformationProducts(user.organizationId, user.sucursalId);
+  const [products, templates] = await Promise.all([
+    loadTransformationProducts(user.organizationId, user.sucursalId),
+    prisma.transformationTemplate.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      include: { outputs: { orderBy: { sortOrder: "asc" } } },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -21,9 +29,17 @@ export default async function NewTransformationPage() {
             o el que ya limpiaste, segun lo que hayas hecho hoy.
           </p>
         </div>
-        <Link href="/portioning" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
-          Volver
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/portioning/templates"
+            className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600"
+          >
+            Plantillas
+          </Link>
+          <Link href="/portioning" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
+            Volver
+          </Link>
+        </div>
       </div>
 
       {products.length === 0 ? (
@@ -31,7 +47,18 @@ export default async function NewTransformationPage() {
           Todavia no tienes productos en el catalogo.
         </p>
       ) : (
-        <TransformationForm products={products} />
+        <TransformationForm
+          products={products}
+          templates={templates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            sourceProductId: t.sourceProductId,
+            outputs: t.outputs.map((o) => ({
+              productId: o.productId,
+              refQtyPerUnit: o.refQtyPerUnit ? o.refQtyPerUnit.toString() : "",
+            })),
+          }))}
+        />
       )}
     </div>
   );

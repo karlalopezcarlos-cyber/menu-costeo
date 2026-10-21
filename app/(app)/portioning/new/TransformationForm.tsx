@@ -32,11 +32,46 @@ function hoy(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function TransformationForm({ products }: { products: TransformationProduct[] }) {
+export type TransformationTemplateOption = {
+  id: string;
+  name: string;
+  sourceProductId: string;
+  outputs: { productId: string; refQtyPerUnit: string }[];
+};
+
+export default function TransformationForm({
+  products,
+  templates,
+}: {
+  products: TransformationProduct[];
+  templates: TransformationTemplateOption[];
+}) {
   const [state, formAction, pending] = useActionState(createTransformation, initialState);
   const [sourceId, setSourceId] = useState("");
   const [initialQty, setInitialQty] = useState("");
   const [rows, setRows] = useState<OutputRow[]>([nuevaFila()]);
+  const [templateId, setTemplateId] = useState("");
+
+  /**
+   * Aplicar una plantilla rellena el que entra y los que salen, y deja las cantidades vacias a
+   * proposito: eso es lo que cambia cada dia y es justo lo que hay que mirar al capturar.
+   */
+  function aplicarPlantilla(id: string) {
+    setTemplateId(id);
+    const plantilla = templates.find((t) => t.id === id);
+    if (!plantilla) return;
+    setSourceId(plantilla.sourceProductId);
+    setRows(
+      plantilla.outputs.length
+        ? plantilla.outputs.map((o) => ({
+            key: Math.random().toString(36).slice(2),
+            productId: o.productId,
+            qty: "",
+            ref: o.refQtyPerUnit,
+          }))
+        : [nuevaFila()],
+    );
+  }
 
   const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const source = sourceId ? porId.get(sourceId) : undefined;
@@ -119,6 +154,35 @@ export default function TransformationForm({ products }: { products: Transformat
 
   return (
     <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
+      {templates.length > 0 && (
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+          <div className="space-y-1">
+            <label htmlFor="plantilla" className="text-sm font-medium text-neutral-700">
+              Plantilla
+            </label>
+            <select
+              id="plantilla"
+              value={templateId}
+              onChange={(e) => aplicarPlantilla(e.target.value)}
+              className="w-full min-w-72 rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            >
+              <option value="">Sin plantilla, lo armo a mano</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="pb-2 text-xs text-neutral-500">
+            Llena que entra y que sale. Las cantidades las capturas tu.
+          </p>
+          <Link href="/portioning/templates" className="ml-auto pb-2 text-xs text-neutral-500 hover:underline">
+            Administrar plantillas
+          </Link>
+        </div>
+      )}
+
       <div className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm md:grid-cols-3">
         <div className="space-y-1">
           <label htmlFor="date" className="text-sm font-medium text-neutral-700">
@@ -142,7 +206,10 @@ export default function TransformationForm({ products }: { products: Transformat
             name="sourceProductId"
             required
             value={sourceId}
-            onChange={(e) => setSourceId(e.target.value)}
+            onChange={(e) => {
+              setSourceId(e.target.value);
+              setTemplateId("");
+            }}
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Elige el producto</option>

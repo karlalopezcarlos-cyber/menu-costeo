@@ -132,6 +132,7 @@ model Organization {
   auditComments             AuditComment[]
   productPresentations      ProductPresentation[]
   dailySaleChanges          DailySaleChange[]
+  transformationTemplates   TransformationTemplate[]
   inventoryCountItemChanges InventoryCountItemChange[]
   supplierPayments          SupplierPayment[]
   sucursales                Sucursal[]
@@ -144,16 +145,16 @@ model Organization {
 }
 
 model ProductCategory {
-  id             String         @id @default(cuid())
-  organizationId String
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  name           String
-  group          CategoryGroup?
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  name            String
+  group           CategoryGroup?
   /// Si sus productos se cuentan en el inventario fisico. Hay categorias que se compran y se
   /// costean pero que nadie va a contar en la alacena (servilletas, gas, desechables): tenerlas
   /// en la hoja de conteo solo alarga la captura y mete ceros que ensucian la valuacion.
-  isInventoriable Boolean       @default(true)
-  createdAt      DateTime       @default(now())
+  isInventoriable Boolean        @default(true)
+  createdAt       DateTime       @default(now())
 
   products Product[]
 
@@ -359,19 +360,21 @@ model Product {
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
-  purchases                 Purchase[]
-  recipeItems               RecipeItem[]
-  inventoryCountItems       InventoryCountItem[]
-  wasteEntries              WasteEntry[]
-  purchaseOrderItems        PurchaseOrderItem[]
-  auditComments             AuditComment[]
-  presentations             ProductPresentation[]
-  inventoryCountItemChanges InventoryCountItemChange[]
-  requisicionItems          RequisicionItem[]
-  planningRunItems          PlanningRunItem[]
-  portioningEntries         PortioningEntry[]
-  portioningOutputProduct   PortioningEntry[]          @relation("PortioningOutputProduct")
-  transformationOutputs     PortioningOutput[]
+  purchases                       Purchase[]
+  recipeItems                     RecipeItem[]
+  inventoryCountItems             InventoryCountItem[]
+  wasteEntries                    WasteEntry[]
+  purchaseOrderItems              PurchaseOrderItem[]
+  auditComments                   AuditComment[]
+  presentations                   ProductPresentation[]
+  inventoryCountItemChanges       InventoryCountItemChange[]
+  requisicionItems                RequisicionItem[]
+  planningRunItems                PlanningRunItem[]
+  portioningEntries               PortioningEntry[]
+  portioningOutputProduct         PortioningEntry[]              @relation("PortioningOutputProduct")
+  transformationOutputs           PortioningOutput[]
+  transformationTemplatesAsSource TransformationTemplate[]       @relation("TransformationTemplateSource")
+  transformationTemplateOutputs   TransformationTemplateOutput[] @relation("TransformationTemplateOutput")
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1209,6 +1212,49 @@ model RequisicionItem {
 /// Un evento de porcionamiento: se toma un producto a granel, se pesa al inicio, y de ahi salen
 /// porciones de una o varias recetas de porcion. La diferencia entre lo que entro y lo que salio
 /// es la merma real de ese corte, que es justo el dato que no existia en ningun lado.
+/// Plantilla de transformacion: de que producto sale que producto.
+///
+/// En una tablajeria las mismas dos o tres transformaciones se repiten todos los dias (camaron
+/// crudo a limpio, limpio a porciones de 20 g). Dejarlas guardadas evita rearmar la captura
+/// cada vez y, sobre todo, evita que un dia se capture con el origen equivocado.
+///
+/// La plantilla solo prellena: al registrar la transformacion se puede cambiar lo que sea, y
+/// las cantidades siempre se capturan a mano, porque son justo lo que cambia cada dia.
+model TransformationTemplate {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  sourceProductId String
+  sourceProduct   Product      @relation("TransformationTemplateSource", fields: [sourceProductId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  outputs TransformationTemplateOutput[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([sourceProductId])
+  @@map("transformation_templates")
+}
+
+model TransformationTemplateOutput {
+  id            String                 @id @default(cuid())
+  templateId    String
+  template      TransformationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product                @relation("TransformationTemplateOutput", fields: [productId], references: [id])
+  /// Cuanto del origen lleva cada unidad de salida, si esta plantilla usa uno distinto al de la
+  /// ficha del producto. Vacio = el de la ficha.
+  refQtyPerUnit Decimal?               @db.Decimal(14, 6)
+  sortOrder     Int                    @default(0)
+
+  @@unique([templateId, productId])
+  @@index([templateId])
+  @@index([productId])
+  @@map("transformation_template_outputs")
+}
+
 model PortioningEntry {
   id              String             @id @default(cuid())
   /// CLEANING: el resultado es otro producto (outputProduct). PORTIONING: el resultado son

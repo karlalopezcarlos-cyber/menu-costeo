@@ -41,8 +41,11 @@ export default async function PortioningPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/portioning/templates" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
+            Plantillas
+          </Link>
           <Link href="/portioning/portions" className="text-sm font-medium text-neutral-500 transition-colors hover:text-brand-600">
-            Porciones
+            Productos de proceso
           </Link>
           <Link
             href="/portioning/new"
