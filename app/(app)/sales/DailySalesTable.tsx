@@ -72,7 +72,7 @@ export default function DailySalesTable({
             <tr>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Dia</th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Platillos distintos
+                Platillos diferentes
               </th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Unidades
@@ -93,7 +93,12 @@ export default function DailySalesTable({
             {days.map((day) => (
               <tr key={day.dateKey} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                 <td className="px-4 py-3 font-medium text-neutral-900">{day.dateLabel}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-neutral-500">{day.dishes}</td>
+                <td
+                  className="px-4 py-3 text-right tabular-nums text-neutral-500"
+                  title={`Ese dia se vendieron ${day.dishes} platillos diferentes del menu`}
+                >
+                  {day.dishes}
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-500">
                   {day.quantity.toLocaleString("es-MX", { maximumFractionDigits: 2 })}
                 </td>
@@ -121,6 +126,11 @@ export default function DailySalesTable({
           )}
         </table>
       </div>
+
+      <p className="text-xs text-neutral-500">
+        <b>Platillos diferentes</b> es cuantos platillos distintos del menu se vendieron ese dia;
+        <b> unidades</b> es cuantos platos salieron en total.
+      </p>
 
       {iva === "sin" && (
         <p className="text-xs text-neutral-500">
