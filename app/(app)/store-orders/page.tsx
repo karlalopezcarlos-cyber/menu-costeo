@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { formatDateTime } from "@/lib/format";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatStoreOrderFolio } from "@/lib/store/folio";
 import StoreOrdersTable, { type StoreOrderRow } from "./StoreOrdersTable";
@@ -23,7 +24,7 @@ export default async function StoreOrdersPage() {
   const rows: StoreOrderRow[] = orders.map((order) => ({
     id: order.id,
     folioLabel: formatStoreOrderFolio(order.folio),
-    dateLabel: order.createdAt.toLocaleString("es-MX", { timeZone: "UTC" }),
+    dateLabel: formatDateTime(order.createdAt),
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     fulfillmentType: order.fulfillmentType,

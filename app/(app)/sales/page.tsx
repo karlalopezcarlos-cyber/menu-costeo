@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatSaleFolio } from "@/lib/sales/folio";
+import { formatDateTime } from "@/lib/format";
 import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
 import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
@@ -89,7 +90,7 @@ export default async function SalesPage({
 
   const bitacoraRows: SaleLogRow[] = bitacora.map((cambio) => ({
     id: cambio.id,
-    whenLabel: cambio.createdAt.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    whenLabel: formatDateTime(cambio.createdAt),
     saleDateLabel: cambio.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     recipeName: cambio.recipe.name,
     action: cambio.action,
@@ -123,7 +124,7 @@ export default async function SalesPage({
       capturedBy: sale.createdBy?.name ?? sale.createdBy?.email ?? null,
       edits: edicion?.veces ?? 0,
       lastEditLabel: edicion?.ultima
-        ? edicion.ultima.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+        ? formatDateTime(edicion.ultima)
         : null,
     };
   });
