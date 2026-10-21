@@ -80,6 +80,9 @@ export default async function SalesPage({
           <Link href="/sales/tickets" className="text-sm text-neutral-500 hover:underline">
             Ver tickets de venta
           </Link>
+          <Link href="/sales/aliases" className="text-sm text-neutral-500 hover:underline">
+            Vinculaciones
+          </Link>
           <a
             href="/api/export/sales-template"
             className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
