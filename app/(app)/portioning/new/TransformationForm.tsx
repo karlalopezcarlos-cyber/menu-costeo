@@ -139,7 +139,15 @@ export default function TransformationForm({
     };
   }, [products, sourceId, salidasPermitidas, rows]);
 
-  /** Peso por unidad que se va a usar: el tecleado manda sobre el de la ficha. */
+  /**
+   * Cuanto del producto que entra lleva cada unidad que sale. Manda el tecleado, luego la
+   * ficha de la porcion, luego la conversion directa (un kilo limpio es un kilo crudo).
+   *
+   * Cuando no se puede deducir —piezas que salen de algo que se mide en kilos y nadie capturo
+   * el gramaje— se despeja del rendimiento, que por omision es 100%: todo lo que entro se fue
+   * en esas piezas. Antes aqui se usaba 1, que para una pieza significa "cada una pesa un
+   * kilo", y de ahi salian rendimientos de 4000%.
+   */
   function refDe(row: OutputRow): Decimal | null {
     const output = porId.get(row.productId);
     if (!source || !output) return null;
@@ -151,7 +159,34 @@ export default function TransformationForm({
         return null;
       }
     }
-    return resolveRefQtyPerUnit(source.baseUnit, output);
+    const deLaFicha = resolveRefQtyPerUnit(source.baseUnit, output);
+    if (deLaFicha) return deLaFicha;
+    return refDesdeRendimiento(row);
+  }
+
+  /** Peso por unidad despejado del rendimiento: (lo que entro x rendimiento) / lo que salio. */
+  function refDesdeRendimiento(row: OutputRow): Decimal | null {
+    if (!row.qty) return null;
+    let cantidad: Decimal;
+    let entro: Decimal;
+    try {
+      cantidad = new Decimal(row.qty);
+      entro = new Decimal(initialQty || "0");
+    } catch {
+      return null;
+    }
+    if (cantidad.lte(0) || entro.lte(0)) return null;
+
+    let pct = new Decimal(100);
+    if (rendimiento) {
+      try {
+        const tecleado = new Decimal(rendimiento);
+        if (tecleado.gt(0)) pct = tecleado.lte(1) ? tecleado.times(100) : tecleado;
+      } catch {
+        // se queda en 100
+      }
+    }
+    return entro.times(pct).dividedBy(100).dividedBy(cantidad);
   }
 
   function refSugerida(row: OutputRow): string {
@@ -175,9 +210,18 @@ export default function TransformationForm({
   const filasUsables = rows.filter((r) => r.productId);
   const puedeDespejar = Boolean(source) && filasUsables.length === 1 && Number(initialQty) > 0;
 
+  /** true cuando el gramaje no se conoce: ahi el rendimiento define el peso, no la cantidad. */
+  const gramajeDesconocido =
+    puedeDespejar &&
+    !filasUsables[0].ref &&
+    !(source && porId.get(filasUsables[0].productId)
+      ? resolveRefQtyPerUnit(source.baseUnit, porId.get(filasUsables[0].productId)!)
+      : null);
+
   function aplicarRendimiento(raw: string) {
     setRendimiento(raw);
-    if (!raw || !puedeDespejar || !source) return;
+    // Sin gramaje, el rendimiento define cuanto pesa cada pieza y la cantidad no se toca.
+    if (!raw || !puedeDespejar || !source || gramajeDesconocido) return;
 
     let pct: Decimal;
     try {
@@ -487,7 +531,7 @@ export default function TransformationForm({
                       onChange={(e) =>
                         setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, ref: e.target.value } : r)))
                       }
-                      placeholder={refSugerida(row) || (rows.filter((r) => r.productId && r.qty).length > 1 ? "capturalo" : "no hace falta")}
+                      placeholder={refSugerida(row) || "capturalo"}
                       className="w-28 rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
                     />
                   </td>
@@ -554,9 +598,11 @@ export default function TransformationForm({
                 <span className="text-lg font-semibold text-neutral-900">%</span>
               </div>
               <p className="text-xs text-neutral-500">
-                {puedeDespejar
-                  ? `Teclealo y se llena la cantidad · ${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel}`
-                  : `${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel} equivalente`}
+                {!puedeDespejar
+                  ? `${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel} equivalente`
+                  : gramajeDesconocido
+                    ? `Sin gramaje capturado, esto define la merma · cada una pesaria ${resultado.outputs[0]?.refQtyPerUnit.toDecimalPlaces(4).toString() ?? "?"} ${source.baseUnitLabel}`
+                    : `Teclealo y se llena la cantidad · ${resultado.outputQtyInSource.toDecimalPlaces(3).toString()} ${source.baseUnitLabel}`}
               </p>
             </div>
             <div>
