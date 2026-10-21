@@ -104,7 +104,13 @@ export default function TemplateForm({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-neutral-700">Que sale</label>
+          <div>
+            <label className="text-sm font-medium text-neutral-700">Que sale</label>
+            <p className="text-xs text-neutral-500">
+              Elige el producto en la lista. Si de la misma tanda salen varios (porciones de 20 g
+              y de 40 g), agrega un renglon por cada uno.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             {hayCategoriasMarcadas && !verTodos && (
               <button
@@ -118,11 +124,18 @@ export default function TemplateForm({
             <button
               type="button"
               onClick={() => setRows((prev) => [...prev, nuevaFila()])}
-              className="text-xs font-medium text-neutral-600 hover:underline"
+              className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
             >
-              Agregar salida
+              + Agregar salida
             </button>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
+          <span className="flex-1">Producto que sale</span>
+          <span className="w-28">Lleva c/u</span>
+          <span className="w-10" />
+          {rows.length > 1 && <span className="w-12" />}
         </div>
 
         {rows.map((row) => {
@@ -163,7 +176,7 @@ export default function TemplateForm({
                       prev.map((r) => (r.key === row.key ? { ...r, ref: e.target.value } : r)),
                     )
                   }
-                  placeholder={sugerida ? sugerida.toDecimalPlaces(6).toString() : "opcional"}
+                  placeholder={sugerida ? sugerida.toDecimalPlaces(6).toString() : "lo de la ficha"}
                   className="w-28 rounded-md border border-neutral-200 px-2 py-2 text-sm"
                   title="Cuanto del producto que entra lleva cada unidad de salida"
                 />
