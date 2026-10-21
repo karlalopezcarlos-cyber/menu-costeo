@@ -13,7 +13,7 @@ export const CLASSIFICATION_LABELS: Record<MenuEngineeringClassification, string
 };
 
 /** Tasa de IVA. El precio de venta ya incluye IVA; la base sin IVA es precio / (1 + IVA_RATE). */
-const IVA_RATE = 0.16;
+export const IVA_RATE = 0.16;
 
 export type MenuEngineeringRow = {
   recipeId: string;

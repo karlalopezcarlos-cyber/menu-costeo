@@ -4,6 +4,8 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { formatSaleFolio } from "@/lib/sales/folio";
 import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
+import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
+import type { IvaMode } from "@/lib/menu-engineering";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -12,10 +14,13 @@ function toDateInputValue(d: Date): string {
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; vista?: string; iva?: string }>;
 }) {
   const params = await searchParams;
   const user = await requireSucursalContext();
+
+  const vistaDiaria = params.vista === "dia";
+  const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
   const now = new Date();
   const defaultFrom = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
@@ -72,6 +77,36 @@ export default async function SalesPage({
     };
   });
 
+  // La venta de cada dia sale de las mismas filas: una venta diaria ya trae juntos lo importado
+  // y lo capturado a mano o por ticket.
+  const porDia = new Map<string, DailySalesInput>();
+  for (const sale of sales) {
+    const dateKey = sale.date.toISOString().slice(0, 10);
+    const importe = Number(sale.quantitySold) * Number(sale.unitPrice);
+    const actual = porDia.get(dateKey);
+    if (actual) {
+      actual.quantity += Number(sale.quantitySold);
+      actual.grossTotal += importe;
+      actual.dishes += 1;
+    } else {
+      porDia.set(dateKey, {
+        dateKey,
+        dateLabel: sale.date.toLocaleDateString("es-MX", {
+          timeZone: "UTC",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }),
+        quantity: Number(sale.quantitySold),
+        grossTotal: importe,
+        dishes: 1,
+      });
+    }
+  }
+  const dias = [...porDia.values()].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+
+  const periodoQuery = `from=${toDateInputValue(from)}&to=${toDateInputValue(to)}`;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,7 +139,32 @@ export default async function SalesPage({
         </div>
       </div>
 
-      <form className="flex items-end gap-3">
+      <div className="flex items-center gap-1 border-b border-neutral-200">
+        <Link
+          href={`/sales?${periodoQuery}`}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            vistaDiaria
+              ? "border-transparent text-neutral-500 hover:text-neutral-800"
+              : "border-neutral-900 text-neutral-900"
+          }`}
+        >
+          Ventas por producto
+        </Link>
+        <Link
+          href={`/sales?${periodoQuery}&vista=dia&iva=${ivaMode}`}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            vistaDiaria
+              ? "border-neutral-900 text-neutral-900"
+              : "border-transparent text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          Ventas por dia
+        </Link>
+      </div>
+
+      <form className="flex flex-wrap items-end gap-3">
+        {vistaDiaria && <input type="hidden" name="vista" value="dia" />}
+        {vistaDiaria && <input type="hidden" name="iva" value={ivaMode} />}
         <div className="space-y-1">
           <label htmlFor="from" className="text-sm font-medium text-neutral-700">
             Desde
@@ -135,23 +195,50 @@ export default async function SalesPage({
         >
           Ver
         </button>
+
+        {vistaDiaria && (
+          <div className="ml-auto inline-flex overflow-hidden rounded-md border border-neutral-200">
+            <Link
+              href={`/sales?${periodoQuery}&vista=dia&iva=con`}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                ivaMode === "con" ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"
+              }`}
+            >
+              Con IVA
+            </Link>
+            <Link
+              href={`/sales?${periodoQuery}&vista=dia&iva=sin`}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                ivaMode === "sin" ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"
+              }`}
+            >
+              Sin IVA
+            </Link>
+          </div>
+        )}
       </form>
 
-      {recipes.length === 0 && (
-        <p className="text-sm text-neutral-500">
-          Todavia no tienes platillos de menu. Marca una receta como &quot;platillo de menu&quot; para
-          que aparezca aqui.
-        </p>
-      )}
+      {vistaDiaria ? (
+        <DailySalesTable days={dias} iva={ivaMode} />
+      ) : (
+        <>
+          {recipes.length === 0 && (
+            <p className="text-sm text-neutral-500">
+              Todavia no tienes platillos de menu. Marca una receta como &quot;platillo de
+              menu&quot; para que aparezca aqui.
+            </p>
+          )}
 
-      <SalesManager
-        recipes={recipes.map((r) => ({
-          id: r.id,
-          name: r.name,
-          sellingPrice: r.sellingPrice ? r.sellingPrice.toString() : null,
-        }))}
-        rows={rows}
-      />
+          <SalesManager
+            recipes={recipes.map((r) => ({
+              id: r.id,
+              name: r.name,
+              sellingPrice: r.sellingPrice ? r.sellingPrice.toString() : null,
+            }))}
+            rows={rows}
+          />
+        </>
+      )}
     </div>
   );
 }
