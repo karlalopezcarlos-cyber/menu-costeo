@@ -51,6 +51,10 @@ export default function TransformationForm({
   const [initialQty, setInitialQty] = useState("");
   const [rows, setRows] = useState<OutputRow[]>([nuevaFila()]);
   const [templateId, setTemplateId] = useState("");
+  // Con el catalogo completo en los selectores, encontrar el camaron entre cientos de productos
+  // es el trabajo mas lento de la captura. Por omision solo se ofrece lo que aparece en alguna
+  // plantilla, que es lo que de verdad se transforma; el resto sigue a un clic de distancia.
+  const [soloPlantillas, setSoloPlantillas] = useState(templates.length > 0);
 
   /**
    * Aplicar una plantilla rellena el que entra y los que salen, y deja las cantidades vacias a
@@ -76,17 +80,42 @@ export default function TransformationForm({
   const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const source = sourceId ? porId.get(sourceId) : undefined;
 
+  /** Productos que pueden entrar: los que alguna plantilla usa como origen. */
+  const origenes = useMemo(() => {
+    if (!soloPlantillas) return products;
+    const ids = new Set(templates.map((t) => t.sourceProductId));
+    // Lo ya elegido no se cae de la lista aunque se apague el filtro con otra cosa puesta.
+    if (sourceId) ids.add(sourceId);
+    return products.filter((p) => ids.has(p.id));
+  }, [products, templates, soloPlantillas, sourceId]);
+
+  /** Productos que pueden salir: los de las plantillas que parten de lo que entro. */
+  const salidasPermitidas = useMemo(() => {
+    if (!soloPlantillas) return null;
+    const ids = new Set<string>();
+    for (const plantilla of templates) {
+      if (sourceId && plantilla.sourceProductId !== sourceId) continue;
+      for (const output of plantilla.outputs) ids.add(output.productId);
+    }
+    return ids;
+  }, [templates, soloPlantillas, sourceId]);
+
   // Lo que normalmente sale de este producto va arriba y separado: es lo que se va a capturar el
   // 90% de las veces. Lo demas sigue disponible, porque el dia que se porciona otra cosa no hay
   // que pelear con la pantalla.
   const { sugeridos, resto } = useMemo(() => {
-    const candidatos = products.filter((p) => p.id !== sourceId);
+    let candidatos = products.filter((p) => p.id !== sourceId);
+    if (salidasPermitidas) {
+      // Lo que ya esta capturado en un renglon no desaparece por el filtro.
+      const puestos = new Set(rows.map((r) => r.productId).filter(Boolean));
+      candidatos = candidatos.filter((p) => salidasPermitidas.has(p.id) || puestos.has(p.id));
+    }
     if (!sourceId) return { sugeridos: [], resto: candidatos };
     return {
       sugeridos: candidatos.filter((p) => p.defaultSourceProductId === sourceId),
       resto: candidatos.filter((p) => p.defaultSourceProductId !== sourceId),
     };
-  }, [products, sourceId]);
+  }, [products, sourceId, salidasPermitidas, rows]);
 
   /** Peso por unidad que se va a usar: el tecleado manda sobre el de la ficha. */
   function refDe(row: OutputRow): Decimal | null {
@@ -154,6 +183,17 @@ export default function TransformationForm({
 
   return (
     <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
+      {templates.length === 0 && (
+        <p className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+          Todavia no tienes plantillas.{" "}
+          <Link href="/portioning/templates/new" className="font-medium text-brand-600 underline-offset-2 hover:underline">
+            Crea las que haces siempre
+          </Link>{" "}
+          (CAMARON → CAMARON LIMPIO) y la proxima captura sera elegir una y teclear cantidades,
+          en vez de buscar entre todo el catalogo.
+        </p>
+      )}
+
       {templates.length > 0 && (
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="space-y-1">
@@ -177,6 +217,15 @@ export default function TransformationForm({
           <p className="pb-2 text-xs text-neutral-500">
             Llena que entra y que sale. Las cantidades las capturas tu.
           </p>
+          <label className="flex items-center gap-2 pb-2 text-xs text-neutral-600">
+            <input
+              type="checkbox"
+              checked={soloPlantillas}
+              onChange={(e) => setSoloPlantillas(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300"
+            />
+            Solo los productos de mis plantillas
+          </label>
           <Link href="/portioning/templates" className="ml-auto pb-2 text-xs text-neutral-500 hover:underline">
             Administrar plantillas
           </Link>
@@ -213,7 +262,7 @@ export default function TransformationForm({
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             <option value="">Elige el producto</option>
-            {products.map((p) => (
+            {origenes.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
                 {p.isProcessed ? " (de proceso)" : ""}
@@ -256,9 +305,19 @@ export default function TransformationForm({
             </p>
           </div>
           <div className="flex items-center gap-3">
-          <Link href="/portioning/portions/new" className="text-xs text-neutral-500 hover:underline">
-            ¿Falta el producto que sale?
-          </Link>
+          {soloPlantillas ? (
+            <button
+              type="button"
+              onClick={() => setSoloPlantillas(false)}
+              className="text-xs text-neutral-500 hover:underline"
+            >
+              ¿No esta el producto? Ver todo el catalogo
+            </button>
+          ) : (
+            <Link href="/portioning/portions/new" className="text-xs text-neutral-500 hover:underline">
+              ¿Falta el producto que sale?
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setRows((prev) => [...prev, nuevaFila()])}
