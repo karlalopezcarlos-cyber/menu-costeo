@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost, getSucursalProductCosts } from "@/lib/costing";
 import { removeYieldFactor, UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { formatDateTime } from "@/lib/format";
 import InventoryCaptureTable, { type CaptureRow } from "./InventoryCaptureTable";
 import InventoryCountTabs from "./InventoryCountTabs";
 import InventoryChangeLogTable, { type ChangeLogRow } from "./InventoryChangeLogTable";
@@ -40,7 +41,7 @@ export default async function InventoryCountPage({
 
   const changeRows: ChangeLogRow[] = changes.map((c) => ({
     id: c.id,
-    changedAtLabel: c.changedAt.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    changedAtLabel: formatDateTime(c.changedAt),
     changedByName: c.changedBy?.name ?? c.changedBy?.email ?? null,
     itemName: c.product?.name ?? c.subRecipe?.name ?? "?",
     unitLabel: c.product
@@ -52,9 +53,25 @@ export default async function InventoryCountPage({
     newQuantity: Number(c.newQuantity),
   }));
 
+  // Lo que ya tiene cantidad en este conteo se sigue mostrando aunque su categoria se haya
+  // marcado como no inventariable despues: si no, el valor seguiria contando sin que nadie
+  // pueda verlo ni corregirlo.
+  const yaCapturados = count.items
+    .map((item) => item.productId)
+    .filter((id): id is string => Boolean(id));
+
   const [products, subRecipes, graph] = await Promise.all([
     prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
+      where: {
+        organizationId: user.organizationId,
+        archivedAt: null,
+        OR: [
+          // Sin categoria se cuenta: no hay forma de saber que no se inventaria.
+          { categoryId: null },
+          { category: { isInventoriable: true } },
+          ...(yaCapturados.length ? [{ id: { in: yaCapturados } }] : []),
+        ],
+      },
       orderBy: { name: "asc" },
       include: { category: true, presentations: true },
     }),

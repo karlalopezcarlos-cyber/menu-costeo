@@ -149,6 +149,10 @@ model ProductCategory {
   organization   Organization   @relation(fields: [organizationId], references: [id])
   name           String
   group          CategoryGroup?
+  /// Si sus productos se cuentan en el inventario fisico. Hay categorias que se compran y se
+  /// costean pero que nadie va a contar en la alacena (servilletas, gas, desechables): tenerlas
+  /// en la hoja de conteo solo alarga la captura y mete ceros que ensucian la valuacion.
+  isInventoriable Boolean       @default(true)
   createdAt      DateTime       @default(now())
 
   products Product[]

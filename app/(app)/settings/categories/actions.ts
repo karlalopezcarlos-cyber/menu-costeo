@@ -102,3 +102,27 @@ export async function deleteCategory(categoryId: string) {
   revalidatePath("/settings/categories");
   revalidatePath("/products");
 }
+
+/**
+ * Decide si los productos de una categoria se cuentan en el inventario fisico.
+ *
+ * Apagarla no borra nada ni esconde el producto del catalogo: sigue comprandose y costeandose
+ * igual. Solo deja de pedirse en la hoja de conteo, y los conteos pasados se quedan como
+ * estaban, porque son el historico de lo que de verdad se conto ese dia.
+ */
+export async function updateCategoryInventoriable(categoryId: string, isInventoriable: boolean) {
+  const user = await requireOrgSession();
+
+  const category = await prisma.productCategory.findFirst({
+    where: { id: categoryId, organizationId: user.organizationId },
+  });
+  if (!category) throw new Error("Categoria no encontrada.");
+
+  await prisma.productCategory.update({
+    where: { id: category.id },
+    data: { isInventoriable },
+  });
+
+  revalidatePath("/settings/categories");
+  revalidatePath("/inventory");
+}

@@ -1,10 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
-import { deleteCategory, updateCategoryGroup, updateCategoryName } from "./actions";
+import {
+  deleteCategory,
+  updateCategoryGroup,
+  updateCategoryInventoriable,
+  updateCategoryName,
+} from "./actions";
 import NewCategoryForm from "./NewCategoryForm";
 import SettingsNav from "../SettingsNav";
 import CategoryGroupSelect from "../CategoryGroupSelect";
 import InlineNameEditor from "../InlineNameEditor";
+import InventoriableToggle from "../InventoriableToggle";
 
 export default async function ProductCategoriesPage() {
   const user = await requireOrgSession();
@@ -16,12 +22,14 @@ export default async function ProductCategoriesPage() {
   });
 
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Configuracion</h1>
         <SettingsNav active="/settings/categories" />
         <p className="mt-3 text-sm text-neutral-500">
-          Estas categorias aparecen como lista desplegable al crear o editar un producto.
+          Estas categorias aparecen como lista desplegable al crear o editar un producto. Las que
+          no se cuentan (servilletas, gas, desechables) se siguen comprando y costeando igual,
+          pero dejan de pedirse en la hoja de inventario.
         </p>
       </div>
 
@@ -34,13 +42,14 @@ export default async function ProductCategoriesPage() {
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Nombre</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Productos</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Grupo (Estado de Resultados)</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Inventario</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
                   Todavia no hay categorias.
                 </td>
               </tr>
@@ -56,6 +65,13 @@ export default async function ProductCategoriesPage() {
                     categoryId={category.id}
                     initialGroup={category.group}
                     action={updateCategoryGroup}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <InventoriableToggle
+                    categoryId={category.id}
+                    initialValue={category.isInventoriable}
+                    action={updateCategoryInventoriable}
                   />
                 </td>
                 <td className="px-4 py-3 text-right">
