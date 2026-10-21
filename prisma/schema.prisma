@@ -249,7 +249,11 @@ model User {
   id             String        @id @default(cuid())
   email          String        @unique
   hashedPassword String
+  /// Nombre para mostrar. Se arma con nombre + apellidos y es lo que leen las bitacoras:
+  /// antes era un campo libre y opcional, y terminaba con apodos o claves de acceso.
   name           String?
+  firstName      String?
+  lastName       String?
   role           Role          @default(STAFF)
   /// Paneles habilitados para este usuario cuando role = STAFF. Los OWNER ven todo sin importar
   /// este campo.

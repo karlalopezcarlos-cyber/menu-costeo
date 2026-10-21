@@ -99,6 +99,27 @@ async function resolveSucursalIds(organizationId: string, formData: FormData): P
   return ids;
 }
 
+/**
+ * Nombre y apellidos de la persona, obligatorios al dar de alta.
+ *
+ * Antes era un solo campo libre y opcional, y lo que terminaba ahi eran apodos o claves de
+ * acceso. Como ese texto es el que firma las bitacoras —quien capturo una venta, quien corrigio
+ * un conteo—, tiene que ser el nombre de una persona para que sirva de algo.
+ */
+function parseNombrePersona(formData: FormData): {
+  firstName: string;
+  lastName: string;
+  name: string;
+} {
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+
+  if (!firstName) throw new Error("Captura el nombre de la persona.");
+  if (!lastName) throw new Error("Captura los apellidos de la persona.");
+
+  return { firstName, lastName, name: `${firstName} ${lastName}` };
+}
+
 export async function createUser(
   _prevState: { error?: string } | undefined,
   formData: FormData,
@@ -107,13 +128,16 @@ export async function createUser(
     const user = await requireOwner();
 
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
-    const name = String(formData.get("name") ?? "").trim();
+    const persona = parseNombrePersona(formData);
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
     const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
 
     if (!email) throw new Error("El correo es obligatorio.");
     if (password.length < 8) throw new Error("La contrasena debe tener al menos 8 caracteres.");
+    if (persona.name.toLowerCase() === password.toLowerCase()) {
+      throw new Error("El nombre no puede ser la contrasena: ese texto se muestra en las bitacoras.");
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw new Error("Ya existe un usuario con ese correo.");
@@ -123,7 +147,9 @@ export async function createUser(
     await prisma.user.create({
       data: {
         email,
-        name: name || null,
+        name: persona.name,
+        firstName: persona.firstName,
+        lastName: persona.lastName,
         hashedPassword,
         role: "STAFF",
         organizationId: user.organizationId,
@@ -154,7 +180,7 @@ export async function updateUser(
     if (target.role === "OWNER") throw new Error("No se puede editar al dueno de la cuenta desde aqui.");
 
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
-    const name = String(formData.get("name") ?? "").trim();
+    const persona = parseNombrePersona(formData);
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
     const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
@@ -169,13 +195,18 @@ export async function updateUser(
     if (password && password.length < 8) {
       throw new Error("La contrasena debe tener al menos 8 caracteres.");
     }
+    if (password && persona.name.toLowerCase() === password.toLowerCase()) {
+      throw new Error("El nombre no puede ser la contrasena: ese texto se muestra en las bitacoras.");
+    }
 
     await prisma.$transaction([
       prisma.user.update({
         where: { id: target.id },
         data: {
           email,
-          name: name || null,
+          name: persona.name,
+          firstName: persona.firstName,
+          lastName: persona.lastName,
           allowedPanels,
           ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
         },

@@ -28,6 +28,8 @@ export default async function UsersPage() {
     id: u.id,
     email: u.email,
     name: u.name,
+    firstName: u.firstName,
+    lastName: u.lastName,
     role: u.role === "OWNER" ? "OWNER" : "STAFF",
     isActive: u.isActive,
     allowedPanels: u.allowedPanels,

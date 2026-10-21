@@ -10,6 +10,8 @@ export type UserRow = {
   id: string;
   email: string;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   role: "OWNER" | "STAFF";
   isActive: boolean;
   allowedPanels: Panel[];
@@ -81,6 +83,8 @@ export default function UsersManager({
                             id: u.id,
                             email: u.email,
                             name: u.name,
+                            firstName: u.firstName,
+                            lastName: u.lastName,
                             allowedPanels: u.allowedPanels,
                             sucursalIds: u.sucursalIds,
                           })

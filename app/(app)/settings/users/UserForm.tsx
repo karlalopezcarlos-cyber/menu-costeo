@@ -9,6 +9,8 @@ export type EditableUser = {
   id: string;
   email: string;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   allowedPanels: Panel[];
   sucursalIds: string[];
 };
@@ -59,21 +61,50 @@ export default function UserForm({
     });
   }
 
+  // Los usuarios creados antes solo tienen el nombre completo en un campo: se parte en dos para
+  // prellenar, y quien edite lo acomoda si quedo chueco.
+  const nombreDividido = (() => {
+    const completo = (editing?.name ?? "").trim();
+    if (!completo) return { firstName: "", lastName: "" };
+    const partes = completo.split(/\s+/);
+    if (partes.length === 1) return { firstName: partes[0], lastName: "" };
+    return { firstName: partes[0], lastName: partes.slice(1).join(" ") };
+  })();
+
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
       <h2 className="text-sm font-semibold text-neutral-900">
         {editing ? `Editar usuario: ${editing.email}` : "Nuevo usuario"}
       </h2>
+      <p className="-mt-2 text-xs text-neutral-500">
+        El nombre y los apellidos son los que firman las bitacoras: con ellos se sabe quien
+        capturo una venta o corrigio un conteo. No pongas apodos ni claves de acceso.
+      </p>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div className="space-y-1">
-          <label htmlFor="name" className="text-xs font-medium text-neutral-700">
-            Nombre
+          <label htmlFor="firstName" className="text-xs font-medium text-neutral-700">
+            Nombre(s)
           </label>
           <input
-            id="name"
-            name="name"
-            defaultValue={editing?.name ?? ""}
+            id="firstName"
+            name="firstName"
+            required
+            placeholder="Gerardo"
+            defaultValue={editing?.firstName ?? nombreDividido.firstName}
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="lastName" className="text-xs font-medium text-neutral-700">
+            Apellidos
+          </label>
+          <input
+            id="lastName"
+            name="lastName"
+            required
+            placeholder="Lopez Carlos"
+            defaultValue={editing?.lastName ?? nombreDividido.lastName}
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
           />
         </div>
