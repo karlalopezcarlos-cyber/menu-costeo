@@ -126,3 +126,26 @@ export async function updateCategoryInventoriable(categoryId: string, isInventor
   revalidatePath("/settings/categories");
   revalidatePath("/inventory");
 }
+
+/**
+ * Decide si los productos de una categoria aparecen en Transformaciones.
+ *
+ * Mientras ninguna categoria lo tenga prendido, la pantalla sigue ofreciendo todo: asi una
+ * organizacion que no usa el modulo no se queda con selectores vacios sin entender por que.
+ */
+export async function updateCategoryTransformable(categoryId: string, isTransformable: boolean) {
+  const user = await requireOrgSession();
+
+  const category = await prisma.productCategory.findFirst({
+    where: { id: categoryId, organizationId: user.organizationId },
+  });
+  if (!category) throw new Error("Categoria no encontrada.");
+
+  await prisma.productCategory.update({
+    where: { id: category.id },
+    data: { isTransformable },
+  });
+
+  revalidatePath("/settings/categories");
+  revalidatePath("/portioning/new");
+}

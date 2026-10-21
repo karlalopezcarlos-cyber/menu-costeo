@@ -54,7 +54,7 @@ export default function TransformationForm({
   // Con el catalogo completo en los selectores, encontrar el camaron entre cientos de productos
   // es el trabajo mas lento de la captura. Por omision solo se ofrece lo que aparece en alguna
   // plantilla, que es lo que de verdad se transforma; el resto sigue a un clic de distancia.
-  const [soloPlantillas, setSoloPlantillas] = useState(templates.length > 0);
+  const [soloPlantillas, setSoloPlantillas] = useState(true);
 
   /**
    * Aplicar una plantilla rellena el que entra y los que salen, y deja las cantidades vacias a
@@ -80,25 +80,45 @@ export default function TransformationForm({
   const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const source = sourceId ? porId.get(sourceId) : undefined;
 
-  /** Productos que pueden entrar: los que alguna plantilla usa como origen. */
+  // Si nadie marco categorias que se transformen, no hay con que filtrar y se ofrece todo.
+  const hayCategoriasMarcadas = useMemo(
+    () => products.some((p) => p.isTransformable),
+    [products],
+  );
+
+  /** Lo que tiene sentido en una tablajeria: lo que se transforma y lo que sale de transformar. */
+  const deTablajeria = useMemo(() => {
+    if (!hayCategoriasMarcadas) return products;
+    return products.filter((p) => p.isTransformable || p.isProcessed);
+  }, [products, hayCategoriasMarcadas]);
+
+  /**
+   * Productos que pueden entrar: los que alguna plantilla usa como origen. Sin plantillas
+   * todavia, se cae al criterio de categoria en vez de al catalogo completo.
+   */
   const origenes = useMemo(() => {
     if (!soloPlantillas) return products;
-    const ids = new Set(templates.map((t) => t.sourceProductId));
-    // Lo ya elegido no se cae de la lista aunque se apague el filtro con otra cosa puesta.
+    const ids = new Set(
+      templates.length > 0 ? templates.map((t) => t.sourceProductId) : deTablajeria.map((p) => p.id),
+    );
+    // Lo ya elegido no se cae de la lista aunque el filtro lo excluya.
     if (sourceId) ids.add(sourceId);
     return products.filter((p) => ids.has(p.id));
-  }, [products, templates, soloPlantillas, sourceId]);
+  }, [products, templates, soloPlantillas, sourceId, deTablajeria]);
 
   /** Productos que pueden salir: los de las plantillas que parten de lo que entro. */
   const salidasPermitidas = useMemo(() => {
     if (!soloPlantillas) return null;
+    if (templates.length === 0) {
+      return hayCategoriasMarcadas ? new Set(deTablajeria.map((p) => p.id)) : null;
+    }
     const ids = new Set<string>();
     for (const plantilla of templates) {
       if (sourceId && plantilla.sourceProductId !== sourceId) continue;
       for (const output of plantilla.outputs) ids.add(output.productId);
     }
     return ids;
-  }, [templates, soloPlantillas, sourceId]);
+  }, [templates, soloPlantillas, sourceId, deTablajeria, hayCategoriasMarcadas]);
 
   // Lo que normalmente sale de este producto va arriba y separado: es lo que se va a capturar el
   // 90% de las veces. Lo demas sigue disponible, porque el dia que se porciona otra cosa no hay
@@ -189,8 +209,16 @@ export default function TransformationForm({
           <Link href="/portioning/templates/new" className="font-medium text-brand-600 underline-offset-2 hover:underline">
             Crea las que haces siempre
           </Link>{" "}
-          (CAMARON → CAMARON LIMPIO) y la proxima captura sera elegir una y teclear cantidades,
-          en vez de buscar entre todo el catalogo.
+          (CAMARON → CAMARON LIMPIO) y la proxima captura sera elegir una y teclear cantidades.
+          Mientras tanto, aqui solo se ofrecen los productos de las categorias que marcaste como
+          que se transforman, en{" "}
+          <Link
+            href="/settings/categories"
+            className="font-medium text-brand-600 underline-offset-2 hover:underline"
+          >
+            Configuracion → Categorias
+          </Link>
+          .
         </p>
       )}
 

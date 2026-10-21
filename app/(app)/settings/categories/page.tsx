@@ -5,6 +5,7 @@ import {
   updateCategoryGroup,
   updateCategoryInventoriable,
   updateCategoryName,
+  updateCategoryTransformable,
 } from "./actions";
 import NewCategoryForm from "./NewCategoryForm";
 import SettingsNav from "../SettingsNav";
@@ -29,7 +30,9 @@ export default async function ProductCategoriesPage() {
         <p className="mt-3 text-sm text-neutral-500">
           Estas categorias aparecen como lista desplegable al crear o editar un producto. Las que
           no se cuentan (servilletas, gas, desechables) se siguen comprando y costeando igual,
-          pero dejan de pedirse en la hoja de inventario.
+          pero dejan de pedirse en la hoja de inventario. Las que se transforman (carnes,
+          pescados y mariscos) son las unicas que se ofrecen al limpiar o porcionar; si no
+          marcas ninguna, ahi se siguen ofreciendo todas.
         </p>
       </div>
 
@@ -43,13 +46,14 @@ export default async function ProductCategoriesPage() {
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Productos</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Grupo (Estado de Resultados)</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Inventario</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Transformaciones</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]"></th>
             </tr>
           </thead>
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
                   Todavia no hay categorias.
                 </td>
               </tr>
@@ -72,6 +76,14 @@ export default async function ProductCategoriesPage() {
                     categoryId={category.id}
                     initialValue={category.isInventoriable}
                     action={updateCategoryInventoriable}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <InventoriableToggle
+                    categoryId={category.id}
+                    initialValue={category.isTransformable}
+                    action={updateCategoryTransformable}
+                    label="Se transforma"
                   />
                 </td>
                 <td className="px-4 py-3 text-right">

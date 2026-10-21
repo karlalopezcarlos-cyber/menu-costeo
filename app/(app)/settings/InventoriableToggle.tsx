@@ -11,10 +11,12 @@ export default function InventoriableToggle({
   categoryId,
   initialValue,
   action,
+  label = "Se cuenta",
 }: {
   categoryId: string;
   initialValue: boolean;
-  action: (categoryId: string, isInventoriable: boolean) => Promise<void>;
+  action: (categoryId: string, value: boolean) => Promise<void>;
+  label?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -34,7 +36,7 @@ export default function InventoriableToggle({
         }}
         className="h-4 w-4 rounded border-neutral-300"
       />
-      <span className={pending ? "text-neutral-400" : ""}>Se cuenta</span>
+      <span className={pending ? "text-neutral-400" : ""}>{label}</span>
     </label>
   );
 }

@@ -40,6 +40,24 @@ export default function TemplateForm({
   );
   const [name, setName] = useState(values?.name ?? "");
   const [nombreTocado, setNombreTocado] = useState(Boolean(values?.name));
+  const [verTodos, setVerTodos] = useState(false);
+
+  /**
+   * Que productos se pueden meter en una plantilla: los de las categorias marcadas como que se
+   * transforman, mas los de proceso, que son justo lo que sale de transformar.
+   *
+   * Mientras nadie marque una sola categoria se ofrecen todos: una organizacion que apenas
+   * empieza no se puede quedar con el selector vacio sin entender por que.
+   */
+  const hayCategoriasMarcadas = useMemo(
+    () => products.some((p) => p.isTransformable),
+    [products],
+  );
+  const elegibles = useMemo(() => {
+    if (verTodos || !hayCategoriasMarcadas) return products;
+    const puestos = new Set([values?.sourceProductId, ...rows.map((r) => r.productId)].filter(Boolean));
+    return products.filter((p) => p.isTransformable || p.isProcessed || puestos.has(p.id));
+  }, [products, verTodos, hayCategoriasMarcadas, rows, values?.sourceProductId]);
 
   const porId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const source = sourceId ? porId.get(sourceId) : undefined;
@@ -75,7 +93,7 @@ export default function TemplateForm({
           className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="">Elige el producto</option>
-          {products.map((p) => (
+          {elegibles.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
               {p.isProcessed ? " (de proceso)" : ""}
@@ -87,13 +105,24 @@ export default function TemplateForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-neutral-700">Que sale</label>
-          <button
-            type="button"
-            onClick={() => setRows((prev) => [...prev, nuevaFila()])}
-            className="text-xs font-medium text-neutral-600 hover:underline"
-          >
-            Agregar salida
-          </button>
+          <div className="flex items-center gap-3">
+            {hayCategoriasMarcadas && !verTodos && (
+              <button
+                type="button"
+                onClick={() => setVerTodos(true)}
+                className="text-xs text-neutral-500 hover:underline"
+              >
+                ¿No esta el producto? Ver todo el catalogo
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setRows((prev) => [...prev, nuevaFila()])}
+              className="text-xs font-medium text-neutral-600 hover:underline"
+            >
+              Agregar salida
+            </button>
+          </div>
         </div>
 
         {rows.map((row) => {
@@ -113,7 +142,7 @@ export default function TemplateForm({
                 className="flex-1 rounded-md border border-neutral-200 px-2 py-2 text-sm"
               >
                 <option value="">Elige el producto</option>
-                {products
+                {elegibles
                   .filter((p) => p.id !== sourceId)
                   .map((p) => (
                     <option key={p.id} value={p.id}>

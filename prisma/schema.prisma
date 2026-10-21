@@ -150,6 +150,11 @@ model ProductCategory {
   organization    Organization   @relation(fields: [organizationId], references: [id])
   name            String
   group           CategoryGroup?
+  /// Si sus productos se transforman (limpiar, porcionar). En una tablajeria son carnes,
+  /// pescados y mariscos; el azucar glass y la bolsa kraft no tienen nada que hacer en esa
+  /// pantalla. Mientras ninguna categoria lo tenga prendido se ofrecen todas, para que la
+  /// pantalla no arranque vacia en una organizacion que todavia no lo configura.
+  isTransformable Boolean       @default(false)
   /// Si sus productos se cuentan en el inventario fisico. Hay categorias que se compran y se
   /// costean pero que nadie va a contar en la alacena (servilletas, gas, desechables): tenerlas
   /// en la hoja de conteo solo alarga la captura y mete ceros que ensucian la valuacion.

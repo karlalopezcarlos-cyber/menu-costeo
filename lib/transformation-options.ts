@@ -22,7 +22,10 @@ export async function loadTransformationProducts(
   const products = await prisma.product.findMany({
     where: { organizationId, archivedAt: null },
     orderBy: { name: "asc" },
-    include: { extrasRecipe: { select: { id: true, name: true } } },
+    include: {
+      extrasRecipe: { select: { id: true, name: true } },
+      category: { select: { isTransformable: true } },
+    },
   });
 
   // El costo de los agregados se saca de las recetas, no se captura a mano: si sube la bolsa,
@@ -47,6 +50,7 @@ export async function loadTransformationProducts(
     baseUnit: product.baseUnit as UnitValue,
     baseUnitLabel: UNIT_LABELS[product.baseUnit as UnitValue],
     isProcessed: product.isProcessed,
+    isTransformable: product.category?.isTransformable ?? false,
     currentUnitCost: product.currentUnitCost.toString(),
     grossUnitCost: removeYieldFactor(
       product.currentUnitCost.toString(),

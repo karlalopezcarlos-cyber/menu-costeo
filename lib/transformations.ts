@@ -140,6 +140,8 @@ export type TransformationProduct = {
   baseUnit: UnitValue;
   baseUnitLabel: string;
   isProcessed: boolean;
+  /** Su categoria esta marcada como que se transforma (carnes, pescados, mariscos). */
+  isTransformable: boolean;
   /** Costo por unidad aprovechable (el del catalogo, con el rendimiento ya aplicado). */
   currentUnitCost: string;
   /** Costo por unidad comprada, sin rendimiento: lo que de verdad costo lo que entra. */
