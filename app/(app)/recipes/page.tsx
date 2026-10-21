@@ -70,7 +70,14 @@ export default async function RecipesPage({
         .map((i) => i.productId)
         .filter((id): id is string => Boolean(id)),
     );
-    const flatUsage = getRecipeFlatProductUsage(recipe.id, graph, usageMemo);
+    // El buscador por ingrediente no puede tumbar la pantalla: si una receta no se puede
+    // aplanar, esa se queda sin lista de ingredientes y las demas siguen saliendo.
+    let flatUsage: Map<string, import("decimal.js").default>;
+    try {
+      flatUsage = getRecipeFlatProductUsage(recipe.id, graph, usageMemo);
+    } catch {
+      flatUsage = new Map();
+    }
     const ingredients = [...flatUsage.entries()]
       .map(([productId, qtyPerYieldUnit]) => {
         const product = productById.get(productId);

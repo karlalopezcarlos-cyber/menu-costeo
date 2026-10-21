@@ -353,21 +353,29 @@ export function getRecipeFlatProductUsage(
   const total = new Map<string, Decimal>();
 
   for (const item of recipe.items) {
-    if (item.productId && item.product) {
-      const qtyInBase = convertQty(item.quantity, item.unit, item.product.baseUnit).dividedBy(
-        recipe.yieldQty,
-      );
-      addTo(total, item.productId, qtyInBase);
-    } else if (item.subRecipeId) {
-      const sub = graph.recipes.get(item.subRecipeId);
-      if (!sub) continue;
-      const subPorUnidad = convertQty(item.quantity, item.unit, sub.yieldUnit).dividedBy(
-        recipe.yieldQty,
-      );
-      const subUsage = getRecipeFlatProductUsage(item.subRecipeId, graph, memo, stack, depth + 1);
-      for (const [productId, qty] of subUsage) {
-        addTo(total, productId, qty.times(subPorUnidad));
+    // Un ingrediente con la unidad mal (una porcion en PZA dentro de una receta que la pide en
+    // gramos) hace tronar la conversion. Esto alimenta el buscador por ingrediente, no el
+    // costeo: se salta ese renglon y lo demas se sigue pudiendo buscar. El problema de fondo no
+    // se esconde, sale igual en la columna de costo como "Error de costeo".
+    try {
+      if (item.productId && item.product) {
+        const qtyInBase = convertQty(item.quantity, item.unit, item.product.baseUnit).dividedBy(
+          recipe.yieldQty,
+        );
+        addTo(total, item.productId, qtyInBase);
+      } else if (item.subRecipeId) {
+        const sub = graph.recipes.get(item.subRecipeId);
+        if (!sub) continue;
+        const subPorUnidad = convertQty(item.quantity, item.unit, sub.yieldUnit).dividedBy(
+          recipe.yieldQty,
+        );
+        const subUsage = getRecipeFlatProductUsage(item.subRecipeId, graph, memo, stack, depth + 1);
+        for (const [productId, qty] of subUsage) {
+          addTo(total, productId, qty.times(subPorUnidad));
+        }
       }
+    } catch {
+      continue;
     }
   }
 
