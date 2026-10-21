@@ -18,6 +18,8 @@ export type SaleRow = {
   source: string;
   /** Ticket(s) de venta (mini POS) que aportaron a este renglon agregado del dia. */
   tickets: { id: string; folioLabel: string }[];
+  /** false cuando el platillo no tiene ingredientes: su costo sale en cero. */
+  hasRecipe: boolean;
   /** Quien dejo la venta como esta: la capturo, subio el archivo o cerro el ticket. */
   capturedBy: string | null;
   /** Cuantas veces se ha corregido a mano despues de registrada. */
@@ -187,7 +189,18 @@ export default function SalesTable({
           {sortedRows.map((row) => (
             <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
               <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
-              <td className="px-4 py-3">{row.recipeName}</td>
+              <td className="px-4 py-3">
+                {row.recipeName}
+                {!row.hasRecipe && (
+                  <Link
+                    href={`/recipes/${row.recipeId}`}
+                    className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200"
+                    title="Este platillo no tiene ingredientes: su costo sale en cero"
+                  >
+                    sin receta
+                  </Link>
+                )}
+              </td>
               <td className="px-4 py-3">{row.quantitySold}</td>
               <td className="px-4 py-3">{formatMoney(row.unitPrice)}</td>
               <td className="px-4 py-3">{formatMoney(row.quantitySold * row.unitPrice)}</td>

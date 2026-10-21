@@ -102,6 +102,28 @@ export default async function SalesPage({
     userName: cambio.changedBy?.name ?? cambio.changedBy?.email ?? null,
   }));
 
+  // Un platillo vendido sin ingredientes cuesta cero: se ve rentable al 100%, no descuenta
+  // inventario y arrastra el costo teorico de todo el periodo. Pasa solito cuando una venta
+  // importada crea el platillo al vuelo y nadie regresa a recetarlo.
+  const recetasVendidas = [...new Set(sales.map((sale) => sale.recipeId))];
+  const conIngredientes = recetasVendidas.length
+    ? await prisma.recipeItem.groupBy({
+        by: ["recipeId"],
+        where: { recipeId: { in: recetasVendidas } },
+        _count: { _all: true },
+      })
+    : [];
+  const recetasConIngredientes = new Set(conIngredientes.map((r) => r.recipeId));
+
+  const sinReceta = sales
+    .filter((sale) => !recetasConIngredientes.has(sale.recipeId))
+    .reduce<{ id: string; name: string }[]>((lista, sale) => {
+      if (lista.some((r) => r.id === sale.recipeId)) return lista;
+      lista.push({ id: sale.recipeId, name: sale.recipe.name });
+      return lista;
+    }, [])
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const edicionesPorVenta = new Map(
     ediciones.map((e) => [e.dailySaleId as string, { veces: e._count._all, ultima: e._max.createdAt }]),
   );
@@ -121,6 +143,7 @@ export default async function SalesPage({
       unitPrice: Number(sale.unitPrice),
       source: sale.source,
       tickets,
+      hasRecipe: recetasConIngredientes.has(sale.recipeId),
       capturedBy: sale.createdBy?.name ?? sale.createdBy?.email ?? null,
       edits: edicion?.veces ?? 0,
       lastEditLabel: edicion?.ultima
@@ -223,6 +246,32 @@ export default async function SalesPage({
           Bitacora
         </Link>
       </div>
+
+      {sinReceta.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p className="font-medium">
+            {sinReceta.length === 1
+              ? "1 platillo que vendiste no tiene receta"
+              : `${sinReceta.length} platillos que vendiste no tienen receta`}
+            .
+          </p>
+          <p className="mt-0.5 text-xs">
+            Sin ingredientes su costo es cero: salen como si fueran pura ganancia, no descuentan
+            inventario y jalan hacia abajo el costo de todo el periodo.
+          </p>
+          <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {sinReceta.map((receta) => (
+              <Link
+                key={receta.id}
+                href={`/recipes/${receta.id}`}
+                className="font-medium underline underline-offset-2"
+              >
+                {receta.name}
+              </Link>
+            ))}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <PeriodFilter from={toDateInputValue(from)} to={toDateInputValue(to)} />
