@@ -240,17 +240,30 @@ export default function SalesTable({
                   >
                     Editar
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm("¿Eliminar esta venta? Esta accion no se puede deshacer.")) {
-                        deleteDailySale(row.id);
-                      }
-                    }}
-                    className="text-neutral-400 hover:text-red-600"
-                  >
-                    Eliminar
-                  </button>
+                  {/* Borrar un renglon suelto solo es honesto cuando la venta se capturo a
+                      mano: una venta importada esta respaldada por el renglon del archivo, y
+                      borrarla aqui la haria reaparecer en el siguiente recalculo. Esas se
+                      borran por dia completo, que es como entraron. */}
+                  {row.source === "manual" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("¿Eliminar esta venta? Esta accion no se puede deshacer.")) {
+                          deleteDailySale(row.id);
+                        }
+                      }}
+                      className="text-neutral-400 hover:text-red-600"
+                    >
+                      Eliminar
+                    </button>
+                  ) : (
+                    <span
+                      className="cursor-default text-neutral-300"
+                      title="Esta venta entro por archivo o por ticket: se borra el dia completo desde la pestana Ventas por dia"
+                    >
+                      Eliminar
+                    </span>
+                  )}
                 </div>
               </td>
             </tr>
@@ -258,6 +271,13 @@ export default function SalesTable({
         </tbody>
       </table>
     </div>
+
+      <p className="text-xs text-neutral-500">
+        Las ventas que entraron por archivo o por ticket se borran por <b>dia completo</b>, en la
+        pestana Ventas por dia: borrarlas de una en una las dejaria volver en el siguiente
+        recalculo, porque el renglon del archivo sigue ahi. Las capturadas a mano si se borran
+        por renglon.
+      </p>
     </div>
   );
 }

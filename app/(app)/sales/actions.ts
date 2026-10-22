@@ -209,6 +209,18 @@ export async function deleteDailySale(saleId: string): Promise<void> {
 
   await prisma.dailySale.delete({ where: { id: sale.id } });
 
+  // Si venia de un archivo, su renglon se va con ella: dejarlo haria reaparecer la venta en el
+  // siguiente recalculo de las importadas.
+  if (sale.source === "import") {
+    await prisma.importRow.deleteMany({
+      where: {
+        matchedRecipeId: sale.recipeId,
+        date: sale.date,
+        importBatch: { sucursalId: user.sucursalId },
+      },
+    });
+  }
+
   // La bitacora se escribe despues de borrar y a proposito no apunta a la venta (ya no existe):
   // por eso guarda la receta y la fecha, para poder decir que se borro y que decia.
   await registrarCambioDeVenta(user.organizationId, user.sucursalId, user.id, {
