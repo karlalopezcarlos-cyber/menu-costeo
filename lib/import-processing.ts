@@ -255,15 +255,20 @@ type PendingRow = {
   importBatchId: string;
 };
 
-/** Vincula un ImportRow pendiente a una receta existente: crea/actualiza el DishAlias y el DailySale. */
+/**
+ * Vincula un nombre del punto de venta con una receta: crea el alias y resuelve de una vez
+ * TODAS las filas pendientes que traen ese mismo nombre.
+ *
+ * La decision es sobre el nombre, no sobre el renglon. Si el archivo trae diez ventas de
+ * "COCA COLA", preguntar diez veces lo mismo es pura talacha: la respuesta ya se sabia desde la
+ * primera. Devuelve cuantas filas quedaron resueltas, para poder decirlo en pantalla.
+ */
 export async function linkRowToRecipe(
   organizationId: string,
   sucursalId: string,
   row: PendingRow,
   recipeId: string,
-) {
-  if (!row.date) throw new Error("La fila no tiene una fecha valida.");
-
+): Promise<number> {
   await prisma.dishAlias.upsert({
     where: { sucursalId_normalizedName: { sucursalId, normalizedName: row.normalizedName } },
     create: {
@@ -276,12 +281,33 @@ export async function linkRowToRecipe(
     update: { recipeId, ignored: false },
   });
 
-  await prisma.importRow.update({
-    where: { id: row.id },
-    data: { status: "MATCHED", matchedRecipeId: recipeId },
+  const pendientes = await prisma.importRow.findMany({
+    where: {
+      normalizedName: row.normalizedName,
+      status: "PENDING",
+      importBatch: { sucursalId },
+    },
+    select: { id: true, date: true },
   });
 
-  await recomputeDailySale(organizationId, sucursalId, recipeId, row.date);
+  if (pendientes.length > 0) {
+    await prisma.importRow.updateMany({
+      where: { id: { in: pendientes.map((p) => p.id) } },
+      data: { status: "MATCHED", matchedRecipeId: recipeId },
+    });
+  }
+
+  // La venta del dia se rearma una sola vez por fecha, no una por fila: si el archivo traia
+  // diez renglones del mismo dia, el total del dia se suma una vez.
+  const fechas = new Map<string, Date>();
+  for (const pendiente of pendientes) {
+    if (pendiente.date) fechas.set(pendiente.date.toISOString(), pendiente.date);
+  }
+  for (const fecha of fechas.values()) {
+    await recomputeDailySale(organizationId, sucursalId, recipeId, fecha);
+  }
+
+  return pendientes.length;
 }
 
 /** Crea una receta nueva (platillo de menu) a partir de un ImportRow pendiente y la vincula. */
@@ -304,7 +330,11 @@ export async function createRecipeAndLinkRow(organizationId: string, sucursalId:
 }
 
 /** Marca un ImportRow pendiente como "nunca es un platillo" (propinas, descuentos, etc.). */
-export async function ignoreRowPermanently(organizationId: string, sucursalId: string, row: PendingRow) {
+export async function ignoreRowPermanently(
+  organizationId: string,
+  sucursalId: string,
+  row: PendingRow,
+): Promise<number> {
   await prisma.dishAlias.upsert({
     where: { sucursalId_normalizedName: { sucursalId, normalizedName: row.normalizedName } },
     create: {
@@ -317,5 +347,16 @@ export async function ignoreRowPermanently(organizationId: string, sucursalId: s
     update: { ignored: true, recipeId: null },
   });
 
-  await prisma.importRow.update({ where: { id: row.id }, data: { status: "IGNORED" } });
+  // Igual que al vincular: lo que se decide es que ese nombre nunca es un platillo, asi que se
+  // aplica a todas sus filas pendientes de un jalon.
+  const { count } = await prisma.importRow.updateMany({
+    where: {
+      normalizedName: row.normalizedName,
+      status: "PENDING",
+      importBatch: { sucursalId },
+    },
+    data: { status: "IGNORED" },
+  });
+
+  return count;
 }

@@ -30,30 +30,75 @@ export default async function ImportReviewPage({
     }),
   ]);
 
+  // Una tarjeta por NOMBRE, no por renglon. Un archivo con diez ventas de "COCA COLA" traia diez
+  // tarjetas identicas pidiendo diez veces la misma decision.
+  type Pendiente = {
+    rowId: string;
+    rawName: string;
+    renglones: number;
+    piezas: number;
+    importe: number;
+    fechas: Set<string>;
+  };
+  const porNombre = new Map<string, Pendiente>();
+  for (const row of pendingRows) {
+    const actual = porNombre.get(row.normalizedName);
+    const piezas = Number(row.quantitySold);
+    const importe = piezas * Number(row.unitPrice);
+    const fecha = row.date ? row.date.toLocaleDateString("es-MX", { timeZone: "UTC" }) : null;
+    if (actual) {
+      actual.renglones += 1;
+      actual.piezas += piezas;
+      actual.importe += importe;
+      if (fecha) actual.fechas.add(fecha);
+    } else {
+      porNombre.set(row.normalizedName, {
+        rowId: row.id,
+        rawName: row.rawName,
+        renglones: 1,
+        piezas,
+        importe,
+        fechas: new Set(fecha ? [fecha] : []),
+      });
+    }
+  }
+  const pendientes = [...porNombre.values()].sort((a, b) => a.rawName.localeCompare(b.rawName));
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Platillos por reconocer</h1>
       <p className="text-sm text-neutral-500">
-        Estos nombres del archivo "{batch.fileName}" no coinciden con ninguna receta conocida.
-        Resuelvelos una vez; en cargas futuras se reconoceran solos.
+        Estos nombres del archivo &quot;{batch.fileName}&quot; no coinciden con ninguna receta
+        conocida. Lo que decidas aqui se aplica a todas las ventas de ese nombre, de este archivo
+        y de los que vengan.
       </p>
 
-      {pendingRows.length === 0 ? (
+      {pendientes.length === 0 ? (
         <p className="text-sm text-neutral-500">
           No quedan platillos pendientes. <Link href="/sales" className="underline">Ir a ventas</Link>
         </p>
       ) : (
         <div className="space-y-4">
-          {pendingRows.map((row) => {
-            const linkAction = linkRowToExistingRecipe.bind(null, batch.id, row.id);
-            const createAction = createRecipeForRow.bind(null, batch.id, row.id);
-            const ignoreAction = ignoreRowAlways.bind(null, batch.id, row.id);
+          {pendientes.map((pendiente) => {
+            const linkAction = linkRowToExistingRecipe.bind(null, batch.id, pendiente.rowId);
+            const createAction = createRecipeForRow.bind(null, batch.id, pendiente.rowId);
+            const ignoreAction = ignoreRowAlways.bind(null, batch.id, pendiente.rowId);
+            const fechas = [...pendiente.fechas];
             return (
-              <div key={row.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-                <p className="font-medium text-neutral-900">{row.rawName}</p>
+              <div key={pendiente.rowId} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
+                <p className="font-medium text-neutral-900">{pendiente.rawName}</p>
                 <p className="mb-3 text-sm text-neutral-500">
-                  Fecha: {row.date ? row.date.toLocaleDateString("es-MX", { timeZone: "UTC" }) : "-"} - Cantidad:{" "}
-                  {row.quantitySold.toString()} - Precio: {formatMoney(Number(row.unitPrice))}
+                  {pendiente.renglones === 1
+                    ? "1 venta"
+                    : `${pendiente.renglones} ventas en el archivo`}{" "}
+                  · {pendiente.piezas.toLocaleString("es-MX", { maximumFractionDigits: 2 })}{" "}
+                  {pendiente.piezas === 1 ? "pieza" : "piezas"} · {formatMoney(pendiente.importe)}
+                  {fechas.length > 0 && (
+                    <>
+                      {" · "}
+                      {fechas.length === 1 ? fechas[0] : `${fechas.length} dias distintos`}
+                    </>
+                  )}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -74,7 +119,7 @@ export default async function ImportReviewPage({
                       type="submit"
                       className="rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white hover:bg-neutral-800"
                     >
-                      Vincular
+                      Vincular{pendiente.renglones > 1 ? ` las ${pendiente.renglones}` : ""}
                     </button>
                   </form>
 
