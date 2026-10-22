@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/format";
+import DeleteDayButton from "./DeleteDayButton";
 import { IVA_RATE } from "@/lib/menu-engineering";
 import type { IvaMode } from "@/lib/menu-engineering";
 
@@ -9,6 +10,8 @@ export type DailySalesInput = {
   /** Venta del dia tal como se capturo, es decir con IVA incluido. */
   grossTotal: number;
   dishes: number;
+  /** Tickets de venta de ese dia: no se borran junto con las ventas, pero hay que avisarlo. */
+  tickets: number;
 };
 
 /**
@@ -80,12 +83,13 @@ export default function DailySalesTable({
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Venta {iva === "sin" ? "sin IVA" : "con IVA"}
               </th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {days.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-neutral-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-neutral-400">
                   No hay ventas en este periodo.
                 </td>
               </tr>
@@ -105,6 +109,15 @@ export default function DailySalesTable({
                 <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
                   {formatMoney(day.grossTotal * factor)}
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <DeleteDayButton
+                    dateKey={day.dateKey}
+                    dateLabel={day.dateLabel}
+                    dishes={day.dishes}
+                    total={day.grossTotal * factor}
+                    tickets={day.tickets}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -121,6 +134,7 @@ export default function DailySalesTable({
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
                   {formatMoney(totalPeriodo)}
                 </td>
+                <td></td>
               </tr>
             </tfoot>
           )}

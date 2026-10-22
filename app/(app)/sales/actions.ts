@@ -455,3 +455,57 @@ export async function generateSaleTicketPaymentLink(
     return { error: error instanceof Error ? error.message : "No se pudo generar el link de pago." };
   }
 }
+
+/**
+ * Borra de un jalon todas las ventas de un dia.
+ *
+ * Sirve para cuando un dia entero entro mal —una importacion con el archivo equivocado, por
+ * ejemplo— y rehacerlo venta por venta seria absurdo. Se borran tambien los renglones importados
+ * de ese dia: si se quedaran, el dia volveria a aparecer solo la proxima vez que algo recalcule
+ * las ventas importadas.
+ *
+ * Los tickets de venta NO se tocan: tienen folio propio y su propia pantalla, y borrarlos de
+ * refilon seria destruir un comprobante sin que nadie lo pidiera.
+ */
+export async function deleteSalesForDay(dateKey: string): Promise<{ borradas: number }> {
+  const user = await requireSucursalContext();
+
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) throw new Error("Fecha invalida.");
+
+  const ventas = await prisma.dailySale.findMany({
+    where: { sucursalId: user.sucursalId, date },
+    select: { id: true, recipeId: true, quantitySold: true, unitPrice: true, source: true },
+  });
+  if (ventas.length === 0) return { borradas: 0 };
+
+  await prisma.dailySale.deleteMany({
+    where: { id: { in: ventas.map((v) => v.id) } },
+  });
+
+  // Cada venta borrada deja su constancia: que decia y quien la borro.
+  await prisma.dailySaleChange.createMany({
+    data: ventas.map((venta) => ({
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      dailySaleId: null,
+      recipeId: venta.recipeId,
+      date,
+      action: "delete",
+      previousQuantity: venta.quantitySold.toString(),
+      previousPrice: venta.unitPrice.toString(),
+      source: venta.source,
+      changedByUserId: user.id,
+    })),
+  });
+
+  await prisma.importRow.deleteMany({
+    where: { date, importBatch: { sucursalId: user.sucursalId } },
+  });
+
+  revalidatePath("/sales");
+  revalidatePath("/menu-engineering");
+  revalidatePath("/dashboard");
+
+  return { borradas: ventas.length };
+}

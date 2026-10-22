@@ -154,6 +154,12 @@ export default async function SalesPage({
 
   // La venta de cada dia sale de las mismas filas: una venta diaria ya trae juntos lo importado
   // y lo capturado a mano o por ticket.
+  const ticketsPorDia = new Map<string, number>();
+  for (const ticket of tickets) {
+    const key = ticket.date.toISOString().slice(0, 10);
+    ticketsPorDia.set(key, (ticketsPorDia.get(key) ?? 0) + 1);
+  }
+
   const porDia = new Map<string, DailySalesInput>();
   for (const sale of sales) {
     const dateKey = sale.date.toISOString().slice(0, 10);
@@ -175,6 +181,7 @@ export default async function SalesPage({
         quantity: Number(sale.quantitySold),
         grossTotal: importe,
         dishes: 1,
+        tickets: ticketsPorDia.get(dateKey) ?? 0,
       });
     }
   }
