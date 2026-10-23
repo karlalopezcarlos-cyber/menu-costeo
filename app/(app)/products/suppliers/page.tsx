@@ -7,13 +7,18 @@ import ProductSupplierTable, { type ProductSupplierRow } from "./ProductSupplier
 export default async function ProductSuppliersPage() {
   const user = await requireOrgSession();
 
-  const [products, suppliers] = await Promise.all([
+  const [products, suppliers, categories] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false },
       orderBy: { name: "asc" },
       include: { category: true, defaultSupplier: { select: { id: true, name: true } } },
     }),
     listSuppliersForCapture(user.organizationId),
+    prisma.productCategory.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   // Un proveedor inactivo ya asignado se sigue mostrando como opcion, para no borrarlo sin querer
@@ -32,6 +37,7 @@ export default async function ProductSuppliersPage() {
   const rows: ProductSupplierRow[] = products.map((product) => ({
     id: product.id,
     name: product.name,
+    categoryId: product.categoryId,
     categoryName: product.category?.name ?? null,
     defaultSupplierId: product.defaultSupplierId,
   }));
@@ -46,11 +52,12 @@ export default async function ProductSuppliersPage() {
             Compras
           </p>
           <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900">
-            Proveedor habitual por producto
+            Acomodar el catalogo
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">
-            Deja amarrado con quien se pide cada producto. Con esto el pedido sugerido se desglosa
-            solo: un pedido por proveedor, con sus datos, listo para mandarle a cada uno.
+            Proveedor habitual y categoria de cada producto, en una sola pantalla y sin entrar
+            uno por uno. El proveedor es lo que hace que el pedido sugerido se desglose solo: un
+            pedido por proveedor, listo para mandarle a cada quien.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -72,7 +79,12 @@ export default async function ProductSuppliersPage() {
           y regresa aqui a asignarlos.
         </p>
       ) : (
-        <ProductSupplierTable rows={rows} suppliers={supplierOptions} sinProveedor={sinProveedor} />
+        <ProductSupplierTable
+          rows={rows}
+          suppliers={supplierOptions}
+          categories={categories}
+          sinProveedor={sinProveedor}
+        />
       )}
     </div>
   );

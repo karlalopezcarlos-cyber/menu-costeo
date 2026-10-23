@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { saveDefaultSuppliers } from "./actions";
 
 export type ProductSupplierRow = {
   id: string;
   name: string;
+  categoryId: string | null;
   categoryName: string | null;
   defaultSupplierId: string | null;
 };
@@ -15,10 +16,12 @@ type SupplierOption = { id: string; name: string };
 export default function ProductSupplierTable({
   rows,
   suppliers,
+  categories,
   sinProveedor,
 }: {
   rows: ProductSupplierRow[];
   suppliers: SupplierOption[];
+  categories: { id: string; name: string }[];
   sinProveedor: number;
 }) {
   const [search, setSearch] = useState("");
@@ -28,22 +31,19 @@ export default function ProductSupplierTable({
   const [asignados, setAsignados] = useState<Record<string, string>>(() =>
     Object.fromEntries(rows.map((r) => [r.id, r.defaultSupplierId ?? ""])),
   );
+  const [categoriaDe, setCategoriaDe] = useState<Record<string, string>>(() =>
+    Object.fromEntries(rows.map((r) => [r.id, r.categoryId ?? ""])),
+  );
+  const [bulkCategoria, setBulkCategoria] = useState("");
 
-  const categoryOptions = useMemo(() => {
-    const names = new Set<string>();
-    let hasUncategorized = false;
-    for (const row of rows) {
-      if (row.categoryName) names.add(row.categoryName);
-      else hasUncategorized = true;
-    }
-    return { names: [...names].sort((a, b) => a.localeCompare(b)), hasUncategorized };
-  }, [rows]);
+
 
   function matchesFilter(row: ProductSupplierRow): boolean {
     const q = search.trim().toLowerCase();
     if (q && !row.name.toLowerCase().includes(q)) return false;
-    if (categoryFilter === "none" && row.categoryName !== null) return false;
-    if (categoryFilter !== "all" && categoryFilter !== "none" && row.categoryName !== categoryFilter) {
+    const categoriaActual = categoriaDe[row.id] ?? "";
+    if (categoryFilter === "none" && categoriaActual !== "") return false;
+    if (categoryFilter !== "all" && categoryFilter !== "none" && categoriaActual !== categoryFilter) {
       return false;
     }
     const actual = asignados[row.id] ?? "";
@@ -55,17 +55,29 @@ export default function ProductSupplierTable({
   const visibleRows = useMemo(
     () => rows.filter(matchesFilter),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, search, categoryFilter, supplierFilter, asignados],
+    [rows, search, categoryFilter, supplierFilter, asignados, categoriaDe],
   );
 
   const pendientes = rows.filter((r) => !(asignados[r.id] ?? "")).length;
-  const cambios = rows.filter((r) => (asignados[r.id] ?? "") !== (r.defaultSupplierId ?? "")).length;
+  const cambios = rows.filter(
+    (r) =>
+      (asignados[r.id] ?? "") !== (r.defaultSupplierId ?? "") ||
+      (categoriaDe[r.id] ?? "") !== (r.categoryId ?? ""),
+  ).length;
 
-  /** Asigna de golpe lo que esta en pantalla: filtras una categoria y la mandas completa. */
+  /** Asigna de golpe lo que esta en pantalla: filtras algo y lo mandas completo. */
   function aplicarAVisibles() {
     setAsignados((prev) => {
       const next = { ...prev };
       for (const row of visibleRows) next[row.id] = bulkSupplier;
+      return next;
+    });
+  }
+
+  function aplicarCategoriaAVisibles() {
+    setCategoriaDe((prev) => {
+      const next = { ...prev };
+      for (const row of visibleRows) next[row.id] = bulkCategoria;
       return next;
     });
   }
@@ -75,7 +87,10 @@ export default function ProductSupplierTable({
       {/* Todas las filas van en el form, tambien las que el filtro esconde: asi un guardado no
           pierde lo que asignaste antes de filtrar. */}
       {rows.map((row) => (
-        <input key={row.id} type="hidden" name={`supplier:${row.id}`} value={asignados[row.id] ?? ""} />
+        <Fragment key={row.id}>
+          <input type="hidden" name={`supplier:${row.id}`} value={asignados[row.id] ?? ""} />
+          <input type="hidden" name={`category:${row.id}`} value={categoriaDe[row.id] ?? ""} />
+        </Fragment>
       ))}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
@@ -111,12 +126,12 @@ export default function ProductSupplierTable({
           className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las categorias</option>
-          {categoryOptions.names.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          <option value="none">Sin categoria</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
             </option>
           ))}
-          {categoryOptions.hasUncategorized && <option value="none">Sin categoria</option>}
         </select>
         <select
           value={supplierFilter}
@@ -169,16 +184,42 @@ export default function ProductSupplierTable({
           Aplicar
         </button>
         <span className="text-xs text-neutral-500">
-          Filtra una categoria y mandala completa con un proveedor; luego ajusta las excepciones.
+          Filtra lo que quieras y mandalo completo; luego ajusta las excepciones.
         </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+        <span className="text-sm text-neutral-600">
+          Cambiar la categoria de los {visibleRows.length} productos en pantalla:
+        </span>
+        <select
+          value={bulkCategoria}
+          onChange={(e) => setBulkCategoria(e.target.value)}
+          className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm"
+        >
+          <option value="">Sin categoria</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={aplicarCategoriaAVisibles}
+          disabled={visibleRows.length === 0}
+          className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 disabled:opacity-50"
+        >
+          Aplicar
+        </button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
-              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Categoria</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Producto</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Categoria</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Proveedor habitual</th>
             </tr>
           </thead>
@@ -202,8 +243,27 @@ export default function ProductSupplierTable({
               const cambiado = (asignados[row.id] ?? "") !== (row.defaultSupplierId ?? "");
               return (
                 <tr key={row.id} className={visible ? "border-t border-neutral-100" : "hidden"}>
-                  <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
                   <td className="px-4 py-3">{row.name}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={categoriaDe[row.id] ?? ""}
+                      onChange={(e) =>
+                        setCategoriaDe((prev) => ({ ...prev, [row.id]: e.target.value }))
+                      }
+                      className={`w-full max-w-xs rounded-md border px-2 py-1 text-sm ${
+                        (categoriaDe[row.id] ?? "") !== (row.categoryId ?? "")
+                          ? "border-amber-300 bg-amber-50"
+                          : "border-neutral-200"
+                      }`}
+                    >
+                      <option value="">Sin categoria</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="px-4 py-3">
                     <select
                       value={asignados[row.id] ?? ""}
