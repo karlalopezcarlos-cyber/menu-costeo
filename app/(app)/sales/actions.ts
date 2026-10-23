@@ -180,6 +180,19 @@ export async function updateDailySale(
       },
     });
 
+    // Si venia de un archivo, sus renglones se retiran: mientras existan, cualquier recalculo de
+    // las importadas devolveria la cantidad original y la correccion se perderia sin aviso. A
+    // partir de esta edicion, la venta vale por si misma.
+    if (sale.source === "import") {
+      await prisma.importRow.deleteMany({
+        where: {
+          matchedRecipeId: sale.recipeId,
+          date: sale.date,
+          importBatch: { sucursalId: user.sucursalId },
+        },
+      });
+    }
+
     await registrarCambioDeVenta(user.organizationId, user.sucursalId, user.id, {
       dailySaleId: sale.id,
       recipeId,

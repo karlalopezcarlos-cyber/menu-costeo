@@ -256,14 +256,7 @@ export default function SalesTable({
                     >
                       Eliminar
                     </button>
-                  ) : (
-                    <span
-                      className="cursor-default text-neutral-300"
-                      title="Esta venta entro por archivo o por ticket: se borra el dia completo desde la pestana Ventas por dia"
-                    >
-                      Eliminar
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               </td>
             </tr>
