@@ -534,3 +534,79 @@ export async function deleteSalesForDay(dateKey: string): Promise<{ borradas: nu
 
   return { borradas: ventas.length };
 }
+
+/**
+ * Devuelve las ventas de un dia que se borraron, reconstruyendolas desde la bitacora.
+ *
+ * Cuando se borra un dia, cada venta deja registrada su cantidad y su precio. Eso no se guardo
+ * pensando en esto, pero alcanza para devolverlas tal como estaban, y hace que un borrado
+ * —que es facil de repetir de mas sin darse cuenta— deje de ser definitivo.
+ *
+ * Lo que no vuelve son los renglones del archivo original: la venta regresa valiendo por si
+ * misma. Por eso queda como capturada a mano.
+ */
+export async function restoreDeletedDay(dateKey: string): Promise<{ restauradas: number }> {
+  const user = await requireSucursalContext();
+
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) throw new Error("Fecha invalida.");
+
+  const borradas = await prisma.dailySaleChange.findMany({
+    where: { sucursalId: user.sucursalId, date, action: "delete" },
+    orderBy: { createdAt: "desc" },
+    select: { recipeId: true, previousQuantity: true, previousPrice: true, source: true },
+  });
+  if (borradas.length === 0) return { restauradas: 0 };
+
+  // De un mismo platillo pudo borrarse mas de una vez; vale la ultima, que es como quedo.
+  const porReceta = new Map<string, (typeof borradas)[number]>();
+  for (const borrada of borradas) {
+    if (!porReceta.has(borrada.recipeId)) porReceta.set(borrada.recipeId, borrada);
+  }
+
+  // No se pisa lo que ya exista: si despues del borrado alguien volvio a capturar ese dia, lo
+  // suyo manda sobre lo que diga la bitacora.
+  const existentes = await prisma.dailySale.findMany({
+    where: { sucursalId: user.sucursalId, date },
+    select: { recipeId: true },
+  });
+  const yaHay = new Set(existentes.map((v) => v.recipeId));
+
+  const porCrear = [...porReceta.values()]
+    .filter((v) => !yaHay.has(v.recipeId) && v.previousQuantity !== null)
+    .map((v) => ({
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      recipeId: v.recipeId,
+      date,
+      quantitySold: v.previousQuantity!.toString(),
+      unitPrice: (v.previousPrice ?? 0).toString(),
+      source: "manual",
+      createdByUserId: user.id,
+    }));
+
+  if (porCrear.length === 0) return { restauradas: 0 };
+
+  await prisma.dailySale.createMany({ data: porCrear, skipDuplicates: true });
+
+  await prisma.dailySaleChange.createMany({
+    data: porCrear.map((v) => ({
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      dailySaleId: null,
+      recipeId: v.recipeId,
+      date,
+      action: "create",
+      newQuantity: v.quantitySold,
+      newPrice: v.unitPrice,
+      source: "manual",
+      changedByUserId: user.id,
+    })),
+  });
+
+  revalidatePath("/sales");
+  revalidatePath("/menu-engineering");
+  revalidatePath("/dashboard");
+
+  return { restauradas: porCrear.length };
+}

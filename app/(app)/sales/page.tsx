@@ -7,6 +7,7 @@ import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
 import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
 import SalesLogTable, { type SaleLogRow } from "./SalesLogTable";
+import DeletedDaysPanel, { type DeletedDay } from "./DeletedDaysPanel";
 import PeriodFilter from "./PeriodFilter";
 import type { IvaMode } from "@/lib/menu-engineering";
 
@@ -87,6 +88,41 @@ export default async function SalesPage({
         },
       })
     : [];
+
+  // Dias que se borraron completos y todavia se pueden devolver: un dia cuenta como borrado
+  // cuando ya no le queda ninguna venta viva.
+  const diasConVenta = new Set(sales.map((sale) => sale.date.toISOString().slice(0, 10)));
+  const borradosPorDia = new Map<string, DeletedDay>();
+  for (const cambio of bitacora) {
+    if (cambio.action !== "delete" || cambio.previousQuantity === null) continue;
+    const dateKey = cambio.date.toISOString().slice(0, 10);
+    if (diasConVenta.has(dateKey)) continue;
+
+    const importe =
+      Number(cambio.previousQuantity) * Number(cambio.previousPrice ?? 0);
+    const actual = borradosPorDia.get(dateKey);
+    if (actual) {
+      actual.ventas += 1;
+      actual.importe += importe;
+    } else {
+      borradosPorDia.set(dateKey, {
+        dateKey,
+        dateLabel: cambio.date.toLocaleDateString("es-MX", {
+          timeZone: "UTC",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }),
+        ventas: 1,
+        importe,
+        cuandoLabel: formatDateTime(cambio.createdAt),
+        quien: cambio.changedBy?.name ?? cambio.changedBy?.email ?? null,
+      });
+    }
+  }
+  const diasBorrados = [...borradosPorDia.values()].sort((a, b) =>
+    b.dateKey.localeCompare(a.dateKey),
+  );
 
   const bitacoraRows: SaleLogRow[] = bitacora.map((cambio) => ({
     id: cambio.id,
@@ -306,7 +342,10 @@ export default async function SalesPage({
       </div>
 
       {vistaBitacora ? (
-        <SalesLogTable rows={bitacoraRows} />
+        <div className="space-y-4">
+          <DeletedDaysPanel days={diasBorrados} />
+          <SalesLogTable rows={bitacoraRows} />
+        </div>
       ) : vistaDiaria ? (
         <DailySalesTable days={dias} iva={ivaMode} />
       ) : (
