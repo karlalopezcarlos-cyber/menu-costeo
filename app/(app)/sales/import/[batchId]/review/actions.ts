@@ -4,7 +4,23 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { createRecipeAndLinkRow, ignoreRowPermanently, linkRowToRecipe } from "@/lib/import-processing";
+import {
+  createRecipeAndLinkRow,
+  destinoAlTerminarCarga,
+  ignoreRowPermanently,
+  linkRowToRecipe,
+} from "@/lib/import-processing";
+
+/**
+ * Si ya no queda nada por reconocer, la carga termino: se sale de esta pantalla hacia las
+ * ventas por dia, que es donde se comprueba que entro lo que debia.
+ */
+async function salirSiYaNoQuedaNada(batchId: string) {
+  const pendientes = await prisma.importRow.count({
+    where: { importBatchId: batchId, status: "PENDING" },
+  });
+  if (pendientes === 0) redirect(await destinoAlTerminarCarga(batchId));
+}
 
 async function getRow(batchId: string, rowId: string, sucursalId: string) {
   const batch = await prisma.importBatch.findFirst({ where: { id: batchId, sucursalId } });
@@ -30,6 +46,8 @@ export async function linkRowToExistingRecipe(batchId: string, rowId: string, fo
   revalidatePath(`/sales/import/${batchId}/review`);
   revalidatePath("/sales");
   revalidatePath("/menu-engineering");
+
+  await salirSiYaNoQuedaNada(batchId);
 }
 
 export async function createRecipeForRow(batchId: string, rowId: string) {
@@ -50,4 +68,6 @@ export async function ignoreRowAlways(batchId: string, rowId: string) {
   await ignoreRowPermanently(user.organizationId, user.sucursalId, row);
 
   revalidatePath(`/sales/import/${batchId}/review`);
+
+  await salirSiYaNoQuedaNada(batchId);
 }

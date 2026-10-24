@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { parseWorkbook } from "@/lib/excel/parse-sales-import";
-import { processBatchRows } from "@/lib/import-processing";
+import { processBatchRows, destinoAlTerminarCarga } from "@/lib/import-processing";
 
 export async function createImportBatch(formData: FormData) {
   const user = await requireSucursalContext();
@@ -75,5 +75,5 @@ export async function processImportBatch(batchId: string, formData: FormData) {
   if (rowsPending > 0) {
     redirect(`/sales/import/${batch.id}/review`);
   }
-  redirect("/sales");
+  redirect(await destinoAlTerminarCarga(batch.id));
 }

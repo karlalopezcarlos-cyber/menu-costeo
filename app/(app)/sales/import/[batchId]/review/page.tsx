@@ -18,17 +18,43 @@ export default async function ImportReviewPage({
   });
   if (!batch) notFound();
 
-  const [pendingRows, recipes] = await Promise.all([
+  const [pendingRows, cargadas, ignoradas, conError, recipes] = await Promise.all([
     prisma.importRow.findMany({
       where: { importBatchId: batch.id, status: "PENDING" },
       orderBy: { rawName: "asc" },
     }),
+    // Lo que ya quedo dentro: es lo que hay que poder ver de un vistazo al terminar.
+    prisma.importRow.findMany({
+      where: { importBatchId: batch.id, status: "MATCHED" },
+      select: { date: true, quantitySold: true, unitPrice: true },
+    }),
+    prisma.importRow.count({ where: { importBatchId: batch.id, status: "IGNORED" } }),
+    prisma.importRow.count({ where: { importBatchId: batch.id, status: "ERROR" } }),
     prisma.recipe.findMany({
       where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
   ]);
+
+  const dias = new Set<string>();
+  let piezasCargadas = 0;
+  let importeCargado = 0;
+  for (const fila of cargadas) {
+    if (fila.date) dias.add(fila.date.toISOString().slice(0, 10));
+    const piezas = Number(fila.quantitySold);
+    piezasCargadas += piezas;
+    importeCargado += piezas * Number(fila.unitPrice);
+  }
+  const diasOrdenados = [...dias].sort();
+  const rangoFechas =
+    diasOrdenados.length === 0
+      ? null
+      : diasOrdenados.length === 1
+        ? new Date(`${diasOrdenados[0]}T00:00:00Z`).toLocaleDateString("es-MX", { timeZone: "UTC" })
+        : `${new Date(`${diasOrdenados[0]}T00:00:00Z`).toLocaleDateString("es-MX", { timeZone: "UTC" })} al ${new Date(
+            `${diasOrdenados[diasOrdenados.length - 1]}T00:00:00Z`,
+          ).toLocaleDateString("es-MX", { timeZone: "UTC" })}`;
 
   // Una tarjeta por NOMBRE, no por renglon. Un archivo con diez ventas de "COCA COLA" traia diez
   // tarjetas identicas pidiendo diez veces la misma decision.
@@ -74,11 +100,52 @@ export default async function ImportReviewPage({
       </p>
 
       {pendientes.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          No quedan platillos pendientes. <Link href="/sales" className="underline">Ir a ventas</Link>
-        </p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-base font-semibold text-emerald-900">La venta ya quedo cargada</p>
+          <ul className="mt-2 space-y-1 text-sm text-emerald-800">
+            <li>
+              <b>{cargadas.length.toLocaleString("es-MX")}</b> renglones cargados ·{" "}
+              {piezasCargadas.toLocaleString("es-MX", { maximumFractionDigits: 2 })} piezas ·{" "}
+              <b>{formatMoney(importeCargado)}</b>
+            </li>
+            {rangoFechas && (
+              <li>
+                {dias.size === 1 ? "Del dia" : `${dias.size} dias:`} {rangoFechas}
+              </li>
+            )}
+            {ignoradas > 0 && (
+              <li>{ignoradas} renglones ignorados (nombres marcados como que no son platillo)</li>
+            )}
+            {conError > 0 && (
+              <li className="text-amber-800">
+                {conError} renglones no se pudieron leer (fecha o cantidad invalida) y quedaron
+                fuera
+              </li>
+            )}
+          </ul>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link
+              href="/sales?vista=dia"
+              className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
+            >
+              Ver ventas por dia
+            </Link>
+            <Link href="/sales" className="text-sm text-neutral-600 hover:underline">
+              Ver ventas por producto
+            </Link>
+            <Link href="/sales/import" className="text-sm text-neutral-600 hover:underline">
+              Cargar otro archivo
+            </Link>
+          </div>
+        </div>
       ) : (
         <div className="space-y-4">
+          <p className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+            Ya van <b>{cargadas.length.toLocaleString("es-MX")}</b> renglones cargados por{" "}
+            <b>{formatMoney(importeCargado)}</b>. Faltan {pendientes.length}{" "}
+            {pendientes.length === 1 ? "nombre" : "nombres"} por reconocer; en cuanto los
+            resuelvas, la carga queda completa.
+          </p>
           {pendientes.map((pendiente) => {
             const linkAction = linkRowToExistingRecipe.bind(null, batch.id, pendiente.rowId);
             const createAction = createRecipeForRow.bind(null, batch.id, pendiente.rowId);

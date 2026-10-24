@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatSaleFolio } from "@/lib/sales/folio";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import SalesManager from "./SalesManager";
 import type { SaleRow } from "./SalesTable";
 import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
@@ -18,12 +18,20 @@ function toDateInputValue(d: Date): string {
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; vista?: string; iva?: string }>;
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+    vista?: string;
+    iva?: string;
+    cargado?: string;
+  }>;
 }) {
   const params = await searchParams;
   const user = await requireSucursalContext();
 
   const vistaDiaria = params.vista === "dia";
+  // Llega con ?cargado=<lote> justo despues de terminar una importacion: ahi se dice que entro.
+  const loteCargado = params.cargado ?? null;
   const vistaBitacora = params.vista === "bitacora";
   const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
@@ -223,6 +231,47 @@ export default async function SalesPage({
   }
   const dias = [...porDia.values()].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 
+  // Resumen de la carga que acaba de terminar, para decirlo en esta misma pantalla en vez de
+  // dejarlo en la de homologar, que ya no tiene nada que hacer.
+  const resumenCarga = loteCargado
+    ? await (async () => {
+        const batch = await prisma.importBatch.findFirst({
+          where: { id: loteCargado, sucursalId: user.sucursalId },
+          select: { fileName: true },
+        });
+        if (!batch) return null;
+
+        const [filas, ignoradas, conError] = await Promise.all([
+          prisma.importRow.findMany({
+            where: { importBatchId: loteCargado, status: "MATCHED" },
+            select: { date: true, quantitySold: true, unitPrice: true },
+          }),
+          prisma.importRow.count({ where: { importBatchId: loteCargado, status: "IGNORED" } }),
+          prisma.importRow.count({ where: { importBatchId: loteCargado, status: "ERROR" } }),
+        ]);
+
+        const dias = new Set<string>();
+        let piezas = 0;
+        let importe = 0;
+        for (const fila of filas) {
+          if (fila.date) dias.add(fila.date.toISOString().slice(0, 10));
+          const cantidad = Number(fila.quantitySold);
+          piezas += cantidad;
+          importe += cantidad * Number(fila.unitPrice);
+        }
+
+        return {
+          fileName: batch.fileName,
+          renglones: filas.length,
+          piezas,
+          importe,
+          dias: dias.size,
+          ignoradas,
+          conError,
+        };
+      })()
+    : null;
+
   const periodoQuery = `from=${toDateInputValue(from)}&to=${toDateInputValue(to)}`;
 
   return (
@@ -289,6 +338,41 @@ export default async function SalesPage({
           Bitacora
         </Link>
       </div>
+
+      {resumenCarga && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-900">
+                La venta ya quedo cargada
+              </p>
+              <p className="mt-0.5 text-sm text-emerald-800">
+                {resumenCarga.renglones.toLocaleString("es-MX")} renglones ·{" "}
+                {resumenCarga.piezas.toLocaleString("es-MX", { maximumFractionDigits: 2 })} piezas
+                · <b>{formatMoney(resumenCarga.importe)}</b> ·{" "}
+                {resumenCarga.dias === 1 ? "1 dia" : `${resumenCarga.dias} dias`}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                Del archivo {resumenCarga.fileName}
+                {resumenCarga.ignoradas > 0 &&
+                  ` · ${resumenCarga.ignoradas} renglones ignorados por no ser platillos`}
+              </p>
+              {resumenCarga.conError > 0 && (
+                <p className="mt-0.5 text-xs font-medium text-amber-800">
+                  {resumenCarga.conError} renglones no se pudieron leer (fecha o cantidad
+                  invalida) y quedaron fuera.
+                </p>
+              )}
+            </div>
+            <Link
+              href={`/sales?${periodoQuery}&vista=dia&iva=${ivaMode}`}
+              className="text-xs font-medium text-emerald-800 hover:underline"
+            >
+              Cerrar aviso
+            </Link>
+          </div>
+        </div>
+      )}
 
       {sinReceta.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">

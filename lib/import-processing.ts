@@ -360,3 +360,28 @@ export async function ignoreRowPermanently(
 
   return count;
 }
+
+/**
+ * A donde mandar a alguien cuando ya no le queda nada por resolver de una carga.
+ *
+ * Termina en "Ventas por dia" y con el periodo puesto en los dias que acaban de entrar: ahi se
+ * ve de un golpe si la carga trajo lo que debia. Quedarse en la pantalla de homologar, que ya
+ * no tiene nada que hacer, obliga a navegar a mano para ver el resultado.
+ */
+export async function destinoAlTerminarCarga(batchId: string): Promise<string> {
+  const filas = await prisma.importRow.findMany({
+    where: { importBatchId: batchId, status: "MATCHED", date: { not: null } },
+    select: { date: true },
+  });
+
+  const dias = filas
+    .map((f) => f.date!.toISOString().slice(0, 10))
+    .sort();
+
+  const params = new URLSearchParams({ vista: "dia", iva: "con", cargado: batchId });
+  if (dias.length > 0) {
+    params.set("from", dias[0]);
+    params.set("to", dias[dias.length - 1]);
+  }
+  return `/sales?${params.toString()}`;
+}
