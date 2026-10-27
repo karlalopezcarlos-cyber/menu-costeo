@@ -26,6 +26,10 @@ export type IncomeStatementResult = {
   compras: GroupAmounts;
   existencia: GroupAmounts;
   inventarioFinal: GroupAmounts;
+  /// Salidas que no son venta: cortesias, consumo de personal y pruebas de cocina. Salieron del
+  /// inventario, asi que ya venian metidas en el costo; se restan para que el costo de ventas
+  /// hable solo de lo que se vendio.
+  creditosAlCosto: GroupAmounts;
   costoDeVentas: GroupAmounts;
   costoPotencial: GroupAmounts;
   variacion: GroupAmounts;
@@ -101,6 +105,9 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     buildRow("Compras", result.compras, "none"),
     buildRow("Existencia", result.existencia, "none"),
     buildRow("Inventario final", result.inventarioFinal, "none"),
+    buildRow("Salidas por creditos al costo", result.creditosAlCosto, "costPct", {
+      ventaTotal: result.ventaTotal,
+    }),
     buildRow("Costo de ventas", result.costoDeVentas, "costPct", {
       bold: true,
       highlight: true,
@@ -123,8 +130,10 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   Compras: "Total de compras de productos registradas en el periodo.",
   Existencia: "Inventario inicial + Entradas desde otra sucursal + Compras.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
+  "Salidas por creditos al costo":
+    "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron; la merma no entra aqui, esa si es costo de operar.",
   "Costo de ventas":
-    "Existencia - Inventario final: costo real de todo lo que salio de la sucursal en el periodo (ventas, mermas, produccion, transferencias). El % es respecto a la Venta total.",
+    "Existencia - Inventario final - Salidas por creditos al costo: lo que de verdad costo lo que se vendio. Incluye mermas y variaciones de produccion, pero ya sin las cortesias ni las pruebas. El % es respecto a la Venta total.",
   "Costo potencial":
     "Costo teorico segun receta de lo que realmente se vendio (mismo calculo que Ingenieria de menu). El % es respecto a la Venta total.",
   Variacion: "Costo potencial - Costo de ventas: positivo significa que el costo real fue menor al teorico (favorable).",
@@ -210,7 +219,8 @@ export async function computeIncomeStatement(
   const rangeEnd = finalCount.date;
   const dateFilter = { gte: rangeStart, lte: rangeEnd };
 
-  const [sales, requisicionesOut, requisicionesIn, purchases, payments, graph] = await Promise.all([
+  const [sales, requisicionesOut, requisicionesIn, purchases, payments, creditos, graph] =
+    await Promise.all([
     prisma.dailySale.findMany({
       where: { sucursalId, date: dateFilter },
       include: { recipe: { include: { category: true } } },
@@ -230,6 +240,18 @@ export async function computeIncomeStatement(
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
       select: { amount: true },
+    }),
+    // Cortesias, consumo de personal y pruebas. La merma no entra: esa si es costo de operar.
+    prisma.wasteEntry.findMany({
+      where: {
+        sucursalId,
+        date: dateFilter,
+        concept: { in: ["SERVICIO", "PRUEBAS"] },
+      },
+      include: {
+        product: { include: { category: true } },
+        subRecipe: { include: { category: true } },
+      },
     }),
     loadOrgRecipeGraph(sucursalId),
   ]);
@@ -278,9 +300,19 @@ export async function computeIncomeStatement(
     addTo(inventarioFinal, item.product.category?.group ?? null, value);
   }
 
+  const creditosAlCosto = zeroAmounts();
+  for (const salida of creditos) {
+    const grupo =
+      salida.product?.category?.group ?? salida.subRecipe?.category?.group ?? null;
+    addTo(creditosAlCosto, grupo, new Decimal(salida.quantity).times(salida.unitCost));
+  }
+
   const ventaTotal = add(ventasNetasPV, salidasAOtraSucursal);
   const existencia = add(add(inventarioInicial, entradasDesdeOtraSucursal), compras);
-  const costoDeVentas = subtract(existencia, inventarioFinal);
+  // Lo que salio por cortesia o prueba ya estaba descontado del inventario, asi que venia
+  // inflando el costo de ventas como si se hubiera vendido. Restarlo deja el costo hablando
+  // solo de la venta, que es contra lo que se compara el costo potencial.
+  const costoDeVentas = subtract(subtract(existencia, inventarioFinal), creditosAlCosto);
 
   const costoPotencial = zeroAmounts();
   const memo = new Map<string, Decimal>();
@@ -323,6 +355,7 @@ export async function computeIncomeStatement(
     compras,
     existencia,
     inventarioFinal,
+    creditosAlCosto,
     costoDeVentas,
     costoPotencial,
     variacion,
