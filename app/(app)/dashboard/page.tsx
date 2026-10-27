@@ -222,8 +222,9 @@ export default async function DashboardPage({
         </button>
       </form>
       <p className="text-xs text-neutral-500">
-        Solo se pueden elegir fechas con un conteo de inventario capturado. Las categorias sin
-        grupo asignado (Configuracion &gt; Categorias) se consolidan en Miscelaneos.
+        Solo se pueden elegir fechas con un conteo de inventario capturado. Las columnas son tus
+        grupos de costo (Configuracion &gt; Grupos de costo); lo que tenga categoria sin grupo
+        sale en una columna aparte hasta que lo acomodes.
       </p>
 
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
