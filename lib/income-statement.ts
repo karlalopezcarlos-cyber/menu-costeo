@@ -103,7 +103,9 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     buildRow("Inventario inicial", result.inventarioInicial, "none"),
     buildRow("Entradas desde otra sucursal", result.entradasDesdeOtraSucursal, "none"),
     buildRow("Compras", result.compras, "none"),
-    buildRow("Existencia", result.existencia, "none"),
+    // "Existencia" (inicial + entradas + compras) se sigue calculando porque el costo de ventas
+    // sale de ahi, pero no se muestra: es un subtotal intermedio que nadie lee y que solo hace
+    // mas larga la tabla.
     buildRow("Inventario final", result.inventarioFinal, "none"),
     buildRow("Salidas por creditos al costo", result.creditosAlCosto, "costPct", {
       ventaTotal: result.ventaTotal,
@@ -128,12 +130,11 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
   Compras: "Total de compras de productos registradas en el periodo.",
-  Existencia: "Inventario inicial + Entradas desde otra sucursal + Compras.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Salidas por creditos al costo":
     "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron; la merma no entra aqui, esa si es costo de operar.",
   "Costo de ventas":
-    "Existencia - Inventario final - Salidas por creditos al costo: lo que de verdad costo lo que se vendio. Incluye mermas y variaciones de produccion, pero ya sin las cortesias ni las pruebas. El % es respecto a la Venta total.",
+    "Inventario inicial + Entradas + Compras - Inventario final - Salidas por creditos al costo: lo que de verdad costo lo que se vendio. Incluye mermas y variaciones de produccion, pero ya sin las cortesias ni las pruebas. El % es respecto a la Venta total.",
   "Costo potencial":
     "Costo teorico segun receta de lo que realmente se vendio (mismo calculo que Ingenieria de menu). El % es respecto a la Venta total.",
   Variacion: "Costo potencial - Costo de ventas: positivo significa que el costo real fue menor al teorico (favorable).",
