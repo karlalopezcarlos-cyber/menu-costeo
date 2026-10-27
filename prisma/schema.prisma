@@ -1043,6 +1043,17 @@ model AuditComment {
 
 /// Registro de merma: un producto desechado/echado a perder en una fecha, con su costo
 /// congelado al momento de capturarlo (igual que una compra) y un comentario libre para la razon.
+/// Por que salio el producto del inventario. Las tres se costean y descuentan igual; lo que
+/// cambia es a donde se atribuye el dinero cuando se analiza el periodo.
+enum WasteConcept {
+  /// Se echo a perder, se cayo, caduco.
+  MERMA
+  /// Salio a servicio: cortesias, consumo de personal, atencion a clientes.
+  SERVICIO
+  /// Se gasto probando: pruebas de cocina, desarrollo de platillos, capacitacion.
+  PRUEBAS
+}
+
 model WasteEntry {
   id              String       @id @default(cuid())
   organizationId  String
@@ -1062,6 +1073,7 @@ model WasteEntry {
   /// "net" (costo con rendimiento aplicado, default) o "gross" (costo de compra, sin descontar
   /// la merma; ej. aguacate entero sin pelar). Solo aplica a productos con rendimiento < 100%.
   costBasis       String       @default("net")
+  concept         WasteConcept @default(MERMA)
   comment         String?
   createdByUserId String?
   createdBy       User?        @relation("WasteEntryCreatedBy", fields: [createdByUserId], references: [id])
@@ -1071,6 +1083,7 @@ model WasteEntry {
   @@index([organizationId, productId])
   @@index([subRecipeId])
   @@index([sucursalId, date])
+  @@index([sucursalId, concept])
   @@map("waste_entries")
 }
 

@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  WASTE_CONCEPTS,
+  WASTE_CONCEPT_LABELS,
+  WASTE_CONCEPT_HELP,
+  type WasteConceptValue,
+} from "../waste-rows";
+
 import { useActionState, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { convertQty, removeYieldFactor, UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
@@ -64,6 +71,7 @@ export default function WasteForm({
 }) {
   const [state, formAction, pending] = useActionState(createWasteEntries, initialState);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow("row-0")]);
+  const [concept, setConcept] = useState<WasteConceptValue>("MERMA");
   const nextKeyRef = useRef(1);
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -157,18 +165,42 @@ export default function WasteForm({
       <input type="hidden" name="rows" value={rowsPayload} />
 
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
-        <div className="max-w-xs space-y-1">
-          <label htmlFor="wasteDate" className="text-sm font-medium text-neutral-700">
-            Fecha de merma
-          </label>
-          <input
-            id="wasteDate"
-            name="wasteDate"
-            type="date"
-            required
-            defaultValue={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          />
+        <div className="flex flex-wrap gap-4">
+          <div className="w-44 space-y-1">
+            <label htmlFor="wasteDate" className="text-sm font-medium text-neutral-700">
+              Fecha
+            </label>
+            <input
+              id="wasteDate"
+              name="wasteDate"
+              type="date"
+              required
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="min-w-64 flex-1 space-y-1">
+            <label htmlFor="concept" className="text-sm font-medium text-neutral-700">
+              Concepto
+            </label>
+            <select
+              id="concept"
+              name="concept"
+              value={concept}
+              onChange={(e) => setConcept(e.target.value as WasteConceptValue)}
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            >
+              {WASTE_CONCEPTS.map((c) => (
+                <option key={c} value={c}>
+                  {WASTE_CONCEPT_LABELS[c]}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-neutral-500">
+              {WASTE_CONCEPT_HELP[concept]}. Las tres se costean y descuentan del inventario
+              igual; el concepto es para saber despues a donde se fue ese dinero.
+            </p>
+          </div>
         </div>
       </div>
 

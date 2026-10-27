@@ -18,11 +18,23 @@ type WasteRowInput = {
   costBasis?: string;
 };
 
+/**
+ * El concepto es de toda la captura, no de cada renglon: se registra "lo que se echo a perder
+ * hoy" o "lo que salio a servicio hoy", no una mezcla. Si hiciera falta mezclar, son dos
+ * capturas, y asi el total por concepto nunca queda a medias.
+ */
+function parseConcept(value: FormDataEntryValue | null): "MERMA" | "SERVICIO" | "PRUEBAS" {
+  const raw = String(value ?? "MERMA");
+  if (raw === "SERVICIO" || raw === "PRUEBAS") return raw;
+  return "MERMA";
+}
+
 export async function createWasteEntries(
   _prevState: { error?: string } | undefined,
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
+    const concept = parseConcept(formData.get("concept"));
     const user = await requireSucursalContext();
 
     const wasteDateRaw = String(formData.get("wasteDate") ?? "");
@@ -96,6 +108,7 @@ export async function createWasteEntries(
         unit,
         unitCost: unitCost.toString(),
         costBasis,
+        concept,
         comment: row.comment.trim() || null,
         createdByUserId: user.id,
       };
@@ -127,6 +140,7 @@ export async function createWasteEntries(
         quantity: quantity.toString(),
         unit: subRecipe.yieldUnit,
         unitCost: unitCost.toString(),
+        concept,
         comment: row.comment.trim() || null,
         createdByUserId: user.id,
       };

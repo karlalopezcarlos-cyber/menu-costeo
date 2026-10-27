@@ -744,7 +744,18 @@ export async function computeItemKardex(
       date: entry.date,
       dateLabel: dateLabel(entry.date),
       type: "merma",
-      label: entry.comment ? `Merma - ${entry.comment}` : "Merma",
+      // El kardex dice el concepto real: una cortesia o una prueba descuentan igual que una
+      // merma, pero leerlas todas como "merma" hace parecer que se tira mucho mas de lo que se
+      // tira.
+      label: (() => {
+        const concepto =
+          entry.concept === "SERVICIO"
+            ? "Salida a servicio"
+            : entry.concept === "PRUEBAS"
+              ? "Pruebas"
+              : "Merma";
+        return entry.comment ? `${concepto} - ${entry.comment}` : concepto;
+      })(),
       qtyDelta: -qtyInBase.toNumber(),
       runningBalance: 0,
       href: "/waste",

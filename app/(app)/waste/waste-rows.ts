@@ -1,5 +1,21 @@
 export type WasteItemType = "product" | "subrecipe" | "plu";
 
+/** Conceptos de salida. Las tres descuentan inventario igual; cambia a donde se atribuye. */
+export const WASTE_CONCEPTS = ["MERMA", "SERVICIO", "PRUEBAS"] as const;
+export type WasteConceptValue = (typeof WASTE_CONCEPTS)[number];
+
+export const WASTE_CONCEPT_LABELS: Record<WasteConceptValue, string> = {
+  MERMA: "Merma",
+  SERVICIO: "Salida a servicio",
+  PRUEBAS: "Pruebas",
+};
+
+export const WASTE_CONCEPT_HELP: Record<WasteConceptValue, string> = {
+  MERMA: "Se echo a perder, se cayo, caduco",
+  SERVICIO: "Cortesias, consumo de personal, atencion a clientes",
+  PRUEBAS: "Pruebas de cocina, desarrollo de platillos, capacitacion",
+};
+
 export type WasteRow = {
   id: string;
   dateLabel: string;
@@ -14,9 +30,17 @@ export type WasteRow = {
   comment: string | null;
   cost: number;
   costBasisLabel: string | null;
+  concept: WasteConceptValue;
 };
 
-export type WasteSortKey = "date" | "product" | "type" | "category" | "quantity" | "cost";
+export type WasteSortKey =
+  | "date"
+  | "product"
+  | "type"
+  | "concept"
+  | "category"
+  | "quantity"
+  | "cost";
 export type SortDir = "asc" | "desc";
 
 export function wasteSortValue(row: WasteRow, key: WasteSortKey): string | number | null {
@@ -27,6 +51,8 @@ export function wasteSortValue(row: WasteRow, key: WasteSortKey): string | numbe
       return row.itemName.toLowerCase();
     case "type":
       return row.itemTypeLabel;
+    case "concept":
+      return WASTE_CONCEPT_LABELS[row.concept];
     case "category":
       return row.categoryName ? row.categoryName.toLowerCase() : null;
     case "quantity":
@@ -38,7 +64,13 @@ export function wasteSortValue(row: WasteRow, key: WasteSortKey): string | numbe
 
 export function filterWasteRows(
   rows: WasteRow[],
-  params: { search: string; categoryFilter: string; dateFrom: string; dateTo: string },
+  params: {
+    search: string;
+    categoryFilter: string;
+    dateFrom: string;
+    dateTo: string;
+    conceptFilter: string;
+  },
 ): WasteRow[] {
   const q = params.search.trim().toLowerCase();
   const fromValue = params.dateFrom ? new Date(`${params.dateFrom}T00:00:00`).getTime() : null;
@@ -53,6 +85,7 @@ export function filterWasteRows(
     ) {
       return false;
     }
+    if (params.conceptFilter !== "all" && row.concept !== params.conceptFilter) return false;
     if (fromValue !== null && row.dateValue < fromValue) return false;
     if (toValue !== null && row.dateValue > toValue) return false;
     return true;

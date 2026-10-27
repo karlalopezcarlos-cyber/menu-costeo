@@ -32,7 +32,8 @@ export default async function WastePage() {
         unitLabel: UNIT_LABELS[entry.unit as UnitValue],
         comment: entry.comment,
         cost: Number(entry.quantity) * Number(entry.unitCost),
-        costBasisLabel: null,
+        concept: entry.concept,
+      costBasisLabel: null,
       };
     }
     return {
@@ -48,6 +49,7 @@ export default async function WastePage() {
       unitLabel: UNIT_LABELS[entry.unit as UnitValue],
       comment: entry.comment,
       cost: Number(entry.quantity) * Number(entry.unitCost),
+      concept: entry.concept,
       costBasisLabel:
         Number(entry.product!.yieldPercentage) !== 100
           ? entry.costBasis === "gross"
@@ -64,7 +66,9 @@ export default async function WastePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Mermas</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+          Mermas y salidas
+        </h1>
         <Link
           href="/waste/new"
           className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"

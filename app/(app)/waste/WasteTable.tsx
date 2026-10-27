@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import {
   filterWasteRows,
+  WASTE_CONCEPTS,
+  WASTE_CONCEPT_LABELS,
+  type WasteConceptValue,
   sortWasteRows,
   type WasteRow,
   type WasteSortKey,
@@ -17,6 +20,7 @@ const COLUMNS: { key: WasteSortKey; label: string }[] = [
   { key: "date", label: "Fecha" },
   { key: "product", label: "Producto / Subreceta / PLU" },
   { key: "type", label: "Tipo" },
+  { key: "concept", label: "Concepto" },
   { key: "category", label: "Categoria" },
   { key: "quantity", label: "Cantidad" },
 ];
@@ -32,6 +36,7 @@ export default function WasteTable({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [conceptFilter, setConceptFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -47,8 +52,8 @@ export default function WasteTable({
   }
 
   const filteredRows = useMemo(
-    () => filterWasteRows(rows, { search, categoryFilter, dateFrom, dateTo }),
-    [rows, search, categoryFilter, dateFrom, dateTo],
+    () => filterWasteRows(rows, { search, categoryFilter, dateFrom, dateTo, conceptFilter }),
+    [rows, search, categoryFilter, dateFrom, dateTo, conceptFilter],
   );
 
   const sortedRows = useMemo(
@@ -58,7 +63,22 @@ export default function WasteTable({
 
   const totalCost = useMemo(() => filteredRows.reduce((sum, row) => sum + row.cost, 0), [filteredRows]);
 
-  const hasFilters = !!search || categoryFilter !== "all" || !!dateFrom || !!dateTo;
+  const hasFilters =
+    !!search || categoryFilter !== "all" || conceptFilter !== "all" || !!dateFrom || !!dateTo;
+
+  // El total por concepto es la razon de separarlos: lo que se tira no se lee igual que lo que
+  // se regalo ni que lo que se gasto probando.
+  const porConcepto = useMemo(() => {
+    const acumulado = new Map<WasteConceptValue, number>();
+    for (const row of filteredRows) {
+      acumulado.set(row.concept, (acumulado.get(row.concept) ?? 0) + row.cost);
+    }
+    return WASTE_CONCEPTS.map((concept) => ({
+      concept,
+      label: WASTE_CONCEPT_LABELS[concept],
+      total: acumulado.get(concept) ?? 0,
+    })).filter((c) => c.total > 0);
+  }, [filteredRows]);
 
   return (
     <div className="space-y-3">
@@ -82,6 +102,18 @@ export default function WasteTable({
             </option>
           ))}
           {hasUncategorized && <option value="none">Sin categoria</option>}
+        </select>
+        <select
+          value={conceptFilter}
+          onChange={(e) => setConceptFilter(e.target.value)}
+          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
+        >
+          <option value="all">Todos los conceptos</option>
+          {WASTE_CONCEPTS.map((concept) => (
+            <option key={concept} value={concept}>
+              {WASTE_CONCEPT_LABELS[concept]}
+            </option>
+          ))}
         </select>
         <div className="space-y-1">
           <label htmlFor="dateFrom" className="text-xs font-medium text-neutral-500">
@@ -113,6 +145,7 @@ export default function WasteTable({
             onClick={() => {
               setSearch("");
               setCategoryFilter("all");
+              setConceptFilter("all");
               setDateFrom("");
               setDateTo("");
             }}
@@ -123,9 +156,23 @@ export default function WasteTable({
         )}
       </div>
 
-      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-        <p className="text-sm text-neutral-500">Costo total de mermas (filtro actual)</p>
-        <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-neutral-500">Costo total de salidas (filtro actual)</p>
+          <p className="text-xl font-semibold text-neutral-900">{formatMoney(totalCost)}</p>
+        </div>
+        {porConcepto.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-neutral-100 pt-3">
+            {porConcepto.map((c) => (
+              <div key={c.concept}>
+                <p className="text-xs font-medium text-neutral-500">{c.label}</p>
+                <p className="text-sm font-semibold tabular-nums text-neutral-900">
+                  {formatMoney(c.total)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -162,10 +209,10 @@ export default function WasteTable({
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                   {rows.length === 0
-                    ? "Todavia no hay mermas registradas."
-                    : "Ninguna merma coincide con los filtros."}
+                    ? "Todavia no hay salidas registradas."
+                    : "Ninguna salida coincide con los filtros."}
                 </td>
               </tr>
             )}
@@ -184,6 +231,19 @@ export default function WasteTable({
                     }`}
                   >
                     {row.itemTypeLabel}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                      row.concept === "MERMA"
+                        ? "bg-red-50 text-red-700"
+                        : row.concept === "SERVICIO"
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-neutral-100 text-neutral-600"
+                    }`}
+                  >
+                    {WASTE_CONCEPT_LABELS[row.concept]}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-neutral-500">{row.categoryName ?? "-"}</td>
