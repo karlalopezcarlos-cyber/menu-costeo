@@ -21,7 +21,11 @@ export type AuditRow = {
   itemType: ItemType;
   name: string;
   categoryName: string | null;
+  /** Grupo de costo al que pertenece su categoria: la columna del Estado de Resultados. */
+  costGroupName: string | null;
   unitLabel: string;
+  /** Costo unitario con el que se valua: el mismo con el que se calcula la variacion en pesos. */
+  unitCost: number;
   presentationUnitLabel: string | null;
   presentationUnitQty: number | null;
   initialQty: number;
@@ -122,12 +126,12 @@ export async function computeInventoryAudit(
     prisma.product.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: { name: "asc" },
-      include: { category: true },
+      include: { category: { include: { costGroup: true } } },
     }),
     prisma.recipe.findMany({
       where: { sucursalId, archivedAt: null, isMenuItem: false },
       orderBy: { name: "asc" },
-      include: { category: true },
+      include: { category: { include: { costGroup: true } } },
     }),
     prisma.purchase.findMany({
       where: { sucursalId, purchaseDate: dateFilter },
@@ -327,7 +331,9 @@ export async function computeInventoryAudit(
       itemType: "product" as const,
       name: product.name,
       categoryName: product.category?.name ?? null,
+      costGroupName: product.category?.costGroup?.name ?? null,
       unitLabel: UNIT_LABELS[product.baseUnit as UnitValue],
+      unitCost: unitCost.toNumber(),
       presentationUnitLabel: product.presentationUnitLabel,
       presentationUnitQty: product.presentationUnitQty ? Number(product.presentationUnitQty) : null,
       initialQty: initialQty.toNumber(),
@@ -385,7 +391,9 @@ export async function computeInventoryAudit(
       itemType: "subrecipe" as const,
       name: recipe.name,
       categoryName: recipe.category?.name ?? null,
+      costGroupName: recipe.category?.costGroup?.name ?? null,
       unitLabel: UNIT_LABELS[recipe.yieldUnit as UnitValue],
+      unitCost: unitCost.toNumber(),
       presentationUnitLabel: null,
       presentationUnitQty: null,
       initialQty: initialQty.toNumber(),

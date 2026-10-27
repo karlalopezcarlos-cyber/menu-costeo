@@ -1,33 +1,17 @@
 import ExcelJS from "exceljs";
 import type { AuditRow } from "@/lib/audit";
 
-function fmtQty(n: number): string {
-  return n.toLocaleString("es-MX", { maximumFractionDigits: 2 });
-}
+const QTY_FMT = "#,##0.00";
+const MONEY_FMT = '"$"#,##0.0000';
 
-/** Ej. "150 ML" -> "150 ML (0.20 Botella)" cuando el producto tiene presentacion fija configurada. */
-function presentationSuffix(row: AuditRow, qty: number): string {
-  if (!row.presentationUnitQty) return "";
-  const count = qty / row.presentationUnitQty;
-  return ` (${count.toFixed(2)} ${row.presentationUnitLabel})`;
-}
-
-function plainCell(row: AuditRow, qty: number): string {
-  return `${fmtQty(qty)} ${row.unitLabel}${presentationSuffix(row, qty)}`;
-}
-
-function positiveCell(row: AuditRow, qty: number): string {
-  return qty === 0 ? "" : `+${fmtQty(qty)} ${row.unitLabel}${presentationSuffix(row, qty)}`;
-}
-
-function negativeCell(row: AuditRow, qty: number): string {
-  return qty === 0 ? "" : `-${fmtQty(qty)} ${row.unitLabel}${presentationSuffix(row, qty)}`;
-}
-
-function signedCell(row: AuditRow, qty: number): string {
-  return `${qty > 0 ? "+" : ""}${fmtQty(qty)} ${row.unitLabel}${presentationSuffix(row, qty)}`;
-}
-
+/**
+ * Auditoria de diferencias, pensada para seguir trabajando el archivo.
+ *
+ * Todas las cantidades van como numero puro, sin la unidad pegada: antes decian "0.34 PZA
+ * (0.00 Botella)" y eso se ve bien en pantalla pero no se puede sumar ni restar. La unidad
+ * ahora es una columna propia, y el costo unitario otra, para poder explicar de donde sale el
+ * valor del inventario sin salirse del archivo.
+ */
 export async function buildAuditWorkbook(
   rows: AuditRow[],
   initialLabel: string,
@@ -38,46 +22,75 @@ export async function buildAuditWorkbook(
   const sheet = workbook.addWorksheet(`Auditoria (${periodLabel})`.slice(0, 31));
 
   sheet.columns = [
+    { header: "Grupo", key: "costGroup", width: 16 },
     { header: "Categoria", key: "category", width: 18 },
-    { header: "Tipo", key: "type", width: 12 },
-    { header: "Nombre", key: "name", width: 30 },
-    { header: "Inicial", key: "initial", width: 22 },
-    { header: "+ Compras", key: "purchases", width: 22 },
-    { header: "+ Produccion", key: "produced", width: 18 },
-    { header: "- Mermas", key: "waste", width: 22 },
-    { header: "- Produccion", key: "productionConsumed", width: 22 },
-    { header: "- Ventas", key: "sales", width: 22 },
-    { header: "= Teorico", key: "theoretical", width: 24 },
-    { header: "Real (final)", key: "actual", width: 24 },
-    { header: "Variacion", key: "variance", width: 24 },
-    { header: "Variacion anterior", key: "previousVariance", width: 24 },
+    { header: "Tipo", key: "type", width: 11 },
+    { header: "Nombre", key: "name", width: 32 },
+    { header: "Unidad", key: "unit", width: 9 },
+    { header: "Costo unitario", key: "unitCost", width: 14 },
+    { header: "Inicial", key: "initial", width: 12 },
+    { header: "+ Compras", key: "purchases", width: 12 },
+    { header: "+ Produccion", key: "produced", width: 13 },
+    { header: "- Mermas", key: "waste", width: 11 },
+    { header: "- Produccion", key: "productionConsumed", width: 13 },
+    { header: "- Ventas", key: "sales", width: 11 },
+    { header: "= Teorico", key: "theoretical", width: 12 },
+    { header: "Real (final)", key: "actual", width: 12 },
+    { header: "Variacion", key: "variance", width: 12 },
+    { header: "Variacion anterior", key: "previousVariance", width: 16 },
     { header: "Variacion $", key: "varianceAmount", width: 14 },
     { header: "Variacion %", key: "variancePct", width: 12 },
+    { header: "Valor inventario", key: "inventoryValue", width: 16 },
     { header: "Comentario", key: "comment", width: 30 },
   ];
   sheet.getRow(1).font = { bold: true };
-  sheet.getColumn("varianceAmount").numFmt = '"$"#,##0.00';
+  sheet.views = [{ state: "frozen", xSplit: 4, ySplit: 1 }];
 
   for (const row of rows) {
+    // Las salidas se guardan en negativo para que la fila se pueda sumar de corrido:
+    // inicial + compras + produccion - mermas - produccion consumida - ventas = teorico.
     sheet.addRow({
+      costGroup: row.costGroupName ?? "",
       category: row.categoryName ?? "",
       type: row.itemType === "product" ? "Producto" : "Subreceta",
       name: row.name,
-      initial: plainCell(row, row.initialQty),
-      purchases: positiveCell(row, row.purchasesQty),
-      produced: positiveCell(row, row.producedQty),
-      waste: negativeCell(row, row.wasteQty),
-      productionConsumed: negativeCell(row, row.productionConsumedQty),
-      sales: negativeCell(row, row.salesQty),
-      theoretical: plainCell(row, row.theoreticalFinalQty),
-      actual: row.actualFinalQty !== null ? plainCell(row, row.actualFinalQty) : "",
-      variance: row.varianceQty !== null ? signedCell(row, row.varianceQty) : "",
-      previousVariance: row.previousVarianceQty !== null ? signedCell(row, row.previousVarianceQty) : "",
-      varianceAmount: row.varianceAmount !== null ? Number(row.varianceAmount.toFixed(2)) : "",
-      variancePct: row.variancePct !== null ? Number(row.variancePct.toFixed(1)) : "",
+      unit: row.unitLabel,
+      unitCost: row.unitCost,
+      initial: row.initialQty,
+      purchases: row.purchasesQty || null,
+      produced: row.producedQty || null,
+      waste: row.wasteQty ? -row.wasteQty : null,
+      productionConsumed: row.productionConsumedQty ? -row.productionConsumedQty : null,
+      sales: row.salesQty ? -row.salesQty : null,
+      theoretical: row.theoreticalFinalQty,
+      actual: row.actualFinalQty,
+      variance: row.varianceQty,
+      previousVariance: row.previousVarianceQty,
+      varianceAmount: row.varianceAmount,
+      variancePct: row.variancePct !== null ? Number(row.variancePct.toFixed(1)) : null,
+      // Lo que vale lo que de verdad hay: por eso el costo unitario esta a la vista.
+      inventoryValue: row.actualFinalQty !== null ? row.actualFinalQty * row.unitCost : null,
       comment: row.comment ?? "",
     });
   }
+
+  for (const key of [
+    "initial",
+    "purchases",
+    "produced",
+    "waste",
+    "productionConsumed",
+    "sales",
+    "theoretical",
+    "actual",
+    "variance",
+    "previousVariance",
+  ]) {
+    sheet.getColumn(key).numFmt = QTY_FMT;
+  }
+  sheet.getColumn("unitCost").numFmt = MONEY_FMT;
+  sheet.getColumn("varianceAmount").numFmt = '"$"#,##0.00';
+  sheet.getColumn("inventoryValue").numFmt = '"$"#,##0.00';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
