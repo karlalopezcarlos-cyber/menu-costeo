@@ -196,6 +196,32 @@ function dateLabel(d: Date): string {
  * vendido (mismo motor que Ingenieria de Menu); Variacion = Costo Potencial - Costo de Ventas
  * (positivo = costo real favorable frente al teorico).
  */
+/** Un renglon de conteo, de producto o de subreceta, con lo necesario para valuarlo. */
+export type ConteoItemValuable = {
+  quantity: Decimal.Value;
+  unitCost: Decimal.Value;
+  product?: { category?: { group: CategoryGroup | null } | null } | null;
+  subRecipe?: { category?: { group: CategoryGroup | null } | null } | null;
+};
+
+/**
+ * Cuanto vale un conteo de inventario.
+ *
+ * Cuenta productos Y subrecetas. Antes solo contaba productos, con el argumento de que el valor
+ * de una subreceta ya estaba implicito en los insumos que la formaron. No es cierto en un
+ * conteo fisico: los jitomates que se volvieron salsa ya no estan en la alacena, nadie los va a
+ * contar; lo que esta es la salsa. Dejarla fuera no evitaba contar dos veces, simplemente
+ * desaparecia del inventario todo lo que la cocina tuviera preparado.
+ */
+export function valuarConteo(items: ConteoItemValuable[]): GroupAmounts {
+  const total = zeroAmounts();
+  for (const item of items) {
+    const grupo = item.product?.category?.group ?? item.subRecipe?.category?.group ?? null;
+    addTo(total, grupo, new Decimal(item.quantity).times(item.unitCost));
+  }
+  return total;
+}
+
 export async function computeIncomeStatement(
   organizationId: string,
   sucursalId: string,
@@ -207,11 +233,25 @@ export async function computeIncomeStatement(
     prisma.organization.findFirstOrThrow({ where: { id: organizationId }, select: { name: true } }),
     prisma.inventoryCount.findFirstOrThrow({
       where: { id: initialCountId, sucursalId },
-      include: { items: { where: { productId: { not: null } }, include: { product: { include: { category: true } } } } },
+      include: {
+        items: {
+          include: {
+            product: { include: { category: true } },
+            subRecipe: { include: { category: true } },
+          },
+        },
+      },
     }),
     prisma.inventoryCount.findFirstOrThrow({
       where: { id: finalCountId, sucursalId },
-      include: { items: { where: { productId: { not: null } }, include: { product: { include: { category: true } } } } },
+      include: {
+        items: {
+          include: {
+            product: { include: { category: true } },
+            subRecipe: { include: { category: true } },
+          },
+        },
+      },
     }),
   ]);
 
@@ -227,11 +267,17 @@ export async function computeIncomeStatement(
     }),
     prisma.requisicionItem.findMany({
       where: { requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
-      include: { product: { include: { category: true } } },
+      include: {
+        product: { include: { category: true } },
+        subRecipe: { include: { category: true } },
+      },
     }),
     prisma.requisicionItem.findMany({
       where: { requisicion: { toSucursalId: sucursalId, date: dateFilter } },
-      include: { product: { include: { category: true } } },
+      include: {
+        product: { include: { category: true } },
+        subRecipe: { include: { category: true } },
+      },
     }),
     prisma.purchase.findMany({
       where: { sucursalId, purchaseDate: dateFilter },
@@ -262,43 +308,20 @@ export async function computeIncomeStatement(
     addTo(ventasNetasPV, sale.recipe.category?.group ?? null, value);
   }
 
-  // Nota: igual que Inventario Inicial/Final, este reporte solo seguimiento a nivel de producto
-  // (materia prima) para Existencia/Costo de Ventas, para no contar dos veces el valor de una
-  // subreceta (su costo ya esta implicito en los productos consumidos para producirla). Las
-  // requisiciones de subrecetas SI descuentan su propio inventario teorico (ver lib/audit.ts),
-  // pero no entran a este calculo de Venta Total para no desbalancear esa ecuacion.
-  const salidasAOtraSucursal = zeroAmounts();
-  for (const item of requisicionesOut) {
-    if (!item.product) continue;
-    const value = new Decimal(item.quantity).times(item.unitCost);
-    addTo(salidasAOtraSucursal, item.product.category?.group ?? null, value);
-  }
-
-  const entradasDesdeOtraSucursal = zeroAmounts();
-  for (const item of requisicionesIn) {
-    if (!item.product) continue;
-    const value = new Decimal(item.quantity).times(item.unitCost);
-    addTo(entradasDesdeOtraSucursal, item.product.category?.group ?? null, value);
-  }
+  // Productos y subrecetas cuentan en los dos lados de la ecuacion: en los conteos y en las
+  // transferencias. Si el inventario incluye lo que la cocina tiene preparado, una salsa que se
+  // mando a otra sucursal tiene que salir como transferencia; si no, desapareceria del
+  // inventario sin aparecer en ningun lado y se leeria como costo.
+  const salidasAOtraSucursal = valuarConteo(requisicionesOut);
+  const entradasDesdeOtraSucursal = valuarConteo(requisicionesIn);
 
   const compras = zeroAmounts();
   for (const purchase of purchases) {
     addTo(compras, purchase.product.category?.group ?? null, new Decimal(purchase.totalPrice));
   }
 
-  const inventarioInicial = zeroAmounts();
-  for (const item of initialCount.items) {
-    if (!item.product) continue;
-    const value = new Decimal(item.quantity).times(item.unitCost);
-    addTo(inventarioInicial, item.product.category?.group ?? null, value);
-  }
-
-  const inventarioFinal = zeroAmounts();
-  for (const item of finalCount.items) {
-    if (!item.product) continue;
-    const value = new Decimal(item.quantity).times(item.unitCost);
-    addTo(inventarioFinal, item.product.category?.group ?? null, value);
-  }
+  const inventarioInicial = valuarConteo(initialCount.items);
+  const inventarioFinal = valuarConteo(finalCount.items);
 
   const creditosAlCosto = zeroAmounts();
   for (const salida of creditos) {
