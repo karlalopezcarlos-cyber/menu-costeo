@@ -81,7 +81,7 @@ export async function updateCategoryGroup(categoryId: string, group: string) {
 
   await prisma.productCategory.update({
     where: { id: category.id },
-    data: { group: group ? (group as CategoryGroup) : null },
+    data: { costGroupId: group || null },
   });
 
   revalidatePath("/settings/categories");

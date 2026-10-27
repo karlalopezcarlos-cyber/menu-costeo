@@ -9,6 +9,12 @@ import InlineNameEditor from "../InlineNameEditor";
 export default async function RecipeCategoriesPage() {
   const user = await requireOrgSession();
 
+  const costGroups = await prisma.costGroup.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true },
+  });
+
   const categories = await prisma.recipeCategory.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { name: "asc" },
@@ -54,7 +60,8 @@ export default async function RecipeCategoriesPage() {
                 <td className="px-4 py-3">
                   <CategoryGroupSelect
                     categoryId={category.id}
-                    initialGroup={category.group}
+                    initialGroup={category.costGroupId}
+                    groups={costGroups}
                     action={updateRecipeCategoryGroup}
                   />
                 </td>

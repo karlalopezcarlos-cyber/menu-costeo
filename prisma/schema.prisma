@@ -131,6 +131,7 @@ model Organization {
   portioningEntries         PortioningEntry[]
   auditComments             AuditComment[]
   productPresentations      ProductPresentation[]
+  costGroups                CostGroup[]
   dailySaleChanges          DailySaleChange[]
   transformationTemplates   TransformationTemplate[]
   inventoryCountItemChanges InventoryCountItemChange[]
@@ -144,6 +145,29 @@ model Organization {
   @@map("organizations")
 }
 
+/// Como separa sus gastos cada negocio en el Estado de Resultados.
+///
+/// Antes eran tres fijos en el codigo (alimento, bebidas, miscelaneos), que es como se separa un
+/// restaurante tipico y como no se separa ningun otro: una cafeteria quiere "cafe" y "reposteria",
+/// una barra quiere "destilados" aparte de "cerveza". Ahora cada organizacion define los suyos,
+/// les pone nombre y los ordena, y la tabla saca una columna por cada uno.
+model CostGroup {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  /// Orden en que salen las columnas del reporte.
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  productCategories ProductCategory[]
+  recipeCategories  RecipeCategory[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("cost_groups")
+}
+
 model ProductCategory {
   id              String         @id @default(cuid())
   organizationId  String
@@ -154,14 +178,16 @@ model ProductCategory {
   /// pescados y mariscos; el azucar glass y la bolsa kraft no tienen nada que hacer en esa
   /// pantalla. Mientras ninguna categoria lo tenga prendido se ofrecen todas, para que la
   /// pantalla no arranque vacia en una organizacion que todavia no lo configura.
-  isTransformable Boolean       @default(false)
+  isTransformable Boolean        @default(false)
   /// Si sus productos se cuentan en el inventario fisico. Hay categorias que se compran y se
   /// costean pero que nadie va a contar en la alacena (servilletas, gas, desechables): tenerlas
   /// en la hoja de conteo solo alarga la captura y mete ceros que ensucian la valuacion.
   isInventoriable Boolean        @default(true)
   createdAt       DateTime       @default(now())
 
-  products Product[]
+  products    Product[]
+  costGroup   CostGroup? @relation(fields: [costGroupId], references: [id])
+  costGroupId String?
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -173,7 +199,10 @@ model RecipeCategory {
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id])
   name           String
+  /// Historico: los tres grupos fijos de antes. Lo vigente es costGroupId.
   group          CategoryGroup?
+  costGroupId    String?
+  costGroup      CostGroup?     @relation(fields: [costGroupId], references: [id])
   createdAt      DateTime       @default(now())
 
   recipes Recipe[]

@@ -6,20 +6,16 @@ const PCT_FMT = "0.00%";
 
 function addDataRow(sheet: ExcelJS.Worksheet, row: IncomeStatementRowView) {
   const values = [row.label];
-  const pairs: [number, number | null][] = [
-    [row.alimento, row.alimentoPct],
-    [row.bebidas, row.bebidasPct],
-    [row.miscelaneos, row.miscelaneosPct],
-    [row.consolidado, row.consolidadoPct],
-  ];
-  for (const [amount, pct] of pairs) {
-    values.push(amount as unknown as string);
-    values.push((pct !== null ? pct / 100 : null) as unknown as string);
+  for (const cell of row.cells) {
+    values.push(cell.amount as unknown as string);
+    values.push((cell.pct !== null ? cell.pct / 100 : null) as unknown as string);
   }
   const excelRow = sheet.addRow(values);
   if (row.bold) excelRow.font = { bold: true };
-  for (let col = 2; col <= 8; col += 2) excelRow.getCell(col).numFmt = MONEY_FMT;
-  for (let col = 3; col <= 9; col += 2) {
+  // Dos columnas por grupo (monto y %), tantas veces como grupos tenga la organizacion.
+  const ultima = 1 + row.cells.length * 2;
+  for (let col = 2; col <= ultima; col += 2) excelRow.getCell(col).numFmt = MONEY_FMT;
+  for (let col = 3; col <= ultima; col += 2) {
     if (row.pctMode !== "none") excelRow.getCell(col).numFmt = PCT_FMT;
   }
   return excelRow;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const TABS = [
+  { href: "/settings/cost-groups", label: "Grupos de costo" },
   { href: "/settings/categories", label: "Categorias de productos" },
   { href: "/settings/recipe-categories", label: "Categorias de recetas" },
   { href: "/settings/suppliers", label: "Proveedores" },

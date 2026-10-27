@@ -2,7 +2,7 @@ import PDFDocument from "pdfkit";
 import { formatMoney } from "@/lib/format";
 import type { IncomeStatementResult, IncomeStatementRowView } from "@/lib/income-statement";
 
-const GROUP_LABELS = ["ALIMENTO", "BEBIDAS", "MISCELANEOS", "CONSOLIDADO"] as const;
+// Las columnas ya no son fijas: salen de los grupos de costo que definio la organizacion.
 
 function moneyCell(n: number): string {
   return formatMoney(n);
@@ -37,14 +37,20 @@ export async function buildIncomeStatementPdf(
     doc.fillColor("#000000");
     doc.moveDown(0.8);
 
+    const groupLabels = [
+      ...result.groups.map((g) => g.name.toUpperCase()),
+      "CONSOLIDADO",
+    ];
+    const columnas = groupLabels.length;
+
     const conceptFrac = 0.2;
-    const groupFrac = (1 - conceptFrac) / 4;
+    const groupFrac = (1 - conceptFrac) / columnas;
     const valueFrac = groupFrac * 0.6;
     const pctFrac = groupFrac * 0.4;
 
     const colX: number[] = [left];
     const colW: number[] = [usableWidth * conceptFrac];
-    for (let g = 0; g < 4; g++) {
+    for (let g = 0; g < columnas; g++) {
       colX.push(colX[colX.length - 1] + colW[colW.length - 1]);
       colW.push(usableWidth * valueFrac);
       colX.push(colX[colX.length - 1] + colW[colW.length - 1]);
@@ -57,7 +63,7 @@ export async function buildIncomeStatementPdf(
       doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff");
       doc.rect(left, y - 2, usableWidth, 16).fill("#262626");
       doc.fillColor("#ffffff");
-      GROUP_LABELS.forEach((label, g) => {
+      groupLabels.forEach((label, g) => {
         const colIndex = 1 + g * 2;
         const groupWidth = colW[colIndex] + colW[colIndex + 1];
         doc.text(label, colX[colIndex], y, { width: groupWidth, align: "center" });
@@ -92,12 +98,10 @@ export async function buildIncomeStatementPdf(
     function drawRowView(row: IncomeStatementRowView) {
       drawRow(
         row.label,
-        [
-          { value: row.alimento, pct: row.pctMode === "none" ? "" : pctCell(row.alimentoPct) },
-          { value: row.bebidas, pct: row.pctMode === "none" ? "" : pctCell(row.bebidasPct) },
-          { value: row.miscelaneos, pct: row.pctMode === "none" ? "" : pctCell(row.miscelaneosPct) },
-          { value: row.consolidado, pct: row.pctMode === "none" ? "" : pctCell(row.consolidadoPct) },
-        ],
+        row.cells.map((c) => ({
+          value: c.amount,
+          pct: row.pctMode === "none" ? "" : pctCell(c.pct),
+        })),
         { bold: row.bold, highlight: row.highlight },
       );
     }

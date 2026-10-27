@@ -9,10 +9,13 @@ function pctText(n: number | null): string {
   return n !== null ? `${n.toFixed(2)}%` : "-";
 }
 
-function rowLine(row: IncomeStatementRowView): string {
+function rowLine(row: IncomeStatementRowView, nombres: Map<string, string>): string {
   const cell = (amount: number, pct: number | null) =>
     row.pctMode === "none" ? formatMoney(amount) : `${formatMoney(amount)} (${pctText(pct)})`;
-  return `- ${row.label}: Alimento ${cell(row.alimento, row.alimentoPct)} | Bebidas ${cell(row.bebidas, row.bebidasPct)} | Miscelaneos ${cell(row.miscelaneos, row.miscelaneosPct)} | Consolidado ${cell(row.consolidado, row.consolidadoPct)}`;
+  const partes = row.cells.map(
+    (c) => `${nombres.get(c.key) ?? c.key} ${cell(c.amount, c.pct)}`,
+  );
+  return `- ${row.label}: ${partes.join(" | ")}`;
 }
 
 /**
@@ -23,8 +26,14 @@ export function buildIncomeStatementContext(
   result: IncomeStatementResult,
   rows: IncomeStatementRowView[],
 ): string {
+  const nombres = new Map<string, string>([
+    ...result.groups.map((g) => [g.id, g.name] as [string, string]),
+    ["consolidado", "Consolidado"],
+  ]);
+
   const lines: string[] = [];
   lines.push(`Sucursal: ${result.sucursalName} (${result.organizationName})`);
+  lines.push(`Grupos de costo: ${result.groups.map((g) => g.name).join(", ") || "sin grupos configurados"}`);
   lines.push(`Periodo: ${result.initialDateLabel} al ${result.finalDateLabel} (${result.diasActivos} dias con venta registrada)`);
   lines.push("");
   lines.push("Cada renglon muestra el monto y, cuando aplica, un porcentaje entre parentesis:");
@@ -32,7 +41,7 @@ export function buildIncomeStatementContext(
   lines.push("- Para Costo de ventas, Costo potencial y Variacion, el % es respecto a la Venta total de esa misma columna.");
   lines.push("");
   for (const row of rows) {
-    lines.push(rowLine(row));
+    lines.push(rowLine(row, nombres));
     const description = INCOME_STATEMENT_ROW_DESCRIPTIONS[row.label];
     if (description) lines.push(`  (${description})`);
   }

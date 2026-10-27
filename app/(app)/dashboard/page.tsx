@@ -15,16 +15,13 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("es-MX", { timeZone: "UTC" });
 }
 
-const GROUP_COLUMNS: {
-  key: keyof GroupAmounts;
-  pctKey: "alimentoPct" | "bebidasPct" | "miscelaneosPct" | "consolidadoPct";
-  label: string;
-}[] = [
-  { key: "alimento", pctKey: "alimentoPct", label: "ALIMENTO" },
-  { key: "bebidas", pctKey: "bebidasPct", label: "BEBIDAS" },
-  { key: "miscelaneos", pctKey: "miscelaneosPct", label: "MISCELANEOS" },
-  { key: "consolidado", pctKey: "consolidadoPct", label: "CONSOLIDADO" },
-];
+/** Las columnas salen de los grupos que definio la organizacion, mas el consolidado al final. */
+function columnasDe(result: { groups: { id: string; name: string }[] }) {
+  return [
+    ...result.groups.map((g) => ({ key: g.id, label: g.name.toUpperCase() })),
+    { key: "consolidado", label: "CONSOLIDADO" },
+  ];
+}
 
 /** Tarjeta de indicador para el resumen de arriba. */
 function StatTile({
@@ -56,9 +53,9 @@ function Row({ row }: { row: IncomeStatementRowView }) {
       <td className="px-2 py-2" title={description}>
         {row.label}
       </td>
-      {GROUP_COLUMNS.map((col, index) => {
-        const value = row[col.key];
-        const pct = row[col.pctKey];
+      {row.cells.map((col, index) => {
+        const value = col.amount;
+        const pct = col.pct;
         return (
           <Fragment key={col.key}>
             <td
@@ -126,6 +123,7 @@ export default async function DashboardPage({
     orderedFinalId,
   );
   const rows = buildIncomeStatementRows(result);
+  const columnas = columnasDe(result);
   const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}`;
   const ventaTotal = result.ventaTotal.consolidado;
   const costoPct = ventaTotal !== 0 ? (result.costoDeVentas.consolidado / ventaTotal) * 100 : null;
@@ -233,7 +231,7 @@ export default async function DashboardPage({
           <thead>
             <tr className="bg-neutral-900 text-white">
               <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em]">CONCEPTO</th>
-              {GROUP_COLUMNS.map((col, index) => (
+              {columnas.map((col, index) => (
                 <th
                   key={col.key}
                   className={`px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.12em] ${index > 0 ? "border-l border-neutral-700" : ""}`}
@@ -268,7 +266,7 @@ export default async function DashboardPage({
               <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Monto pagado"]}>
                 Monto pagado
               </td>
-              {GROUP_COLUMNS.map((col, index) => (
+              {columnas.map((col, index) => (
                 <td
                   key={col.key}
                   className={`px-3 py-2 text-right ${index > 0 ? "border-l border-neutral-200" : ""}`}
@@ -283,7 +281,7 @@ export default async function DashboardPage({
               <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Venta promedio diaria"]}>
                 Venta promedio diaria
               </td>
-              {GROUP_COLUMNS.map((col, index) => (
+              {columnas.map((col, index) => (
                 <td
                   key={col.key}
                   className={`px-3 py-2 text-right ${index > 0 ? "border-l border-neutral-200" : ""}`}

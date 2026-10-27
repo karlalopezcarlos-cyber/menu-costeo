@@ -16,6 +16,12 @@ import InventoriableToggle from "../InventoriableToggle";
 export default async function ProductCategoriesPage() {
   const user = await requireOrgSession();
 
+  const costGroups = await prisma.costGroup.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true },
+  });
+
   const categories = await prisma.productCategory.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { name: "asc" },
@@ -67,7 +73,8 @@ export default async function ProductCategoriesPage() {
                 <td className="px-4 py-3">
                   <CategoryGroupSelect
                     categoryId={category.id}
-                    initialGroup={category.group}
+                    initialGroup={category.costGroupId}
+                    groups={costGroups}
                     action={updateCategoryGroup}
                   />
                 </td>

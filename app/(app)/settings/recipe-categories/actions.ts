@@ -81,7 +81,7 @@ export async function updateRecipeCategoryGroup(categoryId: string, group: strin
 
   await prisma.recipeCategory.update({
     where: { id: category.id },
-    data: { group: group ? (group as CategoryGroup) : null },
+    data: { costGroupId: group || null },
   });
 
   revalidatePath("/settings/recipe-categories");
