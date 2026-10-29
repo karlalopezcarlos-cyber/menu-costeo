@@ -424,6 +424,7 @@ model Product {
   @@index([defaultSupplierId])
   @@index([defaultSourceProductId])
   @@map("products")
+  expenses                  Expense[]
 }
 
 /// Catalogo de presentaciones nombradas de un producto (ej. "Lata 2.75kg" = 2.75 KG, "Bulto 25kg" =
@@ -1126,6 +1127,10 @@ model Expense {
   category        ExpenseCategory? @relation(fields: [categoryId], references: [id])
   supplierId      String?
   supplier        Supplier?        @relation(fields: [supplierId], references: [id])
+  /// Que se pago, elegido del catalogo: un producto de una categoria marcada como gasto. Se
+  /// guarda tambien el nombre en `concept` para que el historico no cambie si lo renombran.
+  productId       String?
+  product         Product?         @relation(fields: [productId], references: [id])
   concept         String
   amount          Decimal          @db.Decimal(14, 2)
   invoiceFolio    String?
@@ -1138,6 +1143,7 @@ model Expense {
   @@index([organizationId, date])
   @@index([categoryId])
   @@index([supplierId])
+  @@index([productId])
   @@map("expenses")
 }
 

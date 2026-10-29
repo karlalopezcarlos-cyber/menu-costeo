@@ -10,9 +10,12 @@ const initialState: ExpenseState = {};
 export default function ExpenseForm({
   categories,
   suppliers,
+  conceptos,
 }: {
   categories: { id: string; name: string }[];
   suppliers: { id: string; name: string }[];
+  /** Productos de categorias marcadas como gasto: lo unico que se puede pagar aqui. */
+  conceptos: { id: string; name: string; categoryName: string | null }[];
 }) {
   const [state, formAction, pending] = useActionState(createExpense, initialState);
 
@@ -22,6 +25,21 @@ export default function ExpenseForm({
       onKeyDown={blockEnterSubmit}
       className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm"
     >
+      {conceptos.length === 0 && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          No hay conceptos de gasto en tu catalogo. Se dan de alta como productos (LUZ, RENTA,
+          NOMINA) en una categoria marcada como <b>gasto</b>:{" "}
+          <Link href="/products/new" className="font-medium underline">
+            crea el producto
+          </Link>{" "}
+          y marca su categoria en{" "}
+          <Link href="/settings/categories" className="font-medium underline">
+            Configuracion &gt; Categorias
+          </Link>
+          .
+        </p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
         <div className="space-y-1">
           <label htmlFor="date" className="text-sm font-medium text-neutral-700">
@@ -37,16 +55,24 @@ export default function ExpenseForm({
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="concept" className="text-sm font-medium text-neutral-700">
+          <label htmlFor="productId" className="text-sm font-medium text-neutral-700">
             Concepto
           </label>
-          <input
-            id="concept"
-            name="concept"
+          <select
+            id="productId"
+            name="productId"
             required
-            placeholder="Ej. Renta de octubre, CFE bimestre sep-oct"
+            defaultValue=""
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Elige que se pago</option>
+            {conceptos.map((concepto) => (
+              <option key={concepto.id} value={concepto.id}>
+                {concepto.name}
+                {concepto.categoryName ? ` · ${concepto.categoryName}` : ""}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -131,6 +157,15 @@ export default function ExpenseForm({
           className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
       </div>
+
+      <p className="text-xs text-neutral-500">
+        El concepto sale del catalogo, no se escribe: asi &quot;LUZ&quot;, &quot;Luz&quot; y
+        &quot;CFE&quot; no terminan siendo tres cosas distintas. ¿Falta uno?{" "}
+        <Link href="/products/new" className="text-brand-600 underline-offset-2 hover:underline">
+          Dalo de alta
+        </Link>{" "}
+        en una categoria marcada como gasto.
+      </p>
 
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 

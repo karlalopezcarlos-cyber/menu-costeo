@@ -23,14 +23,28 @@ export async function createExpense(
     const user = await requireSucursalContext();
 
     const dateRaw = String(formData.get("date") ?? "").trim();
-    const concept = String(formData.get("concept") ?? "").trim();
+    const productId = String(formData.get("productId") ?? "").trim();
     const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
     const supplierId = String(formData.get("supplierId") ?? "").trim() || null;
     const invoiceFolio = String(formData.get("invoiceFolio") ?? "").trim() || null;
     const comment = String(formData.get("comment") ?? "").trim() || null;
 
     if (!dateRaw) return { error: "Captura la fecha del gasto." };
-    if (!concept) return { error: "Describe el gasto (ej. Renta de octubre, CFE)." };
+    if (!productId) return { error: "Elige que se pago." };
+
+    // El concepto no es texto libre: sale del catalogo, de una categoria marcada como gasto. Si
+    // cada quien lo escribe a su manera, "LUZ", "Luz" y "CFE" terminan siendo tres cosas
+    // distintas y ningun reporte las puede juntar.
+    const product = await prisma.product.findFirst({
+      where: { id: productId, organizationId: user.organizationId },
+      include: { category: { select: { isExpense: true } } },
+    });
+    if (!product) return { error: "Ese concepto no existe en tu catalogo." };
+    if (!product.category?.isExpense) {
+      return {
+        error: `"${product.name}" no esta en una categoria marcada como gasto. Marcala en Configuracion > Categorias o elige otro concepto.`,
+      };
+    }
 
     const amount = new Decimal(String(formData.get("amount") ?? "0") || "0");
     if (amount.lte(0)) return { error: "El monto debe ser mayor a cero." };
@@ -55,7 +69,10 @@ export async function createExpense(
         date: new Date(`${dateRaw}T00:00:00.000Z`),
         categoryId,
         supplierId,
-        concept,
+        productId: product.id,
+        // Se guarda el nombre tal como estaba hoy: renombrar el producto despues no debe
+        // cambiar lo que dice un gasto de hace seis meses.
+        concept: product.name,
         amount: amount.toString(),
         invoiceFolio,
         comment,
