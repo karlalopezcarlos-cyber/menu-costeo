@@ -20,7 +20,14 @@ export default async function NewPurchasePage({
       select: { nextPurchaseFolio: true },
     }),
     prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false },
+      where: {
+        organizationId: user.organizationId,
+        archivedAt: null,
+        isProcessed: false,
+        // Lo que es gasto se captura en Gastos, no aqui: una compra lleva cantidad, unidad y
+        // entra al kardex, y la renta no tiene nada de eso.
+        OR: [{ categoryId: null }, { category: { isExpense: false } }],
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,
