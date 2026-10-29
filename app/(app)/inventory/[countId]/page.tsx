@@ -68,7 +68,8 @@ export default async function InventoryCountPage({
         OR: [
           // Sin categoria se cuenta: no hay forma de saber que no se inventaria.
           { categoryId: null },
-          { category: { isInventoriable: true } },
+          // Los gastos (renta, luz, servicios) no son existencias que alguien pueda contar.
+          { category: { isInventoriable: true, isExpense: false } },
           ...(yaCapturados.length ? [{ id: { in: yaCapturados } }] : []),
         ],
       },
