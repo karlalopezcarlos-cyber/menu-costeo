@@ -23,32 +23,50 @@ type SortKey =
   | "actual"
   | "variance"
   | "varianceAmount"
-  | "previousVarianceQty";
+  | "previousVarianceQty"
+  | "unit";
 type SortDir = "asc" | "desc";
 
 /** Ancho de cada columna en % del ancho total de la tabla; junto con VARIANCE_PCT_WIDTH y
  * COMMENT_WIDTH deben sumar 100, para que la tabla (table-fixed) siempre quepa en el ancho
  * disponible sin necesitar scroll horizontal. */
+/** Las columnas de cantidad se alinean a la derecha: una lista de numeros se lee por ahi. */
+const NUMERIC_KEYS = new Set<SortKey>([
+  "initial",
+  "purchases",
+  "produced",
+  "transformedIn",
+  "waste",
+  "productionConsumed",
+  "transformedOut",
+  "sales",
+  "theoretical",
+  "actual",
+  "variance",
+  "previousVarianceQty",
+  "varianceAmount",
+]);
+
 const COLUMNS: { key: SortKey; label: string; width: number }[] = [
-  { key: "category", label: "Categoria", width: 6 },
-  { key: "type", label: "Tipo", width: 5 },
-  { key: "name", label: "Nombre", width: 12 },
-  { key: "initial", label: "Inicial", width: 6 },
-  { key: "purchases", label: "+ Compras", width: 6 },
-  { key: "produced", label: "+ Produccion", width: 6 },
-  { key: "transformedIn", label: "+ Transformacion", width: 7 },
-  { key: "waste", label: "- Mermas", width: 6 },
-  { key: "productionConsumed", label: "- Produccion", width: 6 },
-  { key: "transformedOut", label: "- Transformacion", width: 7 },
-  { key: "sales", label: "- Ventas", width: 6 },
-  { key: "theoretical", label: "= Teorico", width: 6 },
-  { key: "actual", label: "Real (final)", width: 6 },
-  { key: "variance", label: "Variacion", width: 6 },
-  { key: "previousVarianceQty", label: "Variacion anterior", width: 6 },
+  { key: "category", label: "Categoria", width: 7 },
+  { key: "name", label: "Nombre", width: 14 },
+  { key: "unit", label: "Unidad", width: 4 },
+  { key: "initial", label: "Inicial", width: 5 },
+  { key: "purchases", label: "+ Compras", width: 5 },
+  { key: "produced", label: "+ Produccion", width: 5 },
+  { key: "transformedIn", label: "+ Transform.", width: 5 },
+  { key: "waste", label: "- Mermas", width: 5 },
+  { key: "productionConsumed", label: "- Produccion", width: 5 },
+  { key: "transformedOut", label: "- Transform.", width: 5 },
+  { key: "sales", label: "- Ventas", width: 5 },
+  { key: "theoretical", label: "= Teorico", width: 5 },
+  { key: "actual", label: "Real (final)", width: 5 },
+  { key: "variance", label: "Variacion", width: 5 },
+  { key: "previousVarianceQty", label: "Var. anterior", width: 5 },
   { key: "varianceAmount", label: "Variacion $", width: 6 },
 ];
 const VARIANCE_PCT_WIDTH = 4;
-const COMMENT_WIDTH = 7;
+const COMMENT_WIDTH = 5;
 
 function fmt(n: number): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -106,6 +124,8 @@ export default function AuditTable({
     switch (key) {
       case "category":
         return row.categoryName ? row.categoryName.toLowerCase() : null;
+      case "unit":
+        return row.unitLabel;
       case "type":
         return row.itemType;
       case "name":
@@ -265,13 +285,15 @@ export default function AuditTable({
         <thead className="sticky top-0 z-10 bg-neutral-800 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="px-2 py-2 font-medium">
+              <th key={col.key} className="px-2 py-2 align-bottom font-medium">
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
-                  className="flex w-full min-w-0 items-center gap-1 text-left hover:text-neutral-200"
+                  className={`flex w-full min-w-0 items-end gap-1 hover:text-neutral-200 ${
+                    NUMERIC_KEYS.has(col.key) ? "justify-end text-right" : "text-left"
+                  }`}
                 >
-                  <span className="break-words">{col.label}</span>
+                  <span className="break-words leading-tight">{col.label}</span>
                   {sortKey === col.key && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
@@ -306,65 +328,60 @@ export default function AuditTable({
               <tr key={`${row.itemType}-${row.itemId}`} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                 <td className="px-2 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
                 <td className="px-2 py-2">
-                  <span
-                    className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      row.itemType === "product" ? "bg-neutral-100 text-neutral-600" : "bg-blue-100 text-blue-800"
-                    }`}
-                  >
-                    {row.itemType === "product" ? "Producto" : "Subreceta"}
-                  </span>
-                </td>
-                <td className="px-2 py-2">
                   <Link href={kardexHref} target="_blank" className="hover:underline" title="Ver kardex de movimientos">
                     {row.name}
                   </Link>
+                  {row.itemType === "subrecipe" && (
+                    <span className="ml-1.5 rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-800">
+                      sub
+                    </span>
+                  )}
                 </td>
-                <td className="px-2 py-2 text-neutral-500">
-                  {fmt(row.initialQty)} {row.unitLabel}
-                  {presentationSuffix(row, row.initialQty)}
+                <td className="px-2 py-2 text-neutral-400">{row.unitLabel}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-500">
+                  {fmt(row.initialQty)}
                 </td>
-                <td className="px-2 py-2 text-emerald-700">
+                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
                   {row.purchasesQty !== 0
-                    ? `+${fmt(row.purchasesQty)}${presentationSuffix(row, row.purchasesQty)}`
+                    ? `+${fmt(row.purchasesQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-emerald-700">
+                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
                   {row.producedQty !== 0
-                    ? `+${fmt(row.producedQty)}${presentationSuffix(row, row.producedQty)}`
+                    ? `+${fmt(row.producedQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-emerald-700">
+                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
                   {row.transformedInQty !== 0
-                    ? `+${fmt(row.transformedInQty)}${presentationSuffix(row, row.transformedInQty)}`
+                    ? `+${fmt(row.transformedInQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-red-600">
-                  {row.wasteQty !== 0 ? `-${fmt(row.wasteQty)}${presentationSuffix(row, row.wasteQty)}` : "-"}
+                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                  {row.wasteQty !== 0 ? `-${fmt(row.wasteQty)}` : "-"}
                 </td>
-                <td className="px-2 py-2 text-red-600">
+                <td className="px-2 py-2 text-right tabular-nums text-red-600">
                   {row.productionConsumedQty !== 0
-                    ? `-${fmt(row.productionConsumedQty)}${presentationSuffix(row, row.productionConsumedQty)}`
+                    ? `-${fmt(row.productionConsumedQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-red-600">
+                <td className="px-2 py-2 text-right tabular-nums text-red-600">
                   {row.transformedOutQty !== 0
-                    ? `-${fmt(row.transformedOutQty)}${presentationSuffix(row, row.transformedOutQty)}`
+                    ? `-${fmt(row.transformedOutQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-red-600">
-                  {row.salesQty !== 0 ? `-${fmt(row.salesQty)}${presentationSuffix(row, row.salesQty)}` : "-"}
+                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                  {row.salesQty !== 0 ? `-${fmt(row.salesQty)}` : "-"}
                 </td>
-                <td className="px-2 py-2 font-medium">
-                  {fmt(row.theoreticalFinalQty)} {row.unitLabel}
-                  {presentationSuffix(row, row.theoreticalFinalQty)}
+                <td className="px-2 py-2 text-right font-medium tabular-nums">
+                  {fmt(row.theoreticalFinalQty)}
                 </td>
-                <td className="px-2 py-2 text-neutral-500">
+                <td className="px-2 py-2 text-right tabular-nums text-neutral-500">
                   {row.actualFinalQty !== null
-                    ? `${fmt(row.actualFinalQty)} ${row.unitLabel}${presentationSuffix(row, row.actualFinalQty)}`
+                    ? `${fmt(row.actualFinalQty)}`
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 font-medium ${
+                  className={`px-2 py-2 text-right font-medium tabular-nums ${
                     !hasVariance
                       ? "text-neutral-300"
                       : !varianceIsSignificant
@@ -375,11 +392,11 @@ export default function AuditTable({
                   }`}
                 >
                   {row.varianceQty !== null
-                    ? `${row.varianceQty > 0 ? "+" : ""}${fmt(row.varianceQty)} ${row.unitLabel}${presentationSuffix(row, row.varianceQty)}`
+                    ? `${row.varianceQty > 0 ? "+" : ""}${fmt(row.varianceQty)}`
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 ${
+                  className={`px-2 py-2 text-right tabular-nums ${
                     row.previousVarianceQty === null
                       ? "text-neutral-300"
                       : Math.abs(row.previousVarianceQty) <= 0.001
@@ -391,11 +408,11 @@ export default function AuditTable({
                   title="Variacion del periodo anterior (con el mismo conteo, pero comparado contra el conteo previo a este)"
                 >
                   {row.previousVarianceQty !== null
-                    ? `${row.previousVarianceQty > 0 ? "+" : ""}${fmt(row.previousVarianceQty)} ${row.unitLabel}${presentationSuffix(row, row.previousVarianceQty)}`
+                    ? `${row.previousVarianceQty > 0 ? "+" : ""}${fmt(row.previousVarianceQty)}`
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 font-medium ${
+                  className={`px-2 py-2 text-right font-medium tabular-nums ${
                     row.varianceAmount === null
                       ? "text-neutral-300"
                       : !varianceIsSignificant
