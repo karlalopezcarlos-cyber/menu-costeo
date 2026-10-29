@@ -42,6 +42,9 @@ export type IncomeStatementResult = {
   /// Lo que se echo a perder. No se resta del costo —tirar producto es costo de operar— pero se
   /// muestra aparte para saber cuanto de ese costo es desperdicio.
   mermas: GroupAmounts;
+  /// Compras de categorias marcadas como gasto (agua, gas, desechables, limpieza). No son parte
+  /// de lo que se vende, asi que no entran al costo de ventas: van en su propio renglon.
+  gastosDeOperacion: GroupAmounts;
   costoDeVentas: GroupAmounts;
   costoPotencial: GroupAmounts;
   variacion: GroupAmounts;
@@ -142,6 +145,9 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
       ventaTotal: result.ventaTotal,
     })),
     buildRow("Variacion", result.variacion, "costPct", con({ ventaTotal: result.ventaTotal })),
+    buildRow("Gastos de operacion", result.gastosDeOperacion, "costPct", con({
+      ventaTotal: result.ventaTotal,
+    })),
   ];
 }
 
@@ -153,6 +159,8 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
   Compras: "Total de compras de productos registradas en el periodo.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
+  "Gastos de operacion":
+    "Compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende; se muestran aparte para saber cuanto se va en operar. El % es respecto a la Venta total.",
   Mermas:
     "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. NO se resta del costo de ventas: tirar producto es costo de operar y tiene que pesar. Se muestra aparte para saber cuanto del costo es desperdicio. El % es respecto a la Venta total.",
   "Salidas por creditos al costo":
@@ -220,7 +228,7 @@ function dateLabel(d: Date): string {
 export type ConteoItemValuable = {
   quantity: Decimal.Value;
   unitCost: Decimal.Value;
-  product?: { category?: { costGroupId: string | null } | null } | null;
+  product?: { category?: { costGroupId: string | null; isExpense?: boolean } | null } | null;
   subRecipe?: { category?: { costGroupId: string | null } | null } | null;
 };
 
@@ -338,13 +346,23 @@ export async function computeIncomeStatement(
   const salidasAOtraSucursal = valuarConteo(requisicionesOut);
   const entradasDesdeOtraSucursal = valuarConteo(requisicionesIn);
 
+  // Lo que se compra para vender va a Compras; lo que se compra para operar —agua, gas,
+  // desechables— va a Gastos. Antes todo caia en Compras y por eso el costo de ventas incluia
+  // cosas que nunca se vendieron.
   const compras = zeroAmounts();
+  const gastosDeOperacion = zeroAmounts();
   for (const purchase of purchases) {
-    addTo(compras, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
+    const destino = purchase.product.category?.isExpense ? gastosDeOperacion : compras;
+    addTo(destino, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
   }
 
-  const inventarioInicial = valuarConteo(initialCount.items);
-  const inventarioFinal = valuarConteo(finalCount.items);
+  // Un producto de gasto puede seguir contandose fisicamente, pero no puede entrar a la
+  // ecuacion del costo: si su compra salio por un lado y su inventario entra por el otro, el
+  // costo queda descuadrado.
+  const esDeGasto = (item: ConteoItemValuable) =>
+    item.product?.category?.isExpense === true;
+  const inventarioInicial = valuarConteo(initialCount.items.filter((i) => !esDeGasto(i)));
+  const inventarioFinal = valuarConteo(finalCount.items.filter((i) => !esDeGasto(i)));
 
   // Las tres salidas se valuan igual; lo que cambia es que hacen en el reporte.
   //
@@ -439,6 +457,7 @@ export async function computeIncomeStatement(
     inventarioFinal,
     creditosAlCosto,
     mermas,
+    gastosDeOperacion,
     costoDeVentas,
     costoPotencial,
     variacion,

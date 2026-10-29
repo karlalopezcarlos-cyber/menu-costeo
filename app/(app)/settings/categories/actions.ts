@@ -149,3 +149,27 @@ export async function updateCategoryTransformable(categoryId: string, isTransfor
   revalidatePath("/settings/categories");
   revalidatePath("/portioning/new");
 }
+
+/**
+ * Marca una categoria como gasto de operacion.
+ *
+ * Agua, gas, desechables, limpieza: se compran, pero no son parte de lo que se vende. Con esto
+ * sus compras dejan de sumar al costo de ventas y salen en su propio renglon, que es la unica
+ * forma de saber cuanto se va en cada cosa.
+ */
+export async function updateCategoryExpense(categoryId: string, isExpense: boolean) {
+  const user = await requireOrgSession();
+
+  const category = await prisma.productCategory.findFirst({
+    where: { id: categoryId, organizationId: user.organizationId },
+  });
+  if (!category) throw new Error("Categoria no encontrada.");
+
+  await prisma.productCategory.update({
+    where: { id: category.id },
+    data: { isExpense },
+  });
+
+  revalidatePath("/settings/categories");
+  revalidatePath("/dashboard");
+}
