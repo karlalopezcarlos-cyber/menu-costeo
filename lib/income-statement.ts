@@ -39,6 +39,9 @@ export type IncomeStatementResult = {
   /// inventario, asi que ya venian metidas en el costo; se restan para que el costo de ventas
   /// hable solo de lo que se vendio.
   creditosAlCosto: GroupAmounts;
+  /// Lo que se echo a perder. No se resta del costo —tirar producto es costo de operar— pero se
+  /// muestra aparte para saber cuanto de ese costo es desperdicio.
+  mermas: GroupAmounts;
   costoDeVentas: GroupAmounts;
   costoPotencial: GroupAmounts;
   variacion: GroupAmounts;
@@ -128,6 +131,7 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     buildRow("Salidas por creditos al costo", result.creditosAlCosto, "costPct", con({
       ventaTotal: result.ventaTotal,
     })),
+    buildRow("Mermas", result.mermas, "costPct", con({ ventaTotal: result.ventaTotal })),
     buildRow("Costo de ventas", result.costoDeVentas, "costPct", con({
       bold: true,
       highlight: true,
@@ -149,6 +153,8 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
   Compras: "Total de compras de productos registradas en el periodo.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
+  Mermas:
+    "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. NO se resta del costo de ventas: tirar producto es costo de operar y tiene que pesar. Se muestra aparte para saber cuanto del costo es desperdicio. El % es respecto a la Venta total.",
   "Salidas por creditos al costo":
     "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron; la merma no entra aqui, esa si es costo de operar.",
   "Costo de ventas":
@@ -307,13 +313,10 @@ export async function computeIncomeStatement(
       where: { sucursalId, paidDate: dateFilter },
       select: { amount: true },
     }),
-    // Cortesias, consumo de personal y pruebas. La merma no entra: esa si es costo de operar.
+    // Todo lo registrado en Mermas y salidas: los tres conceptos. Se separan al valuar, porque
+    // no se tratan igual (ver mas abajo).
     prisma.wasteEntry.findMany({
-      where: {
-        sucursalId,
-        date: dateFilter,
-        concept: { in: ["SERVICIO", "PRUEBAS"] },
-      },
+      where: { sucursalId, date: dateFilter },
       include: {
         product: { include: { category: true } },
         subRecipe: { include: { category: true } },
@@ -343,11 +346,21 @@ export async function computeIncomeStatement(
   const inventarioInicial = valuarConteo(initialCount.items);
   const inventarioFinal = valuarConteo(finalCount.items);
 
+  // Las tres salidas se valuan igual; lo que cambia es que hacen en el reporte.
+  //
+  // Cortesias y pruebas se RESTAN del costo: salieron del inventario pero no se vendieron, asi
+  // que dejarlas dentro inflaba el costo y acusaba una variacion falsa contra el potencial.
+  //
+  // La merma NO se resta: tirar producto si es costo de operar y tiene que pesar en el costo de
+  // ventas. Pero se muestra en su propio renglon, porque escondida dentro del costo nadie sabe
+  // cuanto se esta tirando.
   const creditosAlCosto = zeroAmounts();
+  const mermas = zeroAmounts();
   for (const salida of creditos) {
     const grupo =
       salida.product?.category?.costGroupId ?? salida.subRecipe?.category?.costGroupId ?? null;
-    addTo(creditosAlCosto, grupo, new Decimal(salida.quantity).times(salida.unitCost));
+    const valor = new Decimal(salida.quantity).times(salida.unitCost);
+    addTo(salida.concept === "MERMA" ? mermas : creditosAlCosto, grupo, valor);
   }
 
   const ventaTotal = add(ventasNetasPV, salidasAOtraSucursal);
@@ -425,6 +438,7 @@ export async function computeIncomeStatement(
     existencia,
     inventarioFinal,
     creditosAlCosto,
+    mermas,
     costoDeVentas,
     costoPotencial,
     variacion,
