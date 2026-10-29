@@ -216,3 +216,52 @@ export async function aplicarRendimientoAlCatalogo(entryId: string) {
   revalidatePath("/products");
   revalidatePath("/recipes");
 }
+
+/**
+ * Borra una transformacion.
+ *
+ * Lo delicado no es borrar el registro, es el costo que dejo: cada producto que salio se quedo
+ * con el costo que esta transformacion le puso. Al borrarla hay que devolverle el costo que le
+ * corresponde, que es el de su transformacion anterior; si no queda ninguna, se deja en cero
+ * porque ya no hay de donde sacarlo —un producto de proceso no tiene compras—.
+ */
+export async function deleteTransformation(entryId: string) {
+  const user = await requireSucursalContext();
+
+  const entry = await prisma.portioningEntry.findFirst({
+    where: { id: entryId, sucursalId: user.sucursalId },
+    include: { outputs: { select: { productId: true } } },
+  });
+  if (!entry) throw new Error("Transformacion no encontrada.");
+
+  const afectados = [
+    ...entry.outputs.map((o) => o.productId).filter((id): id is string => Boolean(id)),
+    ...(entry.outputProductId ? [entry.outputProductId] : []),
+  ];
+
+  await prisma.portioningEntry.delete({ where: { id: entry.id } });
+
+  for (const productId of [...new Set(afectados)]) {
+    const anterior = await prisma.portioningOutput.findFirst({
+      where: { productId, portioningEntry: { sucursalId: user.sucursalId } },
+      orderBy: { portioningEntry: { date: "desc" } },
+      select: { realUnitCost: true, portioningEntry: { select: { date: true } } },
+    });
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: anterior
+        ? {
+            currentUnitCost: anterior.realUnitCost.toString(),
+            currentUnitCostUpdatedAt: anterior.portioningEntry.date,
+          }
+        : { currentUnitCost: "0", currentUnitCostUpdatedAt: null },
+    });
+  }
+
+  revalidatePath("/portioning");
+  revalidatePath("/products");
+  revalidatePath("/recipes");
+  revalidatePath("/inventory");
+  revalidatePath("/audit");
+}

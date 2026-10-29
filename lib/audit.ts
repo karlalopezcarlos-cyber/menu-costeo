@@ -36,6 +36,10 @@ export type AuditRow = {
   salesQty: number;
   requisicionesInQty: number;
   requisicionesOutQty: number;
+  /** Lo que gano por salir de una transformacion (camaron limpio, porciones). */
+  transformedInQty: number;
+  /** Lo que perdio por entrar a una transformacion (el camaron crudo que se limpio). */
+  transformedOutQty: number;
   theoreticalFinalQty: number;
   actualFinalQty: number | null;
   varianceQty: number | null;
@@ -120,6 +124,7 @@ export async function computeInventoryAudit(
     sales,
     requisicionesOut,
     requisicionesIn,
+    transformaciones,
     graph,
     comments,
   ] = await Promise.all([
@@ -161,6 +166,18 @@ export async function computeInventoryAudit(
       where: { requisicion: { toSucursalId: sucursalId, date: dateFilter } },
       select: { productId: true, destSubRecipeId: true, quantity: true, unit: true },
     }),
+    // Lo que entro a una transformacion sale del inventario, y lo que salio entra. Sin esto,
+    // limpiar camaron se veia como un faltante y el limpio como un sobrante salido de la nada.
+    prisma.portioningEntry.findMany({
+      where: { sucursalId, date: dateFilter },
+      select: {
+        productId: true,
+        initialQty: true,
+        outputProductId: true,
+        outputQty: true,
+        outputs: { select: { productId: true, qty: true } },
+      },
+    }),
     loadOrgRecipeGraph(sucursalId),
     finalCountId
       ? prisma.auditComment.findMany({ where: { sucursalId, finalCountId } })
@@ -173,6 +190,26 @@ export async function computeInventoryAudit(
   );
   const baseUnitByProductId = new Map(products.map((p) => [p.id, p.baseUnit as UnitValue]));
   const baseUnitBySubRecipeId = new Map(subRecipes.map((r) => [r.id, r.yieldUnit as UnitValue]));
+
+  // Lo que cada producto perdio por entrar a una transformacion, y lo que gano por salir de una.
+  const transformadoEntraPorProductId = new Map<string, Decimal>();
+  const transformadoSalePorProductId = new Map<string, Decimal>();
+  for (const evento of transformaciones) {
+    const consumido = transformadoEntraPorProductId.get(evento.productId) ?? new Decimal(0);
+    transformadoEntraPorProductId.set(evento.productId, consumido.plus(evento.initialQty));
+
+    if (evento.outputs.length > 0) {
+      for (const salida of evento.outputs) {
+        if (!salida.productId) continue;
+        const actual = transformadoSalePorProductId.get(salida.productId) ?? new Decimal(0);
+        transformadoSalePorProductId.set(salida.productId, actual.plus(salida.qty ?? 0));
+      }
+    } else if (evento.outputProductId && evento.outputQty) {
+      // Limpiezas viejas, de antes de que la salida se guardara como renglon.
+      const actual = transformadoSalePorProductId.get(evento.outputProductId) ?? new Decimal(0);
+      transformadoSalePorProductId.set(evento.outputProductId, actual.plus(evento.outputQty));
+    }
+  }
 
   const commentByKey = new Map(comments.map((c) => [c.productId ?? c.subRecipeId ?? "", c.comment]));
   const costMemo = new Map<string, Decimal>();
@@ -310,13 +347,17 @@ export async function computeInventoryAudit(
     const salesQty = salesConsumedByProductId.get(product.id) ?? new Decimal(0);
     const requisicionesInQty = requisicionesInByProductId.get(product.id) ?? new Decimal(0);
     const requisicionesOutQty = requisicionesOutByProductId.get(product.id) ?? new Decimal(0);
+    const transformedInQty = transformadoSalePorProductId.get(product.id) ?? new Decimal(0);
+    const transformedOutQty = transformadoEntraPorProductId.get(product.id) ?? new Decimal(0);
     const theoreticalFinalQty = initialQty
       .plus(purchasesQty)
       .plus(requisicionesInQty)
+      .plus(transformedInQty)
       .minus(wasteQty)
       .minus(productionConsumedQty)
       .minus(salesQty)
-      .minus(requisicionesOutQty);
+      .minus(requisicionesOutQty)
+      .minus(transformedOutQty);
     const actualFinalQty = finalByKey ? finalByKey.get(product.id) ?? new Decimal(0) : null;
     const varianceQty = actualFinalQty !== null ? actualFinalQty.minus(theoreticalFinalQty) : null;
     const variancePct =
@@ -344,6 +385,8 @@ export async function computeInventoryAudit(
       salesQty: salesQty.toNumber(),
       requisicionesInQty: requisicionesInQty.toNumber(),
       requisicionesOutQty: requisicionesOutQty.toNumber(),
+      transformedInQty: transformedInQty.toNumber(),
+      transformedOutQty: transformedOutQty.toNumber(),
       theoreticalFinalQty: theoreticalFinalQty.toNumber(),
       actualFinalQty: actualFinalQty !== null ? actualFinalQty.toNumber() : null,
       varianceQty: varianceQty !== null ? varianceQty.toNumber() : null,
@@ -404,6 +447,9 @@ export async function computeInventoryAudit(
       salesQty: salesQty.toNumber(),
       requisicionesInQty: requisicionesInQty.toNumber(),
       requisicionesOutQty: requisicionesOutQty.toNumber(),
+      // Las transformaciones trabajan con productos, no con subrecetas.
+      transformedInQty: 0,
+      transformedOutQty: 0,
       theoreticalFinalQty: theoreticalFinalQty.toNumber(),
       actualFinalQty: actualFinalQty !== null ? actualFinalQty.toNumber() : null,
       varianceQty: varianceQty !== null ? varianceQty.toNumber() : null,

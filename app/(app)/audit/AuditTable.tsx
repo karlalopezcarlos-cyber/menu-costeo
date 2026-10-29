@@ -11,6 +11,8 @@ type SortKey =
   | "category"
   | "type"
   | "name"
+  | "transformedIn"
+  | "transformedOut"
   | "initial"
   | "purchases"
   | "produced"
@@ -34,8 +36,10 @@ const COLUMNS: { key: SortKey; label: string; width: number }[] = [
   { key: "initial", label: "Inicial", width: 6 },
   { key: "purchases", label: "+ Compras", width: 6 },
   { key: "produced", label: "+ Produccion", width: 6 },
+  { key: "transformedIn", label: "+ Transformacion", width: 7 },
   { key: "waste", label: "- Mermas", width: 6 },
   { key: "productionConsumed", label: "- Produccion", width: 6 },
+  { key: "transformedOut", label: "- Transformacion", width: 7 },
   { key: "sales", label: "- Ventas", width: 6 },
   { key: "theoretical", label: "= Teorico", width: 6 },
   { key: "actual", label: "Real (final)", width: 6 },
@@ -112,6 +116,10 @@ export default function AuditTable({
         return row.purchasesQty;
       case "produced":
         return row.producedQty;
+      case "transformedIn":
+        return row.transformedInQty;
+      case "transformedOut":
+        return row.transformedOutQty;
       case "waste":
         return row.wasteQty;
       case "productionConsumed":
@@ -325,12 +333,22 @@ export default function AuditTable({
                     ? `+${fmt(row.producedQty)}${presentationSuffix(row, row.producedQty)}`
                     : "-"}
                 </td>
+                <td className="px-2 py-2 text-emerald-700">
+                  {row.transformedInQty !== 0
+                    ? `+${fmt(row.transformedInQty)}${presentationSuffix(row, row.transformedInQty)}`
+                    : "-"}
+                </td>
                 <td className="px-2 py-2 text-red-600">
                   {row.wasteQty !== 0 ? `-${fmt(row.wasteQty)}${presentationSuffix(row, row.wasteQty)}` : "-"}
                 </td>
                 <td className="px-2 py-2 text-red-600">
                   {row.productionConsumedQty !== 0
                     ? `-${fmt(row.productionConsumedQty)}${presentationSuffix(row, row.productionConsumedQty)}`
+                    : "-"}
+                </td>
+                <td className="px-2 py-2 text-red-600">
+                  {row.transformedOutQty !== 0
+                    ? `-${fmt(row.transformedOutQty)}${presentationSuffix(row, row.transformedOutQty)}`
                     : "-"}
                 </td>
                 <td className="px-2 py-2 text-red-600">

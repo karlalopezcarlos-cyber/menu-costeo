@@ -4,6 +4,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { formatMoney } from "@/lib/format";
 import ApplyYieldButton from "./ApplyYieldButton";
+import DeleteTransformationButton from "./DeleteTransformationButton";
 
 function folioLabel(folio: number): string {
   return `POR-${String(folio).padStart(4, "0")}`;
@@ -67,12 +68,13 @@ export default async function PortioningPage() {
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Rendimiento
               </th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-neutral-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400">
                   Todavia no hay transformaciones. Registra una para conocer tu merma real y el
                   costo verdadero de cada porcion.
                 </td>
@@ -150,6 +152,13 @@ export default async function PortioningPage() {
                         />
                       </div>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <DeleteTransformationButton
+                      entryId={entry.id}
+                      folioLabel={folioLabel(entry.folio)}
+                      resumen={`${Number(entry.initialQty).toLocaleString("es-MX", { maximumFractionDigits: 3 })} ${unidad} de ${entry.product.name}`}
+                    />
                   </td>
                 </tr>
               );
