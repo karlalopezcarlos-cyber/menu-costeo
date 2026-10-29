@@ -29,6 +29,7 @@ enum Panel {
   MENU_ENGINEERING
   SETTINGS
   PAYMENTS
+  EXPENSES
   REQUISITIONS
   PLANNING
   STORE_ORDERS
@@ -141,6 +142,8 @@ model Organization {
   saleTickets               SaleTicket[]
   planningRuns              PlanningRun[]
   storeOrders               StoreOrder[]
+  expenses                  Expense[]
+  expenseCategories         ExpenseCategory[]
 
   @@map("organizations")
 }
@@ -177,7 +180,7 @@ model ProductCategory {
   /// Si lo que se compra en esta categoria es gasto de operacion y no insumo: agua, gas,
   /// desechables, limpieza. Sus compras salen en su propio renglon del Estado de Resultados y
   /// no entran al costo de ventas, porque no son parte de lo que se vende.
-  isExpense       Boolean       @default(false)
+  isExpense       Boolean        @default(false)
   /// Si sus productos se transforman (limpiar, porcionar). En una tablajeria son carnes,
   /// pescados y mariscos; el azucar glass y la bolsa kraft no tienen nada que hacer en esa
   /// pantalla. Mientras ninguna categoria lo tenga prendido se ofrecen todas, para que la
@@ -282,6 +285,7 @@ model Sucursal {
   planningRuns              PlanningRun[]
   storeOrders               StoreOrder[]
   storeDeliveryDates        StoreDeliveryDate[]
+  expenses                  Expense[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -326,6 +330,7 @@ model User {
   /// entre ellas con el mismo selector que usa OWNER). Un OWNER ignora esta lista: siempre ve
   /// todas las sucursales de su organizacion sin importar que haya filas aqui.
   sucursales                UserSucursal[]
+  expensesCreated           Expense[]                  @relation("ExpenseCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -514,6 +519,7 @@ model Supplier {
   phones             SupplierPhone[]
   emails             SupplierEmail[]
   defaultForProducts Product[]         @relation("ProductDefaultSupplier")
+  expenses           Expense[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1085,6 +1091,54 @@ enum WasteConcept {
   SERVICIO
   /// Se gasto probando: pruebas de cocina, desarrollo de platillos, capacitacion.
   PRUEBAS
+}
+
+/// Tipos de gasto de operacion: renta, servicios, nomina, mantenimiento, publicidad.
+model ExpenseCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  expenses Expense[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("expense_categories")
+}
+
+/// Un gasto de operacion que no pasa por el almacen.
+///
+/// La renta, la luz y la nomina no son productos: no tienen unidad, no se inventarian y no
+/// entran a ninguna receta. Capturarlas como compra obligaba a inventar productos falsos que
+/// despues ensucian el catalogo, el inventario y los pedidos. Aqui se registran como lo que
+/// son: un concepto y un monto.
+model Expense {
+  id              String           @id @default(cuid())
+  organizationId  String
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal         @relation(fields: [sucursalId], references: [id])
+  date            DateTime         @db.Date
+  categoryId      String?
+  category        ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  supplierId      String?
+  supplier        Supplier?        @relation(fields: [supplierId], references: [id])
+  concept         String
+  amount          Decimal          @db.Decimal(14, 2)
+  invoiceFolio    String?
+  comment         String?
+  createdByUserId String?
+  createdBy       User?            @relation("ExpenseCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime         @default(now())
+
+  @@index([sucursalId, date])
+  @@index([organizationId, date])
+  @@index([categoryId])
+  @@index([supplierId])
+  @@map("expenses")
 }
 
 model WasteEntry {

@@ -293,8 +293,16 @@ export async function computeIncomeStatement(
   const rangeEnd = finalCount.date;
   const dateFilter = { gte: rangeStart, lte: rangeEnd };
 
-  const [sales, requisicionesOut, requisicionesIn, purchases, payments, creditos, graph] =
-    await Promise.all([
+  const [
+    sales,
+    requisicionesOut,
+    requisicionesIn,
+    purchases,
+    gastos,
+    payments,
+    creditos,
+    graph,
+  ] = await Promise.all([
     prisma.dailySale.findMany({
       where: { sucursalId, date: dateFilter },
       include: { recipe: { include: { category: true } } },
@@ -316,6 +324,10 @@ export async function computeIncomeStatement(
     prisma.purchase.findMany({
       where: { sucursalId, purchaseDate: dateFilter },
       include: { product: { include: { category: true } } },
+    }),
+    prisma.expense.findMany({
+      where: { sucursalId, date: dateFilter },
+      select: { amount: true },
     }),
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
@@ -354,6 +366,13 @@ export async function computeIncomeStatement(
   for (const purchase of purchases) {
     const destino = purchase.product.category?.isExpense ? gastosDeOperacion : compras;
     addTo(destino, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
+  }
+
+  // Los gastos del modulo de Gastos (renta, luz, nomina) no pertenecen a ningun grupo de costo:
+  // no son alimento ni bebida, son del negocio entero. Por eso solo suman al consolidado, en vez
+  // de abrir una columna "sin grupo" que no significaria nada.
+  for (const gasto of gastos) {
+    gastosDeOperacion.consolidado += Number(gasto.amount);
   }
 
   // Un producto de gasto puede seguir contandose fisicamente, pero no puede entrar a la

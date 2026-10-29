@@ -13,6 +13,7 @@ export const PANEL_DEFS: { key: Panel; section: string; href: string; label: str
   { key: "PLANNING", section: "planning", href: "/planning", label: "Proyeccion" },
   { key: "STORE_ORDERS", section: "store-orders", href: "/store-orders", label: "Pedidos en linea" },
   { key: "PURCHASES", section: "purchases", href: "/purchases", label: "Compras" },
+  { key: "EXPENSES", section: "expenses", href: "/expenses", label: "Gastos" },
   { key: "REQUISITIONS", section: "requisitions", href: "/requisitions", label: "Requisiciones" },
   { key: "PAYMENTS", section: "payments", href: "/payments", label: "Pagos" },
   { key: "SALES", section: "sales", href: "/sales", label: "Ventas" },

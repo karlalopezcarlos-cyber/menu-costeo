@@ -14,7 +14,7 @@ export type NavItem = { href: string; label: string };
 const GROUPS: { title: string; sections: string[] }[] = [
   { title: "Operacion", sections: ["dashboard", "products", "recipes", "production", "portioning", "inventory", "waste"] },
   { title: "Ventas", sections: ["sales", "orders", "store-orders"] },
-  { title: "Compras", sections: ["purchases", "requisitions", "payments"] },
+  { title: "Compras", sections: ["purchases", "expenses", "requisitions", "payments"] },
   { title: "Analisis", sections: ["planning", "menu-engineering", "audit"] },
   { title: "Sistema", sections: ["settings"] },
 ];
@@ -36,6 +36,7 @@ const ICONS: Record<string, string> = {
   orders: "M6 4h12v16l-6-3-6 3zM9 9h6",
   "store-orders": "M4 9h16l-1 11H5zM8 9V6a4 4 0 018 0v3",
   purchases: "M3 5h3l2 11h11M8 20a1 1 0 100-2 1 1 0 000 2M18 20a1 1 0 100-2 1 1 0 000 2M9 9h11l-1 5H9",
+  expenses: "M4 6h16v12H4zM4 10h16M8 15h4",
   requisitions: "M4 8h12l-3-3M20 16H8l3 3",
   payments: "M3 7h18v10H3zM3 11h18M7 15h3",
   planning: "M4 19V5m0 14h16M8 15l4-5 3 3 5-7",
