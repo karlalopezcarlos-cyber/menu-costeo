@@ -539,21 +539,25 @@ export async function computeIncomeStatement(
 
   const variacion = subtract(costoPotencial, costoDeVentas);
 
-  const montosConSinGrupo = new Set<string>();
-  for (const montos of [
+  // La columna de "sin grupo" solo tiene caso si de verdad hay algo ahi. Se revisan todos los
+  // renglones que se muestran, no unos cuantos: si un monto cae en un renglon que no se reviso,
+  // la columna se esconderia y ese dinero no saldria en ninguna parte. Y se mide contra medio
+  // centavo, no contra cero exacto, porque una columna que solo trae polvo de redondeo se
+  // imprime completa en $0.00 y lo unico que hace es estorbar.
+  const hayMontosSinGrupo = [
     ventasNetasPV,
     salidasAOtraSucursal,
+    ventaTotal,
     inventarioInicial,
-    inventarioFinal,
-    compras,
     entradasDesdeOtraSucursal,
+    compras,
+    inventarioFinal,
     creditosAlCosto,
+    mermas,
+    costoDeVentas,
     costoPotencial,
-  ]) {
-    for (const [key, value] of Object.entries(montos.byGroup)) {
-      if (key === SIN_GRUPO && value !== 0) montosConSinGrupo.add(SIN_GRUPO);
-    }
-  }
+    variacion,
+  ].some((montos) => Math.abs(montos.byGroup[SIN_GRUPO] ?? 0) >= 0.005);
 
   const diasActivosSet = new Set(sales.map((s) => s.date.getTime()));
   const diasActivos = diasActivosSet.size;
@@ -568,7 +572,7 @@ export async function computeIncomeStatement(
     // no tiene caso una columna en cero recordandolo.
     groups: [
       ...costGroups.filter((g) => !gruposOcultos.has(g.id)),
-      ...(montosConSinGrupo.has(SIN_GRUPO) ? [{ id: SIN_GRUPO, name: "Sin grupo" }] : []),
+      ...(hayMontosSinGrupo ? [{ id: SIN_GRUPO, name: "Sin grupo" }] : []),
     ],
     sucursalName: sucursal.name,
     organizationName: organization.name,
