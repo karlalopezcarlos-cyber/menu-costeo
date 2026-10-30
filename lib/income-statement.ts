@@ -56,6 +56,22 @@ export type IncomeStatementResult = {
 
 export type PctMode = "share" | "costPct" | "none";
 
+/**
+ * Renglon del pie del reporte: un solo numero consolidado, sin desglose por grupo de costo.
+ *
+ * Aqui viven las cosas que no se pueden repartir entre alimento y bebidas: lo que se le pago a
+ * los proveedores, el promedio diario y —sobre todo— los gastos. La renta no es de alimentos ni
+ * de bebidas, es del negocio entero; partirla entre columnas seria inventarse un criterio.
+ */
+export type IncomeStatementFooterRow = {
+  label: string;
+  amount: number;
+  /** % respecto a la venta total del periodo, cuando significa algo. */
+  pct: number | null;
+  bold?: boolean;
+  highlight?: boolean;
+};
+
 export type IncomeStatementCell = {
   /** id del grupo, SIN_GRUPO, o "consolidado" para la ultima columna. */
   key: string;
@@ -145,9 +161,38 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
       ventaTotal: result.ventaTotal,
     })),
     buildRow("Variacion", result.variacion, "costPct", con({ ventaTotal: result.ventaTotal })),
-    buildRow("Gastos de operacion", result.gastosDeOperacion, "costPct", con({
-      ventaTotal: result.ventaTotal,
-    })),
+  ];
+}
+
+/**
+ * El pie del reporte, debajo de la tabla por grupos: de la utilidad bruta se bajan los gastos
+ * para llegar a la utilidad despues de gastos. Compartido entre la pagina, el PDF y el Excel.
+ */
+export function buildIncomeStatementFooterRows(
+  result: IncomeStatementResult,
+): IncomeStatementFooterRow[] {
+  const ventaTotal = result.ventaTotal.consolidado;
+  const pct = (n: number) => (ventaTotal !== 0 ? (n / ventaTotal) * 100 : null);
+  const utilidadBruta = ventaTotal - result.costoDeVentas.consolidado;
+  const gastos = result.gastosDeOperacion.consolidado;
+  const utilidad = utilidadBruta - gastos;
+  return [
+    { label: "Monto pagado", amount: result.montoPagado, pct: null },
+    {
+      label: "Venta promedio diaria",
+      amount: result.ventaPromedioDiaria.consolidado,
+      pct: null,
+      bold: true,
+    },
+    { label: "Utilidad bruta", amount: utilidadBruta, pct: pct(utilidadBruta) },
+    { label: "Gastos de operacion", amount: gastos, pct: pct(gastos) },
+    {
+      label: "Utilidad despues de gastos",
+      amount: utilidad,
+      pct: pct(utilidad),
+      bold: true,
+      highlight: true,
+    },
   ];
 }
 
@@ -160,7 +205,11 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   Compras: "Total de compras de productos registradas en el periodo.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
-    "Compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende; se muestran aparte para saber cuanto se va en operar. El % es respecto a la Venta total.",
+    "Todo lo del modulo de Gastos (renta, luz, nomina) mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
+  "Utilidad bruta":
+    "Venta total - Costo de ventas: lo que deja la operacion antes de los gastos. El % es respecto a la Venta total.",
+  "Utilidad despues de gastos":
+    "Utilidad bruta - Gastos de operacion: lo que queda despues de pagar la renta, la luz, la nomina y todo lo que no es producto. El % es respecto a la Venta total.",
   Mermas:
     "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. NO se resta del costo de ventas: tirar producto es costo de operar y tiene que pesar. Se muestra aparte para saber cuanto del costo es desperdicio. El % es respecto a la Venta total.",
   "Salidas por creditos al costo":
@@ -257,13 +306,29 @@ export async function computeIncomeStatement(
   initialCountId: string,
   finalCountId: string,
 ): Promise<IncomeStatementResult> {
-  const [sucursal, organization, costGroups, initialCount, finalCount] = await Promise.all([
+  const [
+    sucursal,
+    organization,
+    costGroups,
+    categoriasDeProducto,
+    categoriasDeReceta,
+    initialCount,
+    finalCount,
+  ] = await Promise.all([
     prisma.sucursal.findFirstOrThrow({ where: { id: sucursalId }, select: { name: true } }),
     prisma.organization.findFirstOrThrow({ where: { id: organizationId }, select: { name: true } }),
     prisma.costGroup.findMany({
       where: { organizationId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true },
+    }),
+    prisma.productCategory.findMany({
+      where: { organizationId },
+      select: { costGroupId: true, isExpense: true },
+    }),
+    prisma.recipeCategory.findMany({
+      where: { organizationId },
+      select: { costGroupId: true },
     }),
     prisma.inventoryCount.findFirstOrThrow({
       where: { id: initialCountId, sucursalId },
@@ -288,6 +353,22 @@ export async function computeIncomeStatement(
       },
     }),
   ]);
+
+  // Un grupo de costo al que solo cuelgan categorias de gasto no merece columna: sus montos ya
+  // no se reparten por grupo, asi que la columna saldria en ceros de arriba a abajo. Si algun
+  // dia se le asigna una categoria que si se vende, la columna vuelve sola.
+  const gruposConVenta = new Set<string>();
+  const gruposSoloGasto = new Set<string>();
+  for (const categoria of categoriasDeProducto) {
+    if (!categoria.costGroupId) continue;
+    (categoria.isExpense ? gruposSoloGasto : gruposConVenta).add(categoria.costGroupId);
+  }
+  for (const categoria of categoriasDeReceta) {
+    if (categoria.costGroupId) gruposConVenta.add(categoria.costGroupId);
+  }
+  const gruposOcultos = new Set(
+    [...gruposSoloGasto].filter((id) => !gruposConVenta.has(id)),
+  );
 
   const rangeStart = initialCount.date;
   const rangeEnd = finalCount.date;
@@ -361,16 +442,19 @@ export async function computeIncomeStatement(
   // Lo que se compra para vender va a Compras; lo que se compra para operar —agua, gas,
   // desechables— va a Gastos. Antes todo caia en Compras y por eso el costo de ventas incluia
   // cosas que nunca se vendieron.
+  // Ningun gasto se reparte entre las columnas: ni los del modulo de Gastos (renta, luz,
+  // nomina) ni las compras de categorias marcadas como gasto. No son de alimentos ni de
+  // bebidas, son del negocio entero, asi que solo suman al consolidado y se leen en el pie del
+  // reporte, debajo de la utilidad bruta.
   const compras = zeroAmounts();
   const gastosDeOperacion = zeroAmounts();
   for (const purchase of purchases) {
-    const destino = purchase.product.category?.isExpense ? gastosDeOperacion : compras;
-    addTo(destino, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
+    if (purchase.product.category?.isExpense) {
+      gastosDeOperacion.consolidado += Number(purchase.totalPrice);
+      continue;
+    }
+    addTo(compras, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
   }
-
-  // Los gastos del modulo de Gastos (renta, luz, nomina) no pertenecen a ningun grupo de costo:
-  // no son alimento ni bebida, son del negocio entero. Por eso solo suman al consolidado, en vez
-  // de abrir una columna "sin grupo" que no significaria nada.
   for (const gasto of gastos) {
     gastosDeOperacion.consolidado += Number(gasto.amount);
   }
@@ -458,7 +542,7 @@ export async function computeIncomeStatement(
     // La columna de "sin grupo" solo aparece si de verdad hay algo ahi: si todo esta acomodado,
     // no tiene caso una columna en cero recordandolo.
     groups: [
-      ...costGroups,
+      ...costGroups.filter((g) => !gruposOcultos.has(g.id)),
       ...(montosConSinGrupo.has(SIN_GRUPO) ? [{ id: SIN_GRUPO, name: "Sin grupo" }] : []),
     ],
     sucursalName: sucursal.name,

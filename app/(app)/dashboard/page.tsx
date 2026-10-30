@@ -4,8 +4,9 @@ import { requireSucursalContext } from "@/lib/tenant";
 import {
   computeIncomeStatement,
   buildIncomeStatementRows,
+  buildIncomeStatementFooterRows,
   INCOME_STATEMENT_ROW_DESCRIPTIONS,
-  type GroupAmounts,
+  type IncomeStatementFooterRow,
   type IncomeStatementRowView,
 } from "@/lib/income-statement";
 import { formatMoney } from "@/lib/format";
@@ -75,6 +76,54 @@ function Row({ row }: { row: IncomeStatementRowView }) {
   );
 }
 
+/**
+ * Renglon del pie: un solo numero, en la columna del consolidado. Los gastos y la utilidad no
+ * se parten entre alimento y bebidas, asi que las columnas de grupo van vacias.
+ */
+function FooterRow({ row, columnas }: { row: IncomeStatementFooterRow; columnas: { key: string }[] }) {
+  const description = INCOME_STATEMENT_ROW_DESCRIPTIONS[row.label];
+  return (
+    <tr
+      className={`border-t border-neutral-100 transition-colors hover:bg-neutral-50 ${
+        row.bold ? "font-semibold" : ""
+      } ${row.highlight ? "bg-amber-50" : ""}`}
+    >
+      <td className="px-2 py-2" title={description}>
+        {row.label}
+      </td>
+      {columnas.map((col, index) => {
+        if (col.key !== "consolidado") {
+          return (
+            <td
+              key={col.key}
+              className={`px-3 py-2 ${index > 0 ? "border-l border-neutral-200" : ""}`}
+              colSpan={2}
+            />
+          );
+        }
+        return (
+          <Fragment key={col.key}>
+            <td
+              className={`px-3 py-2 text-right border-l border-neutral-200 ${
+                row.amount < 0 ? "text-red-600" : ""
+              }`}
+            >
+              {formatMoney(row.amount)}
+            </td>
+            <td
+              className={`px-3 py-2 text-right ${
+                row.pct !== null && row.pct < 0 ? "text-red-600" : "text-neutral-500"
+              }`}
+            >
+              {row.pct !== null ? `${row.pct.toFixed(2)}%` : ""}
+            </td>
+          </Fragment>
+        );
+      })}
+    </tr>
+  );
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -123,7 +172,10 @@ export default async function DashboardPage({
     orderedFinalId,
   );
   const rows = buildIncomeStatementRows(result);
+  const footerRows = buildIncomeStatementFooterRows(result);
   const columnas = columnasDe(result);
+  // Concepto + monto y % por cada columna.
+  const totalColumnas = 1 + columnas.length * 2;
   const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}`;
   const ventaTotal = result.ventaTotal.consolidado;
   const costoPct = ventaTotal !== 0 ? (result.costoDeVentas.consolidado / ventaTotal) * 100 : null;
@@ -244,57 +296,36 @@ export default async function DashboardPage({
             </tr>
           </thead>
           <tbody>
-            <Row row={rows[0]} />
-            <Row row={rows[1]} />
-            <Row row={rows[2]} />
+            {rows.slice(0, 3).map((row) => (
+              <Row key={row.label} row={row} />
+            ))}
 
             <tr className="border-t border-neutral-100">
-              <td className="px-2 py-2 text-neutral-500" colSpan={9}>
+              <td className="px-2 py-2 text-neutral-500" colSpan={totalColumnas}>
                 &nbsp;
               </td>
             </tr>
 
-            <Row row={rows[3]} />
-            <Row row={rows[4]} />
-            <Row row={rows[5]} />
-            <Row row={rows[6]} />
-            <Row row={rows[7]} />
-            <Row row={rows[8]} />
-            <Row row={rows[9]} />
-            <Row row={rows[10]} />
+            {/* De Inventario inicial a Variacion. Se recorren todos: antes se listaban por
+                indice y los renglones nuevos se quedaban sin salir en pantalla. */}
+            {rows.slice(3).map((row) => (
+              <Row key={row.label} row={row} />
+            ))}
 
-            <tr className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
-              <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Monto pagado"]}>
-                Monto pagado
+            <tr className="border-t border-neutral-100">
+              <td className="px-2 py-2 text-neutral-500" colSpan={totalColumnas}>
+                &nbsp;
               </td>
-              {columnas.map((col, index) => (
-                <td
-                  key={col.key}
-                  className={`px-3 py-2 text-right ${index > 0 ? "border-l border-neutral-200" : ""}`}
-                  colSpan={2}
-                >
-                  {col.key === "consolidado" ? formatMoney(result.montoPagado) : ""}
-                </td>
-              ))}
             </tr>
 
-            <tr className="border-t border-neutral-100 font-semibold transition-colors hover:bg-neutral-50">
-              <td className="px-2 py-2" title={INCOME_STATEMENT_ROW_DESCRIPTIONS["Venta promedio diaria"]}>
-                Venta promedio diaria
-              </td>
-              {columnas.map((col, index) => (
-                <td
-                  key={col.key}
-                  className={`px-3 py-2 text-right ${index > 0 ? "border-l border-neutral-200" : ""}`}
-                  colSpan={2}
-                >
-                  {col.key === "consolidado" ? formatMoney(result.ventaPromedioDiaria.consolidado) : ""}
-                </td>
-              ))}
-            </tr>
+            {footerRows.map((row) => (
+              <FooterRow key={row.label} row={row} columnas={columnas} />
+            ))}
+
             <tr>
-              <td className="px-2 py-2 text-xs text-neutral-400" colSpan={9}>
-                {result.diasActivos} dias activos (con venta registrada) en el periodo.
+              <td className="px-2 py-2 text-xs text-neutral-400" colSpan={totalColumnas}>
+                {result.diasActivos} dias activos (con venta registrada) en el periodo. Los gastos
+                no se reparten entre las columnas: son del negocio entero.
               </td>
             </tr>
           </tbody>

@@ -1,5 +1,9 @@
 import ExcelJS from "exceljs";
-import type { IncomeStatementResult, IncomeStatementRowView } from "@/lib/income-statement";
+import {
+  buildIncomeStatementFooterRows,
+  type IncomeStatementResult,
+  type IncomeStatementRowView,
+} from "@/lib/income-statement";
 
 const MONEY_FMT = '"$"#,##0.00';
 const PCT_FMT = "0.00%";
@@ -28,23 +32,21 @@ export async function buildIncomeStatementWorkbook(
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Estado de Resultados");
 
+  // Dos columnas (monto y %) por cada grupo de costo, mas el consolidado.
+  const columnas = result.groups.length + 1;
+  const ultimaColumna = 1 + columnas * 2;
   sheet.getColumn(1).width = 34;
-  for (let col = 2; col <= 9; col++) sheet.getColumn(col).width = 13;
+  for (let col = 2; col <= ultimaColumna; col++) sheet.getColumn(col).width = 13;
 
   sheet.addRow([`${result.organizationName} - ${result.sucursalName}`]).font = { bold: true, size: 12 };
   sheet.addRow([`${result.initialDateLabel} - ${result.finalDateLabel}`]);
   sheet.addRow([]);
 
+  // El encabezado sale de los grupos que definio la organizacion: antes estaba clavado en
+  // Alimento/Bebidas/Miscelaneos y se desalineaba en cuanto alguien configuraba otros.
   const headerRow = sheet.addRow([
     "Concepto",
-    "Alimento",
-    "%",
-    "Bebidas",
-    "%",
-    "Miscelaneos",
-    "%",
-    "Consolidado",
-    "%",
+    ...[...result.groups.map((g) => g.name), "Consolidado"].flatMap((name) => [name, "%"]),
   ]);
   headerRow.font = { bold: true };
   headerRow.eachCell((cell) => {
@@ -62,24 +64,23 @@ export async function buildIncomeStatementWorkbook(
   for (let i = 3; i < rows.length; i++) addDataRow(sheet, rows[i]);
   sheet.addRow([]);
 
-  const pagadoRow = sheet.addRow(["Monto pagado", "", "", "", "", "", "", result.montoPagado, ""]);
-  pagadoRow.getCell(8).numFmt = MONEY_FMT;
+  // El pie: lo que no se reparte por grupo. Cae todo en la columna del consolidado.
+  const montoCol = ultimaColumna - 1;
+  for (const footer of buildIncomeStatementFooterRows(result)) {
+    const values: (string | number)[] = [footer.label];
+    for (let col = 2; col <= ultimaColumna; col++) values.push("");
+    values[montoCol - 1] = footer.amount;
+    if (footer.pct !== null) values[ultimaColumna - 1] = footer.pct / 100;
 
-  const promedioRow = sheet.addRow([
-    "Venta promedio diaria",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    result.ventaPromedioDiaria.consolidado,
-    "",
+    const footerRow = sheet.addRow(values);
+    if (footer.bold) footerRow.font = { bold: true };
+    footerRow.getCell(montoCol).numFmt = MONEY_FMT;
+    if (footer.pct !== null) footerRow.getCell(ultimaColumna).numFmt = PCT_FMT;
+  }
+
+  sheet.addRow([
+    `${result.diasActivos} dias activos (con venta registrada) en el periodo. Los gastos no se reparten entre las columnas: son del negocio entero.`,
   ]);
-  promedioRow.font = { bold: true };
-  promedioRow.getCell(8).numFmt = MONEY_FMT;
-
-  sheet.addRow([`${result.diasActivos} dias activos (con venta registrada) en el periodo.`]);
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

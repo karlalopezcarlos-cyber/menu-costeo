@@ -1,5 +1,6 @@
 import { formatMoney } from "@/lib/format";
 import {
+  buildIncomeStatementFooterRows,
   INCOME_STATEMENT_ROW_DESCRIPTIONS,
   type IncomeStatementResult,
   type IncomeStatementRowView,
@@ -46,8 +47,13 @@ export function buildIncomeStatementContext(
     if (description) lines.push(`  (${description})`);
   }
   lines.push("");
-  lines.push(`- Monto pagado a proveedores en el periodo: ${formatMoney(result.montoPagado)} (${INCOME_STATEMENT_ROW_DESCRIPTIONS["Monto pagado"]})`);
-  lines.push(`- Venta promedio diaria (consolidado): ${formatMoney(result.ventaPromedioDiaria.consolidado)}`);
+  lines.push("Lo que no se reparte por grupo de costo (va completo en el consolidado):");
+  for (const footer of buildIncomeStatementFooterRows(result)) {
+    const pct = footer.pct !== null ? ` (${footer.pct.toFixed(2)}% de la venta total)` : "";
+    lines.push(`- ${footer.label}: ${formatMoney(footer.amount)}${pct}`);
+    const description = INCOME_STATEMENT_ROW_DESCRIPTIONS[footer.label];
+    if (description) lines.push(`  (${description})`);
+  }
   return lines.join("\n");
 }
 

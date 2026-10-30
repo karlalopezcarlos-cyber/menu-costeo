@@ -1,6 +1,10 @@
 import PDFDocument from "pdfkit";
 import { formatMoney } from "@/lib/format";
-import type { IncomeStatementResult, IncomeStatementRowView } from "@/lib/income-statement";
+import {
+  buildIncomeStatementFooterRows,
+  type IncomeStatementResult,
+  type IncomeStatementRowView,
+} from "@/lib/income-statement";
 
 // Las columnas ya no son fijas: salen de los grupos de costo que definio la organizacion.
 
@@ -115,29 +119,29 @@ export async function buildIncomeStatementPdf(
     for (let i = 3; i < rows.length; i++) drawRowView(rows[i]);
     doc.moveDown(0.5);
 
-    drawRow("Monto pagado", [
-      { value: null, pct: "" },
-      { value: null, pct: "" },
-      { value: null, pct: "" },
-      { value: result.montoPagado, pct: "" },
-    ]);
-    drawRow(
-      "Venta promedio diaria",
-      [
-        { value: null, pct: "" },
-        { value: null, pct: "" },
-        { value: null, pct: "" },
-        { value: result.ventaPromedioDiaria.consolidado, pct: "" },
-      ],
-      { bold: true },
-    );
+    // El pie: lo que no se reparte por grupo (pagos, promedio diario, gastos y utilidad) cae
+    // completo en la columna del consolidado.
+    for (const footer of buildIncomeStatementFooterRows(result)) {
+      drawRow(
+        footer.label,
+        [
+          ...result.groups.map(() => ({ value: null, pct: "" })),
+          { value: footer.amount, pct: footer.pct !== null ? pctCell(footer.pct) : "" },
+        ],
+        { bold: footer.bold, highlight: footer.highlight },
+      );
+    }
 
     doc.moveDown(0.4);
     doc
       .font("Helvetica")
       .fontSize(8)
       .fillColor("#888888")
-      .text(`${result.diasActivos} dias activos (con venta registrada) en el periodo.`, left, doc.y);
+      .text(
+        `${result.diasActivos} dias activos (con venta registrada) en el periodo. Los gastos no se reparten entre las columnas: son del negocio entero.`,
+        left,
+        doc.y,
+      );
 
     doc.end();
   });
