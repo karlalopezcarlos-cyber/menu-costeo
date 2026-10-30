@@ -14,6 +14,9 @@ export default function EditRecipeDetailsForm({
   yieldUnit,
   isMenuItem,
   sellingPrice,
+  categoryId,
+  categoryName,
+  categories,
 }: {
   recipeId: string;
   name: string;
@@ -21,6 +24,9 @@ export default function EditRecipeDetailsForm({
   yieldUnit: UnitValue;
   isMenuItem: boolean;
   sellingPrice: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  categories: { id: string; name: string }[];
 }) {
   const [editing, setEditing] = useState(false);
   const boundAction = updateRecipeDetails.bind(null, recipeId);
@@ -41,7 +47,7 @@ export default function EditRecipeDetailsForm({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{name}</h1>
             <p className="text-sm text-neutral-500">
-              Rendimiento: {yieldQty} {UNIT_LABELS[yieldUnit]}
+              {categoryName ?? "Sin categoria"} - Rendimiento: {yieldQty} {UNIT_LABELS[yieldUnit]}
               {isMenuItem && " - Platillo de menu"}
               {sellingPrice && ` - Precio de venta: ${formatMoney(Number(sellingPrice))}`}
             </p>
@@ -60,6 +66,24 @@ export default function EditRecipeDetailsForm({
                   required
                   className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
                 />
+              </div>
+              <div className="col-span-3 space-y-1 sm:col-span-1">
+                <label htmlFor="edit-categoryId" className="text-xs font-medium text-neutral-700">
+                  Categoria
+                </label>
+                <select
+                  id="edit-categoryId"
+                  name="categoryId"
+                  defaultValue={categoryId ?? ""}
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                >
+                  <option value="">Sin categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <label htmlFor="edit-yieldQty" className="text-xs font-medium text-neutral-700">

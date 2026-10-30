@@ -56,6 +56,7 @@ export default async function RecipeDetailPage({
   const recipe = await prisma.recipe.findFirst({
     where: { id: recipeId, sucursalId: user.sucursalId },
     include: {
+      category: { select: { name: true } },
       items: {
         orderBy: { sortOrder: "asc" },
         include: { product: { include: { category: true } }, subRecipe: true },
@@ -117,7 +118,7 @@ export default async function RecipeDetailPage({
     if (!latestFolioByProduct.has(p.productId)) latestFolioByProduct.set(p.productId, p.folio);
   }
 
-  const [products, allRecipes] = await Promise.all([
+  const [products, allRecipes, recipeCategories] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
@@ -127,6 +128,11 @@ export default async function RecipeDetailPage({
       where: { sucursalId: user.sucursalId, archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, yieldUnit: true },
+    }),
+    prisma.recipeCategory.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
   const subRecipeOptions = allRecipes.filter((r) => r.id !== recipe.id);
@@ -200,6 +206,9 @@ export default async function RecipeDetailPage({
               yieldUnit={recipe.yieldUnit as UnitValue}
               isMenuItem={recipe.isMenuItem}
               sellingPrice={recipe.sellingPrice ? recipe.sellingPrice.toString() : null}
+              categoryId={recipe.categoryId}
+              categoryName={recipe.category?.name ?? null}
+              categories={recipeCategories}
             />
           </div>
         </div>

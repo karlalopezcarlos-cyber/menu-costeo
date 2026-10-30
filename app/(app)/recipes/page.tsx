@@ -116,6 +116,9 @@ export default async function RecipesPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Recetas</h1>
         <div className="flex items-center gap-3">
+          <Link href="/recipes/categories" className="text-sm text-neutral-500 hover:underline">
+            Acomodar categorias
+          </Link>
           {showArchived ? (
             <Link href="/recipes" className="text-sm text-neutral-500 hover:underline">
               Ver activas

@@ -393,14 +393,26 @@ export async function updateRecipeDetails(
     const name = String(formData.get("name") ?? "").trim();
     const yieldQty = new Decimal(String(formData.get("yieldQty") ?? "0"));
     const yieldUnit = parseUnit(formData.get("yieldUnit"));
+    const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
 
     if (!name) throw new Error("El nombre es obligatorio.");
     if (yieldQty.lte(0)) throw new Error("El rendimiento debe ser mayor a cero.");
 
     const recipe = await prisma.recipe.findFirst({
       where: { id: recipeId, sucursalId: user.sucursalId },
+      include: { category: { select: { name: true } } },
     });
     if (!recipe) throw new Error("Receta no encontrada.");
+
+    let categoryName: string | null = null;
+    if (categoryId) {
+      const category = await prisma.recipeCategory.findFirst({
+        where: { id: categoryId, organizationId: user.organizationId },
+        select: { name: true },
+      });
+      if (!category) throw new Error("Categoria no encontrada.");
+      categoryName = category.name;
+    }
 
     const duplicate = await prisma.recipe.findFirst({
       where: {
@@ -418,10 +430,15 @@ export async function updateRecipeDetails(
         `el rendimiento de ${recipe.yieldQty.toString()} ${UNIT_LABELS[recipe.yieldUnit as UnitValue]} a ${yieldQty.toString()} ${UNIT_LABELS[yieldUnit]}`,
       );
     }
+    if (recipe.categoryId !== categoryId) {
+      changes.push(
+        `la categoria de ${recipe.category?.name ?? "sin categoria"} a ${categoryName ?? "sin categoria"}`,
+      );
+    }
 
     await prisma.recipe.update({
       where: { id: recipeId },
-      data: { name, yieldQty: yieldQty.toString(), yieldUnit },
+      data: { name, yieldQty: yieldQty.toString(), yieldUnit, categoryId },
     });
 
     // Pasar el rendimiento a otro tipo de unidad (de piezas a litros) deja colgadas a las
