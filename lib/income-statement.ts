@@ -52,6 +52,10 @@ export type IncomeStatementResult = {
   /** Total pagado a proveedores (SupplierPayment) en el periodo. No se desglosa por grupo porque
    * un pago es a un proveedor, no a una categoria especifica. */
   montoPagado: number;
+  /** Lo que se les debe a los proveedores al cierre del periodo: todo lo comprado con proveedor
+   * hasta la fecha final, menos todo lo pagado hasta esa misma fecha. Es un saldo acumulado, no
+   * un movimiento del periodo, y por eso no entra en la utilidad. */
+  saldoProveedores: number;
 };
 
 export type PctMode = "share" | "costPct" | "none";
@@ -193,6 +197,10 @@ export function buildIncomeStatementFooterRows(
       bold: true,
       highlight: true,
     },
+    // Va al final, despues de la utilidad y no entre la utilidad bruta y los gastos: es una
+    // deuda acumulada, no un costo del periodo. Metida en medio de la resta se leeria como si
+    // tambien se restara.
+    { label: "Saldo a proveedores", amount: result.saldoProveedores, pct: null },
   ];
 }
 
@@ -220,6 +228,8 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
     "Costo teorico segun receta de lo que realmente se vendio (mismo calculo que Ingenieria de menu). El % es respecto a la Venta total.",
   Variacion: "Costo potencial - Costo de ventas: positivo significa que el costo real fue menor al teorico (favorable).",
   "Monto pagado": "Total pagado a proveedores (modulo de Pagos) con fecha de pago dentro del periodo.",
+  "Saldo a proveedores":
+    "Lo que se les debe a los proveedores al cierre del periodo: todo lo comprado con proveedor asignado hasta la fecha final, menos todo lo pagado hasta esa misma fecha. Es un saldo acumulado que viene arrastrando de periodos anteriores, no un gasto de este periodo, por eso no se resta de la utilidad. Las compras sin proveedor no cuentan: no hay a quien deberle.",
   "Venta promedio diaria": "Venta total del periodo entre los dias con venta registrada.",
 };
 
@@ -381,6 +391,8 @@ export async function computeIncomeStatement(
     purchases,
     gastos,
     payments,
+    compradoAlCierre,
+    pagadoAlCierre,
     creditos,
     graph,
   ] = await Promise.all([
@@ -413,6 +425,17 @@ export async function computeIncomeStatement(
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
       select: { amount: true },
+    }),
+    // Saldo al cierre: todo lo comprado y lo pagado hasta la fecha final, no solo lo del
+    // periodo. Un saldo es una deuda acumulada; cortarla al periodo dejaria fuera lo que ya se
+    // venia debiendo.
+    prisma.purchase.aggregate({
+      where: { sucursalId, supplierId: { not: null }, purchaseDate: { lte: rangeEnd } },
+      _sum: { totalPrice: true },
+    }),
+    prisma.supplierPayment.aggregate({
+      where: { sucursalId, paidDate: { lte: rangeEnd } },
+      _sum: { amount: true },
     }),
     // Todo lo registrado en Mermas y salidas: los tres conceptos. Se separan al valuar, porque
     // no se tratan igual (ver mas abajo).
@@ -537,6 +560,8 @@ export async function computeIncomeStatement(
   const ventaPromedioDiaria = divideScalar(ventaTotal, diasActivos);
 
   const montoPagado = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const saldoProveedores =
+    Number(compradoAlCierre._sum.totalPrice ?? 0) - Number(pagadoAlCierre._sum.amount ?? 0);
 
   return {
     // La columna de "sin grupo" solo aparece si de verdad hay algo ahi: si todo esta acomodado,
@@ -566,5 +591,6 @@ export async function computeIncomeStatement(
     variacion,
     ventaPromedioDiaria,
     montoPagado,
+    saldoProveedores,
   };
 }
