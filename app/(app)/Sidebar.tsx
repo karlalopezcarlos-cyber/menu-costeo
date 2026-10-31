@@ -15,7 +15,7 @@ const GROUPS: { title: string; sections: string[] }[] = [
   { title: "Operacion", sections: ["dashboard", "products", "recipes", "production", "portioning", "inventory", "waste"] },
   { title: "Ventas", sections: ["sales", "orders", "store-orders"] },
   { title: "Compras", sections: ["purchases", "expenses", "requisitions", "payments"] },
-  { title: "Analisis", sections: ["planning", "menu-engineering", "audit"] },
+  { title: "Analisis", sections: ["planning", "menu-engineering", "audit", "kardex"] },
   { title: "Sistema", sections: ["settings"] },
 ];
 
@@ -42,6 +42,7 @@ const ICONS: Record<string, string> = {
   planning: "M4 19V5m0 14h16M8 15l4-5 3 3 5-7",
   "menu-engineering": "M12 3l2.5 5.5L20 10l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-1.5z",
   audit: "M11 4a7 7 0 100 14 7 7 0 000-14zM20 21l-4-4",
+  kardex: "M4 5h16v14H4zM4 10h16M9 5v14M13 14h4M13 17h4",
   settings:
     "M12 9a3 3 0 100 6 3 3 0 000-6zM19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 00-2-1.2L14.2 3H9.8l-.4 2.7a7 7 0 00-2 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 000 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 002 1.2l.4 2.7h4.4l.4-2.7a7 7 0 002-1.2l2.3 1 2-3.4-2-1.5c.07-.4.1-.8.1-1.2z",
 };

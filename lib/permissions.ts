@@ -9,6 +9,7 @@ export const PANEL_DEFS: { key: Panel; section: string; href: string; label: str
   { key: "PORTIONING", section: "portioning", href: "/portioning", label: "Transformaciones" },
   { key: "INVENTORY", section: "inventory", href: "/inventory", label: "Inventario" },
   { key: "AUDIT", section: "audit", href: "/audit", label: "Auditoria" },
+  { key: "KARDEX", section: "kardex", href: "/kardex", label: "Kardex" },
   { key: "ORDERS", section: "orders", href: "/orders", label: "Pedidos" },
   { key: "PLANNING", section: "planning", href: "/planning", label: "Proyeccion" },
   { key: "STORE_ORDERS", section: "store-orders", href: "/store-orders", label: "Pedidos en linea" },

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Panel" ADD VALUE IF NOT EXISTS 'KARDEX';

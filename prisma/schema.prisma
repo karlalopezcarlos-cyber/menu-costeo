@@ -34,6 +34,7 @@ enum Panel {
   PLANNING
   STORE_ORDERS
   PORTIONING
+  KARDEX
 }
 
 /// Agrupador usado en el Estado de Resultados para desglosar ventas/costos en 3 columnas.
