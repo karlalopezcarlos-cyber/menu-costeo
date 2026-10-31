@@ -114,14 +114,20 @@ export function toTransformationRow(entry: EntryWithRelations): TransformationRo
     unitCost: Number(output.realUnitCost),
   }));
 
-  // Limpiezas viejas: su salida vivia en la entrada, no en renglones aparte.
+  // Limpiezas viejas: su salida vivia en la entrada, no en renglones aparte, y su costo por
+  // unidad nunca se guardo (el flujo de entonces lo calculaba solo para actualizar el catalogo).
+  // Se reconstruye con la misma regla de hoy —todo el dinero que entro sale en la unica salida—
+  // que para una salida sola se reduce a costo de entrada entre lo que salio. No es una
+  // estimacion: es el mismo numero que daria capturarla de nuevo.
   if (outputs.length === 0 && entry.outputProduct) {
+    const qty = Number(entry.outputQty ?? 0);
+    const totalCost = Number(entry.initialQty) * Number(entry.unitCost);
     outputs.push({
       id: `${entry.id}-legacy`,
       name: entry.outputProduct.name,
-      qty: Number(entry.outputQty ?? 0),
+      qty,
       unitLabel: UNIT_LABELS[entry.outputProduct.baseUnit as UnitValue],
-      unitCost: 0,
+      unitCost: qty > 0 ? totalCost / qty : 0,
     });
   }
 
