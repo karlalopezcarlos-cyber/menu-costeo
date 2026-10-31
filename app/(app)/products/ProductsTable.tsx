@@ -9,17 +9,20 @@ export type ProductRow = {
   id: string;
   name: string;
   categoryName: string | null;
+  /** Grupo de costo de su categoria: la columna del estado de resultados donde cae este producto. */
+  costGroupName: string | null;
   baseUnitLabel: string;
   yieldPercentage: number;
   currentUnitCost: number | null;
 };
 
-type SortKey = "name" | "category" | "unit" | "yield" | "cost";
+type SortKey = "name" | "category" | "group" | "unit" | "yield" | "cost";
 type SortDir = "asc" | "desc";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "name", label: "Nombre" },
   { key: "category", label: "Categoria" },
+  { key: "group", label: "Grupo de costo" },
   { key: "unit", label: "Unidad base" },
   { key: "yield", label: "Rendimiento" },
   { key: "cost", label: "Costo vigente" },
@@ -31,6 +34,8 @@ function sortValue(row: ProductRow, key: SortKey): string | number | null {
       return row.name.toLowerCase();
     case "category":
       return row.categoryName ? row.categoryName.toLowerCase() : null;
+    case "group":
+      return row.costGroupName ? row.costGroupName.toLowerCase() : null;
     case "unit":
       return row.baseUnitLabel;
     case "yield":
@@ -156,7 +161,7 @@ export default function ProductsTable({
         <tbody>
           {sortedRows.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400">
+              <td colSpan={7} className="px-4 py-10 text-center text-sm text-neutral-400">
                 {rows.length === 0
                   ? showArchived
                     ? "No hay productos archivados."
@@ -191,6 +196,16 @@ export default function ProductsTable({
                     <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
                       {product.categoryName}
                     </span>
+                  ) : (
+                    <span className="text-neutral-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {/* El grupo no se edita aqui: lo manda la categoria, en Configuracion >
+                      Categorias. Se muestra para ver de un vistazo que quedo sin grupo, porque
+                      eso es lo que abre la columna "Sin grupo" del estado de resultados. */}
+                  {product.costGroupName ? (
+                    <span className="text-neutral-600">{product.costGroupName}</span>
                   ) : (
                     <span className="text-neutral-400">-</span>
                   )}

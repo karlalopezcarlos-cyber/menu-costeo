@@ -16,13 +16,14 @@ export default async function ProductsPage({
   const products = await prisma.product.findMany({
     where: { organizationId: user.organizationId, archivedAt: showArchived ? { not: null } : null },
     orderBy: { name: "asc" },
-    include: { category: true },
+    include: { category: { include: { costGroup: { select: { name: true } } } } },
   });
 
   const rows: ProductRow[] = products.map((product) => ({
     id: product.id,
     name: product.name,
     categoryName: product.category?.name ?? null,
+    costGroupName: product.category?.costGroup?.name ?? null,
     baseUnitLabel: UNIT_LABELS[product.baseUnit as UnitValue],
     yieldPercentage: Number(product.yieldPercentage),
     currentUnitCost: product.currentUnitCostUpdatedAt ? Number(product.currentUnitCost) : null,
