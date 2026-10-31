@@ -59,9 +59,10 @@ export default async function AuditPage({
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Auditoria de inventario</h1>
         <p className="text-sm text-neutral-500">
           Inventario teorico por producto y subreceta (en cantidad, no en dinero): inicial +
-          compras (registradas en Compras o pedidos ya recibidos) + produccion registrada - mermas
-          - consumo por produccion de otras subrecetas - consumo por ventas. Cuando captures tu
-          siguiente conteo, aqui mismo veras la variacion contra lo real.
+          compras (las registradas en Compras; recibir un pedido ya registra la compra) +
+          produccion registrada - mermas - consumo por produccion de otras subrecetas - consumo
+          por ventas. Cuando captures tu siguiente conteo, aqui mismo veras la variacion contra
+          lo real.
         </p>
       </div>
 

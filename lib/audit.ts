@@ -83,10 +83,10 @@ function safeUsage(recipeId: string, graph: RecipeGraph): RecipeUsage | null {
 
 /**
  * Reconciliacion teorica de inventario, en cantidades (no dinero), para productos Y subrecetas:
- * inicial (ultimo conteo) + compras (compras registradas directamente en /purchases + pedidos ya
- * recibidos en /orders, solo productos) + produccion (solo subrecetas) - mermas (solo productos)
- * - consumo por produccion de otras subrecetas - consumo por ventas = teorico. Si se da un conteo
- * final, se compara contra lo realmente contado.
+ * inicial (ultimo conteo) + compras (solo productos, leidas unicamente de Compras) + produccion
+ * (solo subrecetas) - mermas (solo productos) - consumo por produccion de otras subrecetas
+ * - consumo por ventas = teorico. Si se da un conteo final, se compara contra lo realmente
+ * contado. Las entradas por pedido no se suman aparte: recibir un pedido ya registra la compra.
  */
 export async function computeInventoryAudit(
   organizationId: string,
@@ -118,7 +118,6 @@ export async function computeInventoryAudit(
     products,
     subRecipes,
     purchases,
-    purchaseOrderItems,
     wasteEntries,
     productionEntries,
     sales,
@@ -141,10 +140,6 @@ export async function computeInventoryAudit(
     prisma.purchase.findMany({
       where: { sucursalId, purchaseDate: dateFilter },
       select: { productId: true, presentationQty: true, presentationUnit: true },
-    }),
-    prisma.purchaseOrderItem.findMany({
-      where: { purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
-      select: { productId: true, quantity: true },
     }),
     prisma.wasteEntry.findMany({
       where: { sucursalId, date: dateFilter },
@@ -229,9 +224,12 @@ export async function computeInventoryAudit(
       )
     : null;
 
-  const purchasesByProductId = toDecimalMap(
-    purchaseOrderItems.map((i) => ({ key: i.productId, quantity: i.quantity })),
-  );
+  // Las entradas salen de Compras y nada mas. Recibir un pedido registra la compra en la misma
+  // transaccion que lo marca como recibido (ver registerPurchase), asi que leer tambien los
+  // renglones del pedido contaba la misma mercancia dos veces: inflaba las entradas, inflaba el
+  // teorico y marcaba faltantes que no existian. Un pedido recibido nunca ha podido existir sin
+  // su compra, y si la compra se elimina, su entrada tampoco debe contar.
+  const purchasesByProductId = new Map<string, Decimal>();
   for (const purchase of purchases) {
     const baseUnit = baseUnitByProductId.get(purchase.productId);
     if (!baseUnit) continue;
@@ -642,7 +640,6 @@ export async function computeItemKardex(
 
   const [
     purchases,
-    purchaseOrderItems,
     wasteEntries,
     ownProduction,
     allProduction,
@@ -659,12 +656,6 @@ export async function computeItemKardex(
       ? prisma.purchase.findMany({
           where: { sucursalId, productId: itemId, purchaseDate: dateFilter },
           include: { supplier: true },
-        })
-      : Promise.resolve([]),
-    itemType === "product"
-      ? prisma.purchaseOrderItem.findMany({
-          where: { productId: itemId, purchaseOrder: { sucursalId, status: "RECEIVED", receivedAt: dateFilter } },
-          include: { purchaseOrder: { include: { supplier: true } } },
         })
       : Promise.resolve([]),
     itemType === "product"
@@ -770,20 +761,6 @@ export async function computeItemKardex(
       runningBalance: 0,
       href: "/purchases",
       sortIndex: index,
-    });
-  });
-
-  purchaseOrderItems.forEach((purchaseItem, index) => {
-    const date = purchaseItem.purchaseOrder.receivedAt ?? purchaseItem.purchaseOrder.createdAt;
-    movements.push({
-      date,
-      dateLabel: dateLabel(date),
-      type: "compra",
-      label: `Compra recibida${purchaseItem.purchaseOrder.supplier ? ` - ${purchaseItem.purchaseOrder.supplier.name}` : ""} (${purchaseItem.presentationLabel})`,
-      qtyDelta: Number(purchaseItem.quantity),
-      runningBalance: 0,
-      href: `/orders/${purchaseItem.purchaseOrderId}`,
-      sortIndex: 500 + index,
     });
   });
 
