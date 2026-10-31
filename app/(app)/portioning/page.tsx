@@ -1,34 +1,56 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { UNIT_LABELS, type UnitValue } from "@/lib/units";
-import { formatMoney } from "@/lib/format";
-import ApplyYieldButton from "./ApplyYieldButton";
-import DeleteTransformationButton from "./DeleteTransformationButton";
+import { monthStartDateInputValue, todayDateInputValue } from "@/lib/date-inputs";
+import {
+  buildTransformationWhere,
+  hasAnyTransformationFilter,
+  toTransformationRow,
+  TRANSFORMATION_INCLUDE,
+  type TransformationRow,
+} from "@/lib/portioning/query";
+import TransformationsTable from "./TransformationsTable";
 
-function folioLabel(folio: number): string {
-  return `POR-${String(folio).padStart(4, "0")}`;
+// Tope de seguridad para no traer anios de historial de un jalon.
+const ROW_LIMIT = 500;
+
+function readParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
-export default async function PortioningPage() {
+export default async function PortioningPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireSucursalContext();
+  const raw = await searchParams;
+
+  const filters = {
+    search: readParam(raw.q),
+    folio: readParam(raw.folio),
+    dateFrom: readParam(raw.from),
+    dateTo: readParam(raw.to),
+  };
+  const touched = readParam(raw.touched) === "1";
+
+  // Por omision, el mes en curso: la pregunta de esta pantalla es que se transformo este mes y
+  // como salio el rendimiento, no todo el historial.
+  const isDefaultMonth = !touched && !hasAnyTransformationFilter(filters);
+  const monthStart = monthStartDateInputValue();
+  const today = todayDateInputValue();
+  const effectiveFilters = isDefaultMonth
+    ? { ...filters, dateFrom: monthStart, dateTo: today }
+    : filters;
 
   const entries = await prisma.portioningEntry.findMany({
-    where: { sucursalId: user.sucursalId },
+    where: buildTransformationWhere(user.sucursalId, effectiveFilters),
     orderBy: [{ date: "desc" }, { folio: "desc" }],
-    take: 200,
-    include: {
-      product: { select: { name: true, baseUnit: true } },
-      outputProduct: { select: { name: true, baseUnit: true } },
-      outputs: {
-        include: {
-          product: { select: { name: true, baseUnit: true } },
-          recipe: { select: { name: true } },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
+    take: ROW_LIMIT,
+    include: TRANSFORMATION_INCLUDE,
   });
+
+  const rows: TransformationRow[] = entries.map(toTransformationRow);
 
   return (
     <div className="space-y-6">
@@ -57,115 +79,14 @@ export default async function PortioningPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
-            <tr>
-              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
-              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
-              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Entro</th>
-              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Salio</th>
-              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Rendimiento
-              </th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-neutral-400">
-                  Todavia no hay transformaciones. Registra una para conocer tu merma real y el
-                  costo verdadero de cada porcion.
-                </td>
-              </tr>
-            )}
-            {entries.map((entry) => {
-              const unidad = UNIT_LABELS[entry.product.baseUnit as UnitValue];
-              const rendimiento = Number(entry.realYieldPct);
-              const aplicable = rendimiento > 0 && rendimiento <= 100;
-              return (
-                <tr key={entry.id} className="border-t border-neutral-100 align-top transition-colors hover:bg-neutral-50">
-                  <td className="px-4 py-3 text-neutral-500">{folioLabel(entry.folio)}</td>
-                  <td className="px-4 py-3 text-neutral-500">
-                    {entry.date.toLocaleDateString("es-MX", { timeZone: "UTC" })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-neutral-900">{entry.product.name}</p>
-                    <p className="text-xs text-neutral-500">
-                      {Number(entry.initialQty).toLocaleString("es-MX", { maximumFractionDigits: 3 })} {unidad}
-                      {" · "}
-                      {formatMoney(Number(entry.initialQty) * Number(entry.unitCost), 2)}
-                    </p>
-                    {entry.comment && <p className="mt-0.5 text-xs text-neutral-500">{entry.comment}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600">
-                    {entry.outputs.map((output) => {
-                      const nombre = output.product?.name ?? output.recipe?.name ?? "—";
-                      const cantidad = Number(output.qty ?? output.portions ?? 0);
-                      const unidadSalida = output.product
-                        ? UNIT_LABELS[output.product.baseUnit as UnitValue]
-                        : "";
-                      return (
-                        <p key={output.id}>
-                          {cantidad.toLocaleString("es-MX", { maximumFractionDigits: 3 })}{" "}
-                          {unidadSalida && <span className="text-neutral-400">{unidadSalida} </span>}
-                          de {nombre}
-                          <span className="text-neutral-400">
-                            {" · "}
-                            {formatMoney(Number(output.realUnitCost), 2)} c/u
-                          </span>
-                        </p>
-                      );
-                    })}
-                    {/* Limpiezas viejas: su salida vivia en la entrada, no en renglones. */}
-                    {entry.outputs.length === 0 && entry.outputProduct && (
-                      <p>
-                        {Number(entry.outputQty ?? 0).toLocaleString("es-MX", { maximumFractionDigits: 3 })}{" "}
-                        {UNIT_LABELS[entry.outputProduct.baseUnit as UnitValue]} de {entry.outputProduct.name}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span
-                      className={
-                        rendimiento > 100
-                          ? "font-medium tabular-nums text-amber-600"
-                          : rendimiento < 50
-                            ? "font-medium tabular-nums text-red-600"
-                            : rendimiento < 75
-                              ? "font-medium tabular-nums text-amber-600"
-                              : "font-medium tabular-nums text-neutral-900"
-                      }
-                    >
-                      {rendimiento.toFixed(2)}%
-                    </span>
-                    {rendimiento > 100 && (
-                      <p className="text-xs text-amber-600">salio mas de lo que entro</p>
-                    )}
-                    {aplicable && (
-                      <div className="mt-1">
-                        <ApplyYieldButton
-                          entryId={entry.id}
-                          productName={entry.product.name}
-                          yieldPct={rendimiento}
-                        />
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <DeleteTransformationButton
-                      entryId={entry.id}
-                      folioLabel={folioLabel(entry.folio)}
-                      resumen={`${Number(entry.initialQty).toLocaleString("es-MX", { maximumFractionDigits: 3 })} ${unidad} de ${entry.product.name}`}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <TransformationsTable
+        rows={rows}
+        filters={filters}
+        isDefaultMonth={isDefaultMonth}
+        defaultFrom={monthStart}
+        defaultTo={today}
+        truncated={rows.length === ROW_LIMIT}
+      />
     </div>
   );
 }

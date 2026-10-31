@@ -2,6 +2,8 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatPurchaseFolio, parsePurchaseFolio } from "./folio";
 
+export { monthStartDateInputValue } from "@/lib/date-inputs";
+
 export type InvoiceFilters = {
   search: string;
   dateFrom: string;
@@ -34,12 +36,6 @@ export type InvoiceSummary = {
   invoiceCount: number;
   total: number;
 };
-
-/** Primer dia del mes en curso, en el mismo formato que usan los inputs de fecha. */
-export function monthStartDateInputValue(): string {
-  const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().slice(0, 10);
-}
 
 export function hasAnyInvoiceFilter(filters: InvoiceFilters): boolean {
   return Boolean(filters.search.trim() || filters.dateFrom || filters.dateTo || filters.supplier);

@@ -22,9 +22,7 @@ export function hasAnyPurchaseFilter(filters: PurchaseListFilters): boolean {
   );
 }
 
-export function todayDateInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+export { todayDateInputValue } from "@/lib/date-inputs";
 
 /**
  * Construye el filtro de Prisma a partir de los filtros de la lista de compras. Cuando
