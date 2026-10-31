@@ -93,12 +93,16 @@ export async function loadPurchaseInvoices(
   const where = buildInvoiceWhere(sucursalId, filters);
 
   const [grupos, suppliers] = await Promise.all([
+    // Se agrupa por folio y nada mas. Agrupar tambien por fecha, proveedor o folio de factura
+    // partia una misma compra en dos renglones cuando un producto quedo capturado con el folio
+    // de factura escrito distinto: una factura es un folio, no una combinacion de campos.
     prisma.purchase.groupBy({
-      by: ["folio", "purchaseDate", "supplierId", "invoiceFolio"],
+      by: ["folio"],
       where,
       _sum: { totalPrice: true },
       _count: { _all: true },
-      orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
+      _max: { purchaseDate: true, supplierId: true, invoiceFolio: true },
+      orderBy: { folio: "desc" },
     }),
     prisma.supplier.findMany({
       where: { organizationId },
@@ -107,16 +111,22 @@ export async function loadPurchaseInvoices(
   ]);
   const supplierName = new Map(suppliers.map((s) => [s.id, s.name]));
 
-  const rows: InvoiceRow[] = grupos.map((grupo) => ({
-    folio: grupo.folio,
-    folioLabel: formatPurchaseFolio(grupo.folio),
-    invoiceFolio: grupo.invoiceFolio,
-    dateLabel: grupo.purchaseDate.toLocaleDateString("es-MX", { timeZone: "UTC" }),
-    dateValue: grupo.purchaseDate.getTime(),
-    supplierName: grupo.supplierId ? (supplierName.get(grupo.supplierId) ?? null) : null,
-    lineCount: grupo._count._all,
-    total: Number(grupo._sum.totalPrice ?? 0),
-  }));
+  const rows: InvoiceRow[] = grupos
+    .map((grupo) => {
+      const fecha = grupo._max.purchaseDate ?? new Date(0);
+      const supplierId = grupo._max.supplierId;
+      return {
+        folio: grupo.folio,
+        folioLabel: formatPurchaseFolio(grupo.folio),
+        invoiceFolio: grupo._max.invoiceFolio,
+        dateLabel: fecha.toLocaleDateString("es-MX", { timeZone: "UTC" }),
+        dateValue: fecha.getTime(),
+        supplierName: supplierId ? (supplierName.get(supplierId) ?? null) : null,
+        lineCount: grupo._count._all,
+        total: Number(grupo._sum.totalPrice ?? 0),
+      };
+    })
+    .sort((a, b) => b.dateValue - a.dateValue || b.folio - a.folio);
 
   const porProveedor = new Map<string, SupplierTotal>();
   for (const row of rows) {

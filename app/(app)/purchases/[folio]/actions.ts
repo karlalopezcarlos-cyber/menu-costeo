@@ -236,27 +236,52 @@ export async function deletePurchase(
 }
 
 /** Elimina TODOS los renglones de una compra (mismo folio), como si nunca se hubiera registrado. */
+/**
+ * El borrado en si, sin decidir a donde se va la pantalla despues: el detalle de la compra
+ * redirige (esa pantalla deja de existir) y la lista de facturas se queda donde esta.
+ */
+async function removePurchaseGroup(
+  sucursalId: string,
+  folio: number,
+): Promise<{ blocked?: DeletePurchaseResult; supplierId: string | null }> {
+  const purchases = await prisma.purchase.findMany({ where: { sucursalId, folio } });
+  if (purchases.length === 0) throw new Error("Compra no encontrada.");
+
+  // Todos los renglones de un mismo folio comparten proveedor, asi que basta revisar uno.
+  const supplierId = purchases[0].supplierId;
+  const blocked = await findBlockingPayment(sucursalId, supplierId, folio);
+  if (blocked) return { blocked, supplierId };
+
+  const productIds = [...new Set(purchases.map((p) => p.productId))];
+  await prisma.purchase.deleteMany({ where: { sucursalId, folio } });
+  for (const productId of productIds) {
+    await recalcProductCurrentCost(productId);
+  }
+  return { supplierId };
+}
+
+/** Borra la compra completa desde la lista de facturas, sin salir de la lista. */
+export async function deletePurchaseGroupFromList(
+  folio: number,
+): Promise<DeletePurchaseResult | void> {
+  const user = await requireSucursalContext();
+  const { blocked, supplierId } = await removePurchaseGroup(user.sucursalId, folio);
+  if (blocked) return blocked;
+
+  revalidatePath("/purchases");
+  revalidatePath(`/purchases/${folio}`);
+  revalidatePath("/products");
+  if (supplierId) revalidatePath(`/payments/${supplierId}`);
+  revalidatePath("/payments");
+}
+
 export async function deletePurchaseGroup(
   folio: number,
   recipeId?: string | null,
 ): Promise<DeletePurchaseResult | void> {
   const user = await requireSucursalContext();
-  const purchases = await prisma.purchase.findMany({
-    where: { sucursalId: user.sucursalId, folio },
-  });
-  if (purchases.length === 0) throw new Error("Compra no encontrada.");
-
-  // Todos los renglones de un mismo folio comparten proveedor, asi que basta revisar uno.
-  const supplierId = purchases[0].supplierId;
-  const blocked = await findBlockingPayment(user.sucursalId, supplierId, folio);
+  const { blocked, supplierId } = await removePurchaseGroup(user.sucursalId, folio);
   if (blocked) return blocked;
-
-  const productIds = [...new Set(purchases.map((p) => p.productId))];
-
-  await prisma.purchase.deleteMany({ where: { sucursalId: user.sucursalId, folio } });
-  for (const productId of productIds) {
-    await recalcProductCurrentCost(productId);
-  }
 
   revalidatePath("/purchases");
   revalidatePath("/products");

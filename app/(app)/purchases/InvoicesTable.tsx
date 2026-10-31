@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/format";
+import { deletePurchaseGroupFromList } from "./[folio]/actions";
 import type { InvoiceFilters, InvoiceRow, SupplierTotal } from "@/lib/purchases/invoices";
 
 export default function InvoicesTable({
@@ -29,6 +30,12 @@ export default function InvoicesTable({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  const [pending, startTransition] = useTransition();
+  const [deletingFolio, setDeletingFolio] = useState<number | null>(null);
+  const [blockedDelete, setBlockedDelete] = useState<{ message: string; paymentHref: string } | null>(
+    null,
+  );
 
   const [searchInput, setSearchInput] = useState(filters.search);
   const [dateFrom, setDateFrom] = useState(isDefaultMonth ? defaultFrom : filters.dateFrom);
@@ -61,8 +68,44 @@ export default function InvoicesTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
+  function eliminar(row: InvoiceRow) {
+    const etiqueta =
+      row.invoiceFolio && row.invoiceFolio !== row.folioLabel
+        ? `${row.invoiceFolio} (${row.folioLabel})`
+        : row.folioLabel;
+    if (
+      !confirm(
+        `¿Eliminar la compra ${etiqueta} de ${row.supplierName ?? "sin proveedor"}?\n\n` +
+          `Se borran sus ${row.lineCount} producto${row.lineCount === 1 ? "" : "s"} por ${formatMoney(row.total)} ` +
+          `y se recalcula el costo de cada uno. Esta accion no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+    setBlockedDelete(null);
+    setDeletingFolio(row.folio);
+    startTransition(async () => {
+      const result = await deletePurchaseGroupFromList(row.folio);
+      setDeletingFolio(null);
+      if (result?.error) {
+        setBlockedDelete({ message: result.error, paymentHref: result.paymentHref ?? "/payments" });
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
+      {blockedDelete && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p>{blockedDelete.message}</p>
+          <Link
+            href={blockedDelete.paymentHref}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 font-medium text-amber-800 hover:bg-amber-100"
+          >
+            Ir a Pagos
+          </Link>
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <input
           type="text"
@@ -218,18 +261,19 @@ export default function InvoicesTable({
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Total
               </th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]" />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
                   Ninguna factura coincide con los filtros.
                 </td>
               </tr>
             )}
             {rows.map((row) => (
-              <tr key={`${row.folio}-${row.dateValue}`} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <tr key={row.folio} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                 <td className="px-4 py-3">
                   <Link
                     href={`/purchases/${row.folio}`}
@@ -247,6 +291,16 @@ export default function InvoicesTable({
                 <td className="px-4 py-3 text-neutral-500">{row.supplierName ?? "-"}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-500">{row.lineCount}</td>
                 <td className="px-4 py-3 text-right tabular-nums font-medium">{formatMoney(row.total)}</td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => eliminar(row)}
+                    disabled={pending}
+                    className="text-sm text-neutral-400 transition-colors hover:text-red-600 disabled:opacity-50"
+                  >
+                    {deletingFolio === row.folio ? "Eliminando..." : "Eliminar"}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
