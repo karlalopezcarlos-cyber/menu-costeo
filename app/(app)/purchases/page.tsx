@@ -2,8 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import PurchasesTable, { type PurchaseRow } from "./PurchasesTable";
+import InvoicesTable from "./InvoicesTable";
 import { toPurchaseRow } from "./purchase-rows";
 import { buildPurchaseWhere, hasAnyPurchaseFilter, resolvePendingProductIds, todayDateInputValue } from "@/lib/purchases/query";
+import {
+  hasAnyInvoiceFilter,
+  loadPurchaseInvoices,
+  monthStartDateInputValue,
+} from "@/lib/purchases/invoices";
 
 // Tope de seguridad para no traer un historial completo de anios a la pantalla de un jalon:
 // si una busqueda sin acotar por fecha regresa mas de esto, se avisa para que se agregue un filtro.
@@ -20,6 +26,7 @@ export default async function PurchasesPage({
 }) {
   const user = await requireSucursalContext();
   const raw = await searchParams;
+  const tab = readParam(raw.tab) === "facturas" ? "facturas" : "productos";
 
   const filters = {
     search: readParam(raw.q),
@@ -38,6 +45,52 @@ export default async function PurchasesPage({
   const today = todayDateInputValue();
   const effectiveFilters = isDefaultToday ? { ...filters, dateFrom: today, dateTo: today } : filters;
 
+  const suppliersForFilter = await prisma.supplier.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: { name: "asc" },
+    select: { name: true },
+  });
+  const supplierOptions = suppliersForFilter.map((s) => s.name);
+
+  if (tab === "facturas") {
+    // Aqui el periodo por omision es el mes en curso, no el dia: la pregunta de esta pestana es
+    // cuantas facturas entraron en el mes y cuanto suman.
+    const invoiceFilters = {
+      search: filters.search,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      supplier: filters.supplier,
+    };
+    const isDefaultMonth = !touched && !hasAnyInvoiceFilter(invoiceFilters);
+    const monthStart = monthStartDateInputValue();
+    const hoy = todayDateInputValue();
+    const effectiveInvoiceFilters = isDefaultMonth
+      ? { ...invoiceFilters, dateFrom: monthStart, dateTo: hoy }
+      : invoiceFilters;
+
+    const summary = await loadPurchaseInvoices(
+      user.sucursalId,
+      user.organizationId,
+      effectiveInvoiceFilters,
+    );
+
+    return (
+      <PurchasesShell tab={tab}>
+        <InvoicesTable
+          rows={summary.rows}
+          bySupplier={summary.bySupplier}
+          invoiceCount={summary.invoiceCount}
+          total={summary.total}
+          supplierOptions={supplierOptions}
+          filters={invoiceFilters}
+          isDefaultMonth={isDefaultMonth}
+          defaultFrom={monthStart}
+          defaultTo={hoy}
+        />
+      </PurchasesShell>
+    );
+  }
+
   const pendingProductIds = await resolvePendingProductIds(user.sucursalId);
   const pendingIdSet = new Set(pendingProductIds);
 
@@ -47,24 +100,43 @@ export default async function PurchasesPage({
     effectiveFilters.pendingOnly ? pendingProductIds : null,
   );
 
-  const [purchases, suppliers] = await Promise.all([
-    prisma.purchase.findMany({
-      where,
-      orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
-      take: ROW_LIMIT,
-      include: { product: true, supplier: true },
-    }),
-    prisma.supplier.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { name: "asc" },
-      select: { name: true },
-    }),
-  ]);
+  const purchases = await prisma.purchase.findMany({
+    where,
+    orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
+    take: ROW_LIMIT,
+    include: { product: true, supplier: true },
+  });
 
   const rows: PurchaseRow[] = purchases.map((purchase) =>
     toPurchaseRow(purchase, pendingIdSet.has(purchase.productId)),
   );
 
+  return (
+    <PurchasesShell tab={tab}>
+      <PurchasesTable
+        rows={rows}
+        supplierOptions={supplierOptions}
+        filters={filters}
+        isDefaultToday={isDefaultToday}
+        today={today}
+        truncated={rows.length === ROW_LIMIT}
+      />
+    </PurchasesShell>
+  );
+}
+
+/** Encabezado y pestanas, compartidos por las dos vistas del modulo. */
+function PurchasesShell({
+  tab,
+  children,
+}: {
+  tab: "productos" | "facturas";
+  children: React.ReactNode;
+}) {
+  const tabs = [
+    { key: "productos", label: "Por producto", href: "/purchases" },
+    { key: "facturas", label: "Por factura", href: "/purchases?tab=facturas" },
+  ];
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -77,14 +149,28 @@ export default async function PurchasesPage({
         </Link>
       </div>
 
-      <PurchasesTable
-        rows={rows}
-        supplierOptions={suppliers.map((s) => s.name)}
-        filters={filters}
-        isDefaultToday={isDefaultToday}
-        today={today}
-        truncated={rows.length === ROW_LIMIT}
-      />
+      <nav className="flex gap-4 border-b border-neutral-200 text-sm">
+        {tabs.map((item) =>
+          item.key === tab ? (
+            <span
+              key={item.key}
+              className="border-b-2 border-neutral-900 pb-2 font-medium text-neutral-900"
+            >
+              {item.label}
+            </span>
+          ) : (
+            <Link
+              key={item.key}
+              href={item.href}
+              className="pb-2 text-neutral-500 transition-colors hover:text-neutral-900"
+            >
+              {item.label}
+            </Link>
+          ),
+        )}
+      </nav>
+
+      {children}
     </div>
   );
 }
