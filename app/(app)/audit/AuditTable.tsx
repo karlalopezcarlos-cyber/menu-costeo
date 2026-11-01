@@ -57,7 +57,7 @@ const NUMERIC_KEYS = new Set<SortKey>([
  */
 const COLUMNS: { key: SortKey; label: string; width: number; hint?: string }[] = [
   { key: "category", label: "Categoria", width: 6 },
-  { key: "name", label: "Nombre", width: 11 },
+  { key: "name", label: "Nombre", width: 10 },
   { key: "unit", label: "Unidad", width: 4 },
   { key: "initial", label: "Inicial", width: 4, hint: "Lo que habia en el conteo inicial" },
   { key: "purchases", label: "+ Compras", width: 5, hint: "Lo que entro por compras en el periodo" },
@@ -68,12 +68,12 @@ const COLUMNS: { key: SortKey; label: string; width: number; hint?: string }[] =
   { key: "transformedOut", label: "- Transform.", width: 5, hint: "Lo que se consumio al entrar a una transformacion" },
   { key: "sales", label: "- Ventas", width: 4, hint: "Lo que consumieron los platillos vendidos" },
   { key: "theoretical", label: "= Teorico", width: 5, hint: "Lo que deberia haber: inicial + entradas - salidas" },
-  { key: "actual", label: "Real", width: 5, hint: "Lo que se conto en el inventario final" },
+  { key: "actual", label: "Real", width: 4, hint: "Lo que se conto en el inventario final" },
   { key: "variance", label: "Variacion", width: 5, hint: "Lo real menos lo teorico" },
   { key: "previousVarianceQty", label: "Var. ant.", width: 4, hint: "Variacion del periodo anterior, contra el conteo previo a este" },
-  { key: "varianceAmount", label: "Var. $", width: 4, hint: "La variacion valuada a su costo unitario" },
-  { key: "variancePct", label: "Var. %", width: 4, hint: "La variacion contra lo teorico, en porcentaje" },
-  { key: "comment", label: "Comentario", width: 14 },
+  { key: "varianceAmount", label: "Var. $", width: 6, hint: "La variacion valuada a su costo unitario" },
+  { key: "variancePct", label: "Var. %", width: 5, hint: "La variacion contra lo teorico, en porcentaje" },
+  { key: "comment", label: "Comentario", width: 13 },
 ];
 
 function fmt(n: number): string {
@@ -368,50 +368,50 @@ export default function AuditTable({
                   )}
                 </td>
                 <td className="px-2 py-2 text-neutral-400">{row.unitLabel}</td>
-                <td className="px-2 py-2 text-right tabular-nums text-neutral-500">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-neutral-500">
                   {fmt(row.initialQty)}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-emerald-700">
                   {row.purchasesQty !== 0
                     ? `+${fmt(row.purchasesQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-emerald-700">
                   {row.producedQty !== 0
                     ? `+${fmt(row.producedQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-emerald-700">
                   {row.transformedInQty !== 0
                     ? `+${fmt(row.transformedInQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
                   {row.wasteQty !== 0 ? `-${fmt(row.wasteQty)}` : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
                   {row.productionConsumedQty !== 0
                     ? `-${fmt(row.productionConsumedQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
                   {row.transformedOutQty !== 0
                     ? `-${fmt(row.transformedOutQty)}`
                     : "-"}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-red-600">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
                   {row.salesQty !== 0 ? `-${fmt(row.salesQty)}` : "-"}
                 </td>
-                <td className="px-2 py-2 text-right font-medium tabular-nums">
+                <td className="px-2 py-2 wrap-anywhere text-right font-medium tabular-nums">
                   {fmt(row.theoreticalFinalQty)}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-neutral-500">
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-neutral-500">
                   {row.actualFinalQty !== null
                     ? `${fmt(row.actualFinalQty)}`
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 text-right font-medium tabular-nums ${
+                  className={`px-2 py-2 wrap-anywhere text-right font-medium tabular-nums ${
                     !hasVariance
                       ? "text-neutral-300"
                       : !varianceIsSignificant
@@ -426,7 +426,7 @@ export default function AuditTable({
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 text-right tabular-nums ${
+                  className={`px-2 py-2 wrap-anywhere text-right tabular-nums ${
                     row.previousVarianceQty === null
                       ? "text-neutral-300"
                       : Math.abs(row.previousVarianceQty) <= 0.001
@@ -442,7 +442,7 @@ export default function AuditTable({
                     : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 text-right font-medium tabular-nums ${
+                  className={`px-2 py-2 wrap-anywhere text-right font-medium tabular-nums ${
                     row.varianceAmount === null
                       ? "text-neutral-300"
                       : !varianceIsSignificant
@@ -455,7 +455,7 @@ export default function AuditTable({
                   {row.varianceAmount !== null ? fmtMoney(row.varianceAmount) : "-"}
                 </td>
                 <td
-                  className={`px-2 py-2 text-right tabular-nums ${
+                  className={`px-2 py-2 wrap-anywhere text-right tabular-nums ${
                     row.variancePct === null
                       ? "text-neutral-300"
                       : !varianceIsSignificant
