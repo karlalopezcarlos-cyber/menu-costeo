@@ -294,7 +294,10 @@ export default function AuditTable({
             <col key={col.key} style={{ width: `${col.width}%` }} />
           ))}
         </colgroup>
-        <thead className="sticky top-0 z-10 bg-neutral-800 text-left text-white">
+        {/* top-16, no top-0: la barra de la app es sticky y mide h-16, asi que con
+            top-0 el encabezado de la tabla se metia debajo de ella al bajar y dejaba
+            de verse justo cuando mas se necesita. */}
+        <thead className="sticky top-16 z-10 bg-neutral-800 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
               <th

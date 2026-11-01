@@ -117,7 +117,10 @@ export default function MenuEngineeringTable({
   return (
     <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 bg-neutral-900 text-left text-white">
+        {/* top-16, no top-0: la barra de la app es sticky y mide h-16, asi que con
+            top-0 el encabezado de la tabla se metia debajo de ella al bajar y dejaba
+            de verse justo cuando mas se necesita. */}
+        <thead className="sticky top-16 z-10 bg-neutral-900 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
               <th key={col.key} className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
