@@ -1,11 +1,12 @@
 import type { AuditRow } from "@/lib/audit";
 
 /**
- * "with" deja solo lo que hay que revisar; "without" solo lo que cuadro, que es el mismo
- * conjunto que la tabla pinta de verde. Los renglones sin conteo final no caen en ninguno de
- * los dos: no se midio su variacion, asi que decir que cuadran seria inventarlo.
+ * "counted" deja lo que si se conto al cierre, con o sin variacion; "with" deja solo lo que hay
+ * que revisar; "without" solo lo que cuadro, que es el mismo conjunto que la tabla pinta de
+ * verde. Las tres opciones piden conteo final, asi que un renglon sin conteo no aparece en
+ * ninguna: no se midio su variacion, y decir que cuadra seria inventarlo.
  */
-export type VarianceFilter = "all" | "with" | "without";
+export type VarianceFilter = "all" | "counted" | "with" | "without";
 
 export type AuditRowFilters = {
   search: string;
@@ -55,6 +56,8 @@ export function filterAuditRows(rows: AuditRow[], filters: AuditRowFilters): Aud
       return false;
     }
     if (filters.varianceFilter !== "all") {
+      // null es "no se conto al cierre", y eso basta para descartarlo en las tres opciones;
+      // "counted" no necesita mas que eso.
       const real = hasRealVariance(row);
       if (real === null) return false;
       if (filters.varianceFilter === "with" && !real) return false;

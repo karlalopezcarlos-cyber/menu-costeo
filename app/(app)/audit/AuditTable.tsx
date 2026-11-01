@@ -265,6 +265,7 @@ export default function AuditTable({
         className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
       >
         <option value="all">Con y sin variacion</option>
+        <option value="counted">Solo con inventario final</option>
         <option value="with">Solo con variacion</option>
         <option value="without">Sin variaciones</option>
       </select>

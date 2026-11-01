@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
   if (filters.categoryFilter !== "all") {
     filtersSummary.push(`Categoria: ${filters.categoryFilter === "none" ? "Sin categoria" : filters.categoryFilter}`);
   }
+  if (filters.varianceFilter === "counted") filtersSummary.push("Solo con inventario final");
   if (filters.varianceFilter === "with") filtersSummary.push("Solo con variacion");
   if (filters.varianceFilter === "without") filtersSummary.push("Sin variaciones");
   if (filters.onlyDifferences) filtersSummary.push("Solo con movimiento o variacion");
