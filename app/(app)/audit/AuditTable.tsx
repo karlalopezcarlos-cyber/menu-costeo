@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AuditRow } from "@/lib/audit";
-import { filterAuditRows, sumVarianceAmounts } from "@/lib/audit-filters";
+import { filterAuditRows, sumVarianceAmounts, type VarianceFilter } from "@/lib/audit-filters";
 import { saveAuditComments } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -106,6 +106,7 @@ export default function AuditTable({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "product" | "subrecipe">("all");
+  const [varianceFilter, setVarianceFilter] = useState<VarianceFilter>("all");
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [onlyWithComment, setOnlyWithComment] = useState(false);
 
@@ -190,14 +191,27 @@ export default function AuditTable({
   }, [rows, sortKey, sortDir]);
 
   const visibleRows = useMemo(
-    () => filterAuditRows(sortedRows, { search, typeFilter, categoryFilter, onlyDifferences, onlyWithComment }),
-    [sortedRows, search, categoryFilter, typeFilter, onlyDifferences, onlyWithComment],
+    () =>
+      filterAuditRows(sortedRows, {
+        search,
+        typeFilter,
+        categoryFilter,
+        varianceFilter,
+        onlyDifferences,
+        onlyWithComment,
+      }),
+    [sortedRows, search, categoryFilter, typeFilter, varianceFilter, onlyDifferences, onlyWithComment],
   );
 
   const { totalShortageAmount, totalSurplusAmount } = useMemo(() => sumVarianceAmounts(visibleRows), [visibleRows]);
 
   const hasFilters =
-    !!search || categoryFilter !== "all" || typeFilter !== "all" || onlyDifferences || onlyWithComment;
+    !!search ||
+    categoryFilter !== "all" ||
+    typeFilter !== "all" ||
+    varianceFilter !== "all" ||
+    onlyDifferences ||
+    onlyWithComment;
   const colCount = COLUMNS.length;
 
   const boundSaveComments = finalCountId ? saveAuditComments.bind(null, finalCountId) : null;
@@ -206,6 +220,7 @@ export default function AuditTable({
     initial: initialCountId,
     type: typeFilter,
     category: categoryFilter,
+    variance: varianceFilter,
     onlyDifferences: String(onlyDifferences),
     onlyWithComment: String(onlyWithComment),
   });
@@ -244,6 +259,15 @@ export default function AuditTable({
         ))}
         {categoryOptions.hasUncategorized && <option value="none">Sin categoria</option>}
       </select>
+      <select
+        value={varianceFilter}
+        onChange={(e) => setVarianceFilter(e.target.value as VarianceFilter)}
+        className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
+      >
+        <option value="all">Con y sin variacion</option>
+        <option value="with">Solo con variacion</option>
+        <option value="without">Sin variaciones</option>
+      </select>
       <label className="flex items-center gap-1.5 text-sm text-neutral-600">
         <input
           type="checkbox"
@@ -269,6 +293,7 @@ export default function AuditTable({
             setSearch("");
             setCategoryFilter("all");
             setTypeFilter("all");
+            setVarianceFilter("all");
             setOnlyDifferences(false);
             setOnlyWithComment(false);
           }}

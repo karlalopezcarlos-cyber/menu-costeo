@@ -1,12 +1,26 @@
 import type { AuditRow } from "@/lib/audit";
 
+/**
+ * "with" deja solo lo que hay que revisar; "without" solo lo que cuadro, que es el mismo
+ * conjunto que la tabla pinta de verde. Los renglones sin conteo final no caen en ninguno de
+ * los dos: no se midio su variacion, asi que decir que cuadran seria inventarlo.
+ */
+export type VarianceFilter = "all" | "with" | "without";
+
 export type AuditRowFilters = {
   search: string;
   typeFilter: "all" | "product" | "subrecipe";
   categoryFilter: string;
+  varianceFilter: VarianceFilter;
   onlyDifferences: boolean;
   onlyWithComment: boolean;
 };
+
+/** La misma tolerancia con la que la tabla decide el color: debajo de esto, cuadro. */
+export function hasRealVariance(row: AuditRow): boolean | null {
+  if (row.varianceQty === null) return null;
+  return Math.abs(row.varianceQty) > 0.001;
+}
 
 /**
  * Si al renglon le paso algo en el periodo. Sirve para dos cosas: esconderlo con "Solo con
@@ -39,6 +53,12 @@ export function filterAuditRows(rows: AuditRow[], filters: AuditRowFilters): Aud
       row.categoryName !== filters.categoryFilter
     ) {
       return false;
+    }
+    if (filters.varianceFilter !== "all") {
+      const real = hasRealVariance(row);
+      if (real === null) return false;
+      if (filters.varianceFilter === "with" && !real) return false;
+      if (filters.varianceFilter === "without" && real) return false;
     }
     if (filters.onlyDifferences) {
       const hasVariance = row.varianceQty !== null && Math.abs(row.varianceQty) > 0.001;

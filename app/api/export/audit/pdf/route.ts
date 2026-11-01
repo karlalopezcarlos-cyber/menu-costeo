@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     search: params.get("search") ?? "",
     typeFilter: (params.get("type") as AuditRowFilters["typeFilter"]) ?? "all",
     categoryFilter: params.get("category") ?? "all",
+    varianceFilter: (params.get("variance") as AuditRowFilters["varianceFilter"]) ?? "all",
     onlyDifferences: params.get("onlyDifferences") === "true",
     onlyWithComment: params.get("onlyWithComment") === "true",
   };
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
   if (filters.categoryFilter !== "all") {
     filtersSummary.push(`Categoria: ${filters.categoryFilter === "none" ? "Sin categoria" : filters.categoryFilter}`);
   }
+  if (filters.varianceFilter === "with") filtersSummary.push("Solo con variacion");
+  if (filters.varianceFilter === "without") filtersSummary.push("Sin variaciones");
   if (filters.onlyDifferences) filtersSummary.push("Solo con movimiento o variacion");
   if (filters.onlyWithComment) filtersSummary.push("Solo con comentario en la variacion");
 
