@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AuditRow } from "@/lib/audit";
-import { filterAuditRows, rowHasActivity, sumVarianceAmounts } from "@/lib/audit-filters";
+import { filterAuditRows, sumVarianceAmounts } from "@/lib/audit-filters";
 import { saveAuditComments } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -340,11 +340,11 @@ export default function AuditTable({
           {visibleRows.map((row) => {
             const hasVariance = row.varianceQty !== null;
             const varianceIsSignificant = hasVariance && Math.abs(row.varianceQty as number) > 0.001;
-            // Cuadro: se conto y lo contado coincide con el teorico. Se pinta el renglon entero
-            // de verde para poder barrer la lista de un vistazo y quedarte solo en lo que no
-            // cuadra. Un producto que no se movio en el periodo no cuadra ni descuadra, asi que
-            // se queda en blanco en vez de llenar la pantalla de verde.
-            const cuadra = hasVariance && !varianceIsSignificant && rowHasActivity(row);
+            // Cuadro: se conto y lo contado coincide con el teorico. El renglon entero se pinta
+            // de verde para barrer la lista de un vistazo y quedarse solo en lo que no cuadra.
+            // Cuenta tambien el que no se movio en el periodo y sigue en cero: la pregunta que
+            // responde el color es "¿tengo que revisar este renglon?", y la respuesta ahi es no.
+            const cuadra = hasVariance && !varianceIsSignificant;
             const kardexParams = new URLSearchParams({ initial: initialCountId, type: row.itemType });
             if (finalCountId) kardexParams.set("final", finalCountId);
             const kardexHref = `/audit/${row.itemId}?${kardexParams.toString()}`;
