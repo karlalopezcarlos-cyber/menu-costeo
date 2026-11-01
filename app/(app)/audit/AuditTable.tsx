@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AuditRow } from "@/lib/audit";
-import { filterAuditRows, sumVarianceAmounts } from "@/lib/audit-filters";
+import { filterAuditRows, rowHasActivity, sumVarianceAmounts } from "@/lib/audit-filters";
 import { saveAuditComments } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -23,13 +23,12 @@ type SortKey =
   | "actual"
   | "variance"
   | "varianceAmount"
+  | "variancePct"
   | "previousVarianceQty"
+  | "comment"
   | "unit";
 type SortDir = "asc" | "desc";
 
-/** Ancho de cada columna en % del ancho total de la tabla; junto con VARIANCE_PCT_WIDTH y
- * COMMENT_WIDTH deben sumar 100, para que la tabla (table-fixed) siempre quepa en el ancho
- * disponible sin necesitar scroll horizontal. */
 /** Las columnas de cantidad se alinean a la derecha: una lista de numeros se lee por ahi. */
 const NUMERIC_KEYS = new Set<SortKey>([
   "initial",
@@ -45,28 +44,37 @@ const NUMERIC_KEYS = new Set<SortKey>([
   "variance",
   "previousVarianceQty",
   "varianceAmount",
+  "variancePct",
 ]);
 
+/**
+ * Ancho de cada columna en % del ancho total de la tabla. Deben sumar 100, para que la tabla
+ * (table-fixed) siempre quepa en el ancho disponible sin necesitar scroll horizontal.
+ *
+ * El comentario se lleva 14: es texto, no un numero de tres digitos, y leerlo es la mitad del
+ * trabajo de revisar una auditoria. Lo que se le dio salio de las columnas de movimiento, que
+ * casi siempre traen un guion.
+ */
 const COLUMNS: { key: SortKey; label: string; width: number }[] = [
   { key: "category", label: "Categoria", width: 7 },
-  { key: "name", label: "Nombre", width: 14 },
-  { key: "unit", label: "Unidad", width: 4 },
-  { key: "initial", label: "Inicial", width: 5 },
-  { key: "purchases", label: "+ Compras", width: 5 },
-  { key: "produced", label: "+ Produccion", width: 5 },
-  { key: "transformedIn", label: "+ Transform.", width: 5 },
-  { key: "waste", label: "- Mermas", width: 5 },
-  { key: "productionConsumed", label: "- Produccion", width: 5 },
-  { key: "transformedOut", label: "- Transform.", width: 5 },
-  { key: "sales", label: "- Ventas", width: 5 },
-  { key: "theoretical", label: "= Teorico", width: 5 },
-  { key: "actual", label: "Real (final)", width: 5 },
-  { key: "variance", label: "Variacion", width: 5 },
-  { key: "previousVarianceQty", label: "Var. anterior", width: 5 },
-  { key: "varianceAmount", label: "Variacion $", width: 6 },
+  { key: "name", label: "Nombre", width: 15 },
+  { key: "unit", label: "Unidad", width: 3 },
+  { key: "initial", label: "Inicial", width: 4 },
+  { key: "purchases", label: "+ Compras", width: 4 },
+  { key: "produced", label: "+ Produccion", width: 4 },
+  { key: "transformedIn", label: "+ Transform.", width: 4 },
+  { key: "waste", label: "- Mermas", width: 4 },
+  { key: "productionConsumed", label: "- Produccion", width: 4 },
+  { key: "transformedOut", label: "- Transform.", width: 4 },
+  { key: "sales", label: "- Ventas", width: 4 },
+  { key: "theoretical", label: "= Teorico", width: 6 },
+  { key: "actual", label: "Real (final)", width: 4 },
+  { key: "variance", label: "Variacion", width: 6 },
+  { key: "previousVarianceQty", label: "Var. anterior", width: 4 },
+  { key: "varianceAmount", label: "Variacion $", width: 5 },
+  { key: "variancePct", label: "Variacion %", width: 4 },
+  { key: "comment", label: "Comentario", width: 14 },
 ];
-const VARIANCE_PCT_WIDTH = 4;
-const COMMENT_WIDTH = 5;
 
 function fmt(n: number): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -156,6 +164,12 @@ export default function AuditTable({
         return row.varianceAmount;
       case "previousVarianceQty":
         return row.previousVarianceQty;
+      case "variancePct":
+        return row.variancePct;
+      case "comment":
+        // Sin comentario va al final, igual que cualquier otra celda vacia: ordenar por esta
+        // columna es justamente para juntar arriba los renglones que ya tienen explicacion.
+        return row.comment ? row.comment.toLowerCase() : null;
     }
   }
 
@@ -184,7 +198,7 @@ export default function AuditTable({
 
   const hasFilters =
     !!search || categoryFilter !== "all" || typeFilter !== "all" || onlyDifferences || onlyWithComment;
-  const colCount = COLUMNS.length + 2;
+  const colCount = COLUMNS.length;
 
   const boundSaveComments = finalCountId ? saveAuditComments.bind(null, finalCountId) : null;
 
@@ -279,8 +293,6 @@ export default function AuditTable({
           {COLUMNS.map((col) => (
             <col key={col.key} style={{ width: `${col.width}%` }} />
           ))}
-          <col style={{ width: `${VARIANCE_PCT_WIDTH}%` }} />
-          <col style={{ width: `${COMMENT_WIDTH}%` }} />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-neutral-800 text-left text-white">
           <tr>
@@ -298,8 +310,6 @@ export default function AuditTable({
                 </button>
               </th>
             ))}
-            <th className="px-2 py-2 font-medium">Variacion %</th>
-            <th className="px-2 py-2 font-medium">Comentario</th>
           </tr>
         </thead>
         <tbody>
@@ -320,12 +330,22 @@ export default function AuditTable({
           {visibleRows.map((row) => {
             const hasVariance = row.varianceQty !== null;
             const varianceIsSignificant = hasVariance && Math.abs(row.varianceQty as number) > 0.001;
+            // Cuadro: se conto y lo contado coincide con el teorico. Se pinta el renglon entero
+            // de verde para poder barrer la lista de un vistazo y quedarte solo en lo que no
+            // cuadra. Un producto que no se movio en el periodo no cuadra ni descuadra, asi que
+            // se queda en blanco en vez de llenar la pantalla de verde.
+            const cuadra = hasVariance && !varianceIsSignificant && rowHasActivity(row);
             const kardexParams = new URLSearchParams({ initial: initialCountId, type: row.itemType });
             if (finalCountId) kardexParams.set("final", finalCountId);
             const kardexHref = `/audit/${row.itemId}?${kardexParams.toString()}`;
             const inputName = `comment:${row.itemType}:${row.itemId}`;
             return (
-              <tr key={`${row.itemType}-${row.itemId}`} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <tr
+                key={`${row.itemType}-${row.itemId}`}
+                className={`border-t border-neutral-100 transition-colors ${
+                  cuadra ? "bg-emerald-50 hover:bg-emerald-100" : "hover:bg-neutral-50"
+                }`}
+              >
                 <td className="px-2 py-2 text-neutral-500">{row.categoryName ?? "-"}</td>
                 <td className="px-2 py-2">
                   <Link href={kardexHref} target="_blank" className="hover:underline" title="Ver kardex de movimientos">
@@ -385,7 +405,7 @@ export default function AuditTable({
                     !hasVariance
                       ? "text-neutral-300"
                       : !varianceIsSignificant
-                        ? "text-neutral-400"
+                        ? "text-emerald-700"
                         : (row.varianceQty as number) < 0
                           ? "text-red-600"
                           : "text-emerald-700"
@@ -416,7 +436,7 @@ export default function AuditTable({
                     row.varianceAmount === null
                       ? "text-neutral-300"
                       : !varianceIsSignificant
-                        ? "text-neutral-400"
+                        ? "text-emerald-700"
                         : row.varianceAmount < 0
                           ? "text-red-600"
                           : "text-emerald-700"
@@ -424,7 +444,17 @@ export default function AuditTable({
                 >
                   {row.varianceAmount !== null ? fmtMoney(row.varianceAmount) : "-"}
                 </td>
-                <td className="px-2 py-2 text-neutral-500">
+                <td
+                  className={`px-2 py-2 text-right tabular-nums ${
+                    row.variancePct === null
+                      ? "text-neutral-300"
+                      : !varianceIsSignificant
+                        ? "text-emerald-700"
+                        : row.variancePct < 0
+                          ? "text-red-600"
+                          : "text-emerald-700"
+                  }`}
+                >
                   {row.variancePct !== null ? `${row.variancePct > 0 ? "+" : ""}${row.variancePct.toFixed(1)}%` : "-"}
                 </td>
                 <td className="px-2 py-2">
@@ -432,8 +462,19 @@ export default function AuditTable({
                     <input
                       name={inputName}
                       defaultValue={row.comment ?? ""}
+                      // El comentario casi siempre es mas largo que la celda. El title lo
+                      // muestra completo al pasar el cursor, y se actualiza mientras se
+                      // escribe para que el globo nunca diga algo distinto a lo que hay.
+                      title={row.comment ?? ""}
+                      onChange={(e) => {
+                        e.currentTarget.title = e.currentTarget.value;
+                      }}
                       placeholder="Explica la variacion..."
-                      className="w-full min-w-0 rounded-md border border-neutral-200 px-2 py-1 text-sm"
+                      className={`w-full min-w-0 rounded-md border px-2 py-1 text-sm ${
+                        row.comment
+                          ? "border-neutral-300 bg-white font-medium text-neutral-900"
+                          : "border-neutral-200"
+                      }`}
                     />
                   ) : (
                     <span className="text-xs text-neutral-300">Sin conteo final</span>
