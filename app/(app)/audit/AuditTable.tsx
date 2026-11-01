@@ -55,24 +55,24 @@ const NUMERIC_KEYS = new Set<SortKey>([
  * trabajo de revisar una auditoria. Lo que se le dio salio de las columnas de movimiento, que
  * casi siempre traen un guion.
  */
-const COLUMNS: { key: SortKey; label: string; width: number }[] = [
-  { key: "category", label: "Categoria", width: 7 },
-  { key: "name", label: "Nombre", width: 15 },
-  { key: "unit", label: "Unidad", width: 3 },
-  { key: "initial", label: "Inicial", width: 4 },
-  { key: "purchases", label: "+ Compras", width: 4 },
-  { key: "produced", label: "+ Produccion", width: 4 },
-  { key: "transformedIn", label: "+ Transform.", width: 4 },
-  { key: "waste", label: "- Mermas", width: 4 },
-  { key: "productionConsumed", label: "- Produccion", width: 4 },
-  { key: "transformedOut", label: "- Transform.", width: 4 },
-  { key: "sales", label: "- Ventas", width: 4 },
-  { key: "theoretical", label: "= Teorico", width: 6 },
-  { key: "actual", label: "Real (final)", width: 4 },
-  { key: "variance", label: "Variacion", width: 6 },
-  { key: "previousVarianceQty", label: "Var. anterior", width: 4 },
-  { key: "varianceAmount", label: "Variacion $", width: 5 },
-  { key: "variancePct", label: "Variacion %", width: 4 },
+const COLUMNS: { key: SortKey; label: string; width: number; hint?: string }[] = [
+  { key: "category", label: "Categoria", width: 6 },
+  { key: "name", label: "Nombre", width: 11 },
+  { key: "unit", label: "Unidad", width: 4 },
+  { key: "initial", label: "Inicial", width: 4, hint: "Lo que habia en el conteo inicial" },
+  { key: "purchases", label: "+ Compras", width: 5, hint: "Lo que entro por compras en el periodo" },
+  { key: "produced", label: "+ Produccion", width: 5, hint: "Lo que se produjo de esta subreceta" },
+  { key: "transformedIn", label: "+ Transform.", width: 5, hint: "Lo que entro por salir de una transformacion" },
+  { key: "waste", label: "- Mermas", width: 5, hint: "Mermas, salidas a servicio y pruebas" },
+  { key: "productionConsumed", label: "- Produccion", width: 5, hint: "Lo que se consumio al producir otras subrecetas" },
+  { key: "transformedOut", label: "- Transform.", width: 5, hint: "Lo que se consumio al entrar a una transformacion" },
+  { key: "sales", label: "- Ventas", width: 4, hint: "Lo que consumieron los platillos vendidos" },
+  { key: "theoretical", label: "= Teorico", width: 5, hint: "Lo que deberia haber: inicial + entradas - salidas" },
+  { key: "actual", label: "Real", width: 5, hint: "Lo que se conto en el inventario final" },
+  { key: "variance", label: "Variacion", width: 5, hint: "Lo real menos lo teorico" },
+  { key: "previousVarianceQty", label: "Var. ant.", width: 4, hint: "Variacion del periodo anterior, contra el conteo previo a este" },
+  { key: "varianceAmount", label: "Var. $", width: 4, hint: "La variacion valuada a su costo unitario" },
+  { key: "variancePct", label: "Var. %", width: 4, hint: "La variacion contra lo teorico, en porcentaje" },
   { key: "comment", label: "Comentario", width: 14 },
 ];
 
@@ -297,7 +297,11 @@ export default function AuditTable({
         <thead className="sticky top-0 z-10 bg-neutral-800 text-left text-white">
           <tr>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="px-2 py-2 align-bottom font-medium">
+              <th
+                key={col.key}
+                title={col.hint}
+                className="overflow-hidden px-2 py-2 align-bottom text-xs font-medium"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort(col.key)}
@@ -305,8 +309,11 @@ export default function AuditTable({
                     NUMERIC_KEYS.has(col.key) ? "justify-end text-right" : "text-left"
                   }`}
                 >
-                  <span className="break-words leading-tight">{col.label}</span>
-                  {sortKey === col.key && <span>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                  {/* wrap-anywhere y no break-words: con una sola palabra larga ("Produccion")
+                      break-words no reduce el ancho minimo del texto, asi que el titulo se
+                      desbordaba encima de la columna de junto en vez de partirse. */}
+                  <span className="min-w-0 leading-tight wrap-anywhere">{col.label}</span>
+                  {sortKey === col.key && <span className="shrink-0">{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </button>
               </th>
             ))}
