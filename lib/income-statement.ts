@@ -210,7 +210,8 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Venta total": "Ventas netas PV + Salidas a otra sucursal.",
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
-  Compras: "Total de compras de productos registradas en el periodo.",
+  Compras:
+    "Compras de producto del periodo, que aqui va de la fecha del conteo inicial a la del conteo final, ambos dias incluidos: no es el mes de calendario. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
     "Todo lo del modulo de Gastos (renta, luz, nomina) mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
