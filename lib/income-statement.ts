@@ -146,7 +146,7 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
     buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
     buildRow("Entradas desde otra sucursal", result.entradasDesdeOtraSucursal, "none", con()),
-    buildRow("Compras", result.compras, "none", con()),
+    buildRow("Compras", result.compras, "costPct", con({ ventaTotal: result.ventaTotal })),
     // "Existencia" (inicial + entradas + compras) se sigue calculando porque el costo de ventas
     // sale de ahi, pero no se muestra: es un subtotal intermedio que nadie lee y que solo hace
     // mas larga la tabla.
@@ -211,7 +211,7 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
   Compras:
-    "Compras de producto del periodo, que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
+    "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
     "Todo lo del modulo de Gastos (renta, luz, nomina), mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza), mas lo que salio del inventario sin venderse: las mermas y las salidas por creditos al costo. No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
