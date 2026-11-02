@@ -214,17 +214,17 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
     "Compras de producto del periodo, que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
-    "Todo lo del modulo de Gastos (renta, luz, nomina) mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
+    "Todo lo del modulo de Gastos (renta, luz, nomina), mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza), mas lo que salio del inventario sin venderse: las mermas y las salidas por creditos al costo. No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
   "Utilidad bruta":
     "Venta total - Costo de ventas: lo que deja la operacion antes de los gastos. El % es respecto a la Venta total.",
   "Utilidad despues de gastos":
     "Utilidad bruta - Gastos de operacion: lo que queda despues de pagar la renta, la luz, la nomina y todo lo que no es producto. El % es respecto a la Venta total.",
   Mermas:
-    "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. NO se resta del costo de ventas: tirar producto es costo de operar y tiene que pesar. Se muestra aparte para saber cuanto del costo es desperdicio. El % es respecto a la Venta total.",
+    "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. Se RESTA del costo de ventas —no se vendio— y se suma a Gastos de operacion, asi que tirar producto sigue pesando igual en la utilidad, solo que en su propio renglon y no escondido dentro del costo. El % es respecto a la Venta total.",
   "Salidas por creditos al costo":
-    "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron; la merma no entra aqui, esa si es costo de operar.",
+    "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron y se suman a Gastos de operacion, igual que la merma, que va en su propio renglon.",
   "Costo de ventas":
-    "Inventario inicial + Entradas + Compras - Inventario final - Salidas por creditos al costo: lo que de verdad costo lo que se vendio. Incluye mermas y variaciones de produccion, pero ya sin las cortesias ni las pruebas. El % es respecto a la Venta total.",
+    "Inventario inicial + Entradas + Compras - Inventario final - Salidas por creditos al costo - Mermas: lo que costo exclusivamente lo que se vendio. Todo lo que salio sin venderse se saca de aqui y se cobra en Gastos de operacion. Es el numero que se compara contra el costo potencial. El % es respecto a la Venta total.",
   "Costo potencial":
     "Costo teorico segun receta de lo que realmente se vendio (mismo calculo que Ingenieria de menu). El % es respecto a la Venta total.",
   Variacion: "Costo potencial - Costo de ventas: positivo significa que el costo real fue menor al teorico (favorable).",
@@ -497,14 +497,10 @@ export async function computeIncomeStatement(
   const inventarioInicial = valuarConteo(initialCount.items.filter((i) => !esDeGasto(i)));
   const inventarioFinal = valuarConteo(finalCount.items.filter((i) => !esDeGasto(i)));
 
-  // Las tres salidas se valuan igual; lo que cambia es que hacen en el reporte.
-  //
-  // Cortesias y pruebas se RESTAN del costo: salieron del inventario pero no se vendieron, asi
-  // que dejarlas dentro inflaba el costo y acusaba una variacion falsa contra el potencial.
-  //
-  // La merma NO se resta: tirar producto si es costo de operar y tiene que pesar en el costo de
-  // ventas. Pero se muestra en su propio renglon, porque escondida dentro del costo nadie sabe
-  // cuanto se esta tirando.
+  // Las tres salidas se valuan igual y las tres se tratan igual: salieron del inventario pero
+  // no se vendieron. Se separan en dos renglones solo para poder leerlas —cuanto se regalo y
+  // cuanto se tiro son preguntas distintas— pero las dos salen del costo de ventas y las dos
+  // entran a Gastos de operacion.
   const creditosAlCosto = zeroAmounts();
   const mermas = zeroAmounts();
   for (const salida of creditos) {
@@ -516,10 +512,20 @@ export async function computeIncomeStatement(
 
   const ventaTotal = add(ventasNetasPV, salidasAOtraSucursal);
   const existencia = add(add(inventarioInicial, entradasDesdeOtraSucursal), compras);
-  // Lo que salio por cortesia o prueba ya estaba descontado del inventario, asi que venia
-  // inflando el costo de ventas como si se hubiera vendido. Restarlo deja el costo hablando
-  // solo de la venta, que es contra lo que se compara el costo potencial.
-  const costoDeVentas = subtract(subtract(existencia, inventarioFinal), creditosAlCosto);
+  // Lo que salio sin venderse —cortesias, consumo de personal, pruebas y merma— ya estaba
+  // descontado del inventario, asi que venia inflando el costo de ventas como si se hubiera
+  // vendido. Restarlo deja el costo hablando solo de la venta, que es contra lo que se compara
+  // el costo potencial.
+  const costoDeVentas = subtract(
+    subtract(subtract(existencia, inventarioFinal), creditosAlCosto),
+    mermas,
+  );
+
+  // Y entra a los gastos, no se evapora. Restarlo del costo y no sumarlo en ningun lado hacia
+  // que regalar y tirar producto SUBIERAN la utilidad. Asi la utilidad despues de gastos no
+  // cambia: el dinero sigue pesando lo mismo, nada mas se lee en su propio renglon en vez de
+  // venir escondido dentro del costo de ventas.
+  gastosDeOperacion.consolidado += creditosAlCosto.consolidado + mermas.consolidado;
 
   const costoPotencial = zeroAmounts();
   const memo = new Map<string, Decimal>();
