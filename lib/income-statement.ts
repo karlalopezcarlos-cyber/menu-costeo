@@ -211,7 +211,7 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
   "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
   Compras:
-    "Compras de producto del periodo, que aqui va de la fecha del conteo inicial a la del conteo final, ambos dias incluidos: no es el mes de calendario. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
+    "Compras de producto del periodo, que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
     "Todo lo del modulo de Gastos (renta, luz, nomina) mas las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
@@ -383,7 +383,13 @@ export async function computeIncomeStatement(
 
   const rangeStart = initialCount.date;
   const rangeEnd = finalCount.date;
-  const dateFilter = { gte: rangeStart, lte: rangeEnd };
+  // El periodo abre el dia DESPUES del conteo inicial y cierra el dia del conteo final. Un
+  // conteo se levanta al cierre del dia, asi que lo que entro y salio el dia del conteo inicial
+  // ya esta dentro de ese conteo: volverlo a sumar contaba la misma mercancia dos veces —y el
+  // reporte del periodo anterior, que termina en ese mismo conteo, ya la habia contado—. Con
+  // lte al final queda simetrico: ningun dia se cuenta dos veces ni se queda sin contar. Es el
+  // mismo corte que usa la Auditoria (ver lib/audit.ts), que siempre lo hizo asi.
+  const dateFilter = { gt: rangeStart, lte: rangeEnd };
 
   const [
     sales,
