@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import {
@@ -275,20 +276,6 @@ export default async function DashboardPage({
           </select>
         </div>
         <div className="space-y-1">
-          <label htmlFor="iva" className="text-sm font-medium text-neutral-700">
-            IVA
-          </label>
-          <select
-            id="iva"
-            name="iva"
-            defaultValue={ivaView === "conIva" ? "con" : "sin"}
-            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          >
-            <option value="sin">Sin IVA</option>
-            <option value="con">Con IVA (ventas y gastos)</option>
-          </select>
-        </div>
-        <div className="space-y-1">
           <label htmlFor="final" className="text-sm font-medium text-neutral-700">
             Fecha final (inventario)
           </label>
@@ -305,12 +292,39 @@ export default async function DashboardPage({
             ))}
           </select>
         </div>
+        {/* La vista viaja escondida en el formulario para que cambiar de fecha no la pierda:
+            los botones de abajo son los que la cambian. */}
+        <input type="hidden" name="iva" value={ivaView === "conIva" ? "con" : "sin"} />
         <button
           type="submit"
           className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
           Ver
         </button>
+        {/* Dos botones y no un desplegable, igual que en Ingenieria de menu: se ve de un
+            vistazo cual de las dos vistas se esta leyendo, sin tener que abrir nada. */}
+        <div className="flex overflow-hidden rounded-md border border-neutral-200">
+          <Link
+            href={`/dashboard?initial=${orderedInitialId}&final=${orderedFinalId}&iva=con`}
+            className={`px-3 py-2 text-sm font-medium ${
+              ivaView === "conIva"
+                ? "bg-neutral-900 text-white"
+                : "bg-white text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            Analizar con IVA
+          </Link>
+          <Link
+            href={`/dashboard?initial=${orderedInitialId}&final=${orderedFinalId}&iva=sin`}
+            className={`px-3 py-2 text-sm font-medium ${
+              ivaView === "sinIva"
+                ? "bg-neutral-900 text-white"
+                : "bg-white text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            Analizar sin IVA
+          </Link>
+        </div>
       </form>
       <p className="text-xs text-neutral-500">
         Solo se pueden elegir fechas con un conteo de inventario capturado. Las columnas son tus
