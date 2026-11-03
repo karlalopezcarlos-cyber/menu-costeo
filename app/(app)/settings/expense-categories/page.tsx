@@ -29,7 +29,8 @@ export default async function ExpenseCategoriesPage() {
           Como se clasifican los gastos de operacion: renta, servicios, nomina, mantenimiento.
           Son los que se usan al registrar un gasto, y con ellos se puede ver en que se va el
           dinero que no es insumo. El IVA de cada tipo es el que se le quita al gasto para
-          leerlo neto en el Estado de Resultados: la renta y la luz lo traen, la nomina no.
+          leerlo neto en el Estado de Resultados. Arranca en 0: ponle 16 a los que si lo traen
+          en el recibo, como la renta y la luz, y dejale 0 a los que no, como la nomina.
         </p>
       </div>
 

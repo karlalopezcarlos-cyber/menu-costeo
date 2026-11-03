@@ -51,7 +51,8 @@ export default async function TaxesPage() {
         <ul className="space-y-2 text-sm text-neutral-600">
           <li>
             <span className="font-medium text-neutral-800">IVA e IEPS de compras:</span> en cada
-            producto, porque el limon y el tequila no pagan lo mismo. Se configura en{" "}
+            producto, porque el limon y el tequila no pagan lo mismo. Todos arrancan en 0 y se le
+            pone a los que si lo causan. Se configura en{" "}
             <Link href="/products" className="text-brand-600 hover:underline">
               Productos
             </Link>
@@ -60,7 +61,7 @@ export default async function TaxesPage() {
           </li>
           <li>
             <span className="font-medium text-neutral-800">IVA de gastos:</span> en cada tipo de
-            gasto, porque la renta lo trae y la nomina no. Se configura en{" "}
+            gasto, porque la renta lo trae y la nomina no. Tambien arrancan en 0. Se configura en{" "}
             <Link href="/settings/expense-categories" className="text-brand-600 hover:underline">
               Tipos de gasto
             </Link>

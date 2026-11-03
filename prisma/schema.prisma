@@ -367,10 +367,11 @@ model Product {
   categoryId               String?
   category                 ProductCategory? @relation(fields: [categoryId], references: [id])
   baseUnit                 Unit
-  /// Tasa de IVA del producto, en por ciento. 16 por omision, que es la tasa general; los
-  /// alimentos que van en tasa 0 se corrigen producto por producto. No afecta el costeo: el
-  /// precio de compra se captura sin impuesto y el IVA es acreditable, no es costo del negocio.
-  ivaRate                  Decimal          @default(16) @db.Decimal(5, 2)
+  /// Tasa de IVA del producto, en por ciento. 0 por omision: en un restaurante casi todo el
+  /// almacen es alimento sin procesar, que va en tasa 0, asi que el impuesto se marca producto
+  /// por producto. No afecta el costeo: el precio de compra se captura sin impuesto y el IVA
+  /// es acreditable, no es costo del negocio.
+  ivaRate                  Decimal          @default(0) @db.Decimal(5, 2)
   /// Tasa de IEPS, en por ciento. 0 = no lo causa, que es el caso de casi todo. Se calcula
   /// sobre el subtotal y forma parte de la base del IVA, como en la ley.
   iepsRate                 Decimal          @default(0) @db.Decimal(5, 2)
@@ -1120,9 +1121,9 @@ model ExpenseCategory {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
-  /// IVA que trae este tipo de gasto, en por ciento. La renta y la luz lo causan; la nomina
-  /// no. Se copia al gasto al capturarlo.
-  ivaRate        Decimal      @default(16) @db.Decimal(5, 2)
+  /// IVA que trae este tipo de gasto, en por ciento. 0 por omision y se prende donde aplica:
+  /// la renta y la luz lo causan, la nomina no. Se copia al gasto al capturarlo.
+  ivaRate        Decimal      @default(0) @db.Decimal(5, 2)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
 

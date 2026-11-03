@@ -6,12 +6,14 @@ import { TASAS_IVA_COMUNES } from "@/lib/taxes";
 /**
  * IVA e IEPS del producto, compartidos por el alta y la edicion.
  *
- * El IVA arranca en 16 porque es la tasa general y es lo que trae la mayoria de las facturas;
- * el IEPS arranca en 0 porque casi nada lo causa. Ninguno de los dos toca el costo: el precio
- * de compra se captura sin impuesto y el IVA es acreditable.
+ * Los dos arrancan en 0 y se prenden donde aplica. En un restaurante casi todo el almacen es
+ * alimento sin procesar, que va en tasa 0: con el default en 16 habria que entrar a corregir
+ * casi todos los productos, y el que se escape queda cobrando un IVA que su factura no trae.
+ * Ninguno de los dos toca el costo: el precio de compra se captura sin impuesto y el IVA es
+ * acreditable.
  */
 export default function TaxFields({
-  ivaRate = "16",
+  ivaRate = "0",
   iepsRate = "0",
 }: {
   ivaRate?: string;
@@ -46,10 +48,11 @@ export default function TaxFields({
           ))}
         </datalist>
         <p className="text-xs text-neutral-500">
-          16% es la tasa general. Los alimentos no preparados suelen ir en 0: cambialo aqui y las
-          compras nuevas de este producto lo toman solo. No afecta el costo —el precio se captura
-          sin impuesto y el IVA es acreditable—, sirve para cuadrar contra la factura y para saber
-          cuanto se le paga al proveedor.
+          Arranca en 0 porque los alimentos sin procesar no lo causan. Ponle 16 a lo que si lo
+          trae en la factura —abarrotes procesados, bebidas, desechables— y las compras nuevas de
+          este producto lo toman solo. No afecta el costo —el precio se captura sin impuesto y el
+          IVA es acreditable—, sirve para cuadrar contra la factura y para saber cuanto se le paga
+          al proveedor.
         </p>
       </div>
 
