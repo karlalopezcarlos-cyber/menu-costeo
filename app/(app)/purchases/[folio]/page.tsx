@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio, parsePurchaseFolio } from "@/lib/purchases/folio";
 import { formatMoney } from "@/lib/format";
+import { sumTaxes } from "@/lib/taxes";
 import type { UnitValue } from "@/lib/units";
 import PurchaseEditForm from "./PurchaseEditForm";
 import PurchaseGroupManager from "./PurchaseGroupManager";
@@ -73,7 +74,14 @@ export default async function PurchaseDetailPage({
   const backLabel = recipe ? `← Volver a "${recipe.name}"` : "← Compras";
   const folioLabel = formatPurchaseFolio(folio);
   const [firstPurchase] = purchases;
-  const totalAmount = purchases.reduce((sum, p) => sum + Number(p.totalPrice), 0);
+  // El renglon decia "Total de la compra" y mostraba el subtotal: quien viene a cuadrar
+  // contra la factura ve 100 donde el papel dice 116 y no hay nada que lo explique.
+  const taxes = sumTaxes(
+    purchases.map((p) => ({
+      subtotal: p.totalPrice,
+      rates: { ivaRate: Number(p.ivaRate), iepsRate: Number(p.iepsRate) },
+    })),
+  );
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -95,8 +103,23 @@ export default async function PurchaseDetailPage({
           <p className="mt-1 text-sm text-neutral-500">{purchases.length} productos en esta compra.</p>
         )}
         <p className="mt-2 text-sm text-neutral-500">
-          Total de la compra: <b className="text-neutral-900">{formatMoney(totalAmount)}</b>
+          Subtotal: <b className="text-neutral-900">{formatMoney(taxes.subtotal)}</b>
+          {taxes.ieps !== 0 && <> · IEPS: {formatMoney(taxes.ieps)}</>}
+          {taxes.iva !== 0 && <> · IVA: {formatMoney(taxes.iva)}</>}
+          {taxes.total !== taxes.subtotal && (
+            <>
+              {" "}
+              · Total con impuestos:{" "}
+              <b className="text-neutral-900">{formatMoney(taxes.total)}</b>
+            </>
+          )}
         </p>
+        {taxes.total !== taxes.subtotal && (
+          <p className="mt-1 text-xs text-neutral-400">
+            El costo del negocio es el subtotal: el IVA de compras es acreditable y no entra al
+            costeo. El total con impuestos es lo que se le paga al proveedor.
+          </p>
+        )}
 
         <div className="mt-3">
           <PurchaseHeaderForm
@@ -121,6 +144,8 @@ export default async function PurchaseDetailPage({
           presentationQty={firstPurchase.presentationQty.toString()}
           presentationUnit={firstPurchase.presentationUnit as UnitValue}
           totalPrice={firstPurchase.totalPrice.toString()}
+          ivaRate={firstPurchase.ivaRate.toString()}
+          iepsRate={firstPurchase.iepsRate.toString()}
           supplierId={firstPurchase.supplierId ?? ""}
           suppliers={suppliers}
           note={firstPurchase.note}
@@ -143,6 +168,8 @@ export default async function PurchaseDetailPage({
             supplierId: p.supplierId ?? "",
             note: p.note,
             comment: p.comment,
+            ivaRate: p.ivaRate.toString(),
+            iepsRate: p.iepsRate.toString(),
           }))}
           suppliers={suppliers}
           recipeId={recipe?.id ?? null}

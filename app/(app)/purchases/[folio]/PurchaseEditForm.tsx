@@ -6,6 +6,7 @@ import Decimal from "decimal.js";
 import { applyYieldFactor, computeUnitCost, UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { updatePurchase, deletePurchase } from "./actions";
 import { formatMoney } from "@/lib/format";
+import { computeTaxes } from "@/lib/taxes";
 
 type SupplierOption = { id: string; name: string };
 
@@ -20,6 +21,8 @@ export default function PurchaseEditForm({
   presentationQty,
   presentationUnit,
   totalPrice,
+  ivaRate,
+  iepsRate,
   supplierId,
   suppliers,
   note,
@@ -35,6 +38,8 @@ export default function PurchaseEditForm({
   presentationQty: string;
   presentationUnit: UnitValue;
   totalPrice: string;
+  ivaRate: string;
+  iepsRate: string;
   supplierId: string;
   suppliers: SupplierOption[];
   note: string | null;
@@ -46,6 +51,12 @@ export default function PurchaseEditForm({
   const [qty, setQty] = useState(presentationQty);
   const [unit, setUnit] = useState<UnitValue>(presentationUnit);
   const [price, setPrice] = useState(totalPrice);
+  const [iva, setIva] = useState(ivaRate);
+  const [ieps, setIeps] = useState(iepsRate);
+  const desglose = computeTaxes(Number(price) || 0, {
+    ivaRate: Number(iva) || 0,
+    iepsRate: Number(ieps) || 0,
+  });
   const [blockedDelete, setBlockedDelete] = useState<{ message: string; paymentHref: string } | null>(null);
 
   let preview: Decimal | null = null;
@@ -167,12 +178,56 @@ export default function PurchaseEditForm({
               />
             </div>
           </div>
+          {/* La tasa se puede corregir aqui, no solo al capturar: una factura mal clasificada se
+              arregla en el renglon y no cambiandole la categoria a todo el producto. El precio
+              de arriba es SIEMPRE el subtotal; el impuesto va encima. */}
+          <div className="space-y-1">
+            <label htmlFor="ivaRate" className="text-sm font-medium text-neutral-700">
+              IVA (%)
+            </label>
+            <input
+              id="ivaRate"
+              name="ivaRate"
+              type="number"
+              step="any"
+              min="0"
+              max="100"
+              value={iva}
+              onChange={(e) => setIva(e.target.value)}
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="iepsRate" className="text-sm font-medium text-neutral-700">
+              IEPS (%)
+            </label>
+            <input
+              id="iepsRate"
+              name="iepsRate"
+              type="number"
+              step="any"
+              min="0"
+              max="100"
+              value={ieps}
+              onChange={(e) => setIeps(e.target.value)}
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+            />
+          </div>
         </div>
 
         <p className="text-sm text-neutral-700">
           Costo resultante:{" "}
           <strong>{preview ? `${formatMoney(preview.toNumber(), 4)} / ${UNIT_LABELS[baseUnit]}` : "-"}</strong>
         </p>
+
+        {desglose.total !== desglose.subtotal && (
+          <p className="text-sm text-neutral-500">
+            Subtotal <b className="text-neutral-800">{formatMoney(desglose.subtotal)}</b>
+            {desglose.ieps !== 0 && <> · IEPS {formatMoney(desglose.ieps)}</>} · IVA{" "}
+            {formatMoney(desglose.iva)} · a pagar{" "}
+            <b className="text-neutral-800">{formatMoney(desglose.total)}</b>
+          </p>
+        )}
 
         <div className="space-y-1">
           <label htmlFor="comment" className="text-sm font-medium text-neutral-700">

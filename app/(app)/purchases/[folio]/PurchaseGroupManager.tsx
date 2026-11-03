@@ -20,6 +20,9 @@ export type GroupedPurchase = {
   supplierId: string;
   note: string | null;
   comment: string | null;
+  /** Tasas congeladas de este renglon, en por ciento. */
+  ivaRate: string;
+  iepsRate: string;
 };
 
 export default function PurchaseGroupManager({
@@ -102,7 +105,15 @@ export default function PurchaseGroupManager({
                   <td className="px-4 py-3 text-right text-neutral-500">
                     {p.presentationQty} {UNIT_LABELS[p.presentationUnit]}
                   </td>
-                  <td className="px-4 py-3 text-right">{formatMoney(p.totalPrice)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {formatMoney(p.totalPrice)}
+                    {(Number(p.ivaRate) > 0 || Number(p.iepsRate) > 0) && (
+                      <p className="mt-0.5 text-xs text-neutral-400">
+                        + IVA {p.ivaRate}%
+                        {Number(p.iepsRate) > 0 && <> · IEPS {p.iepsRate}%</>}
+                      </p>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-neutral-700 whitespace-nowrap">
                     {formatMoney(p.computedUnitCost, 4)} / {UNIT_LABELS[p.baseUnit]}
                   </td>
@@ -144,6 +155,8 @@ export default function PurchaseGroupManager({
                         presentationQty={p.presentationQty}
                         presentationUnit={p.presentationUnit}
                         totalPrice={p.totalPrice.toString()}
+                        ivaRate={p.ivaRate}
+                        iepsRate={p.iepsRate}
                         supplierId={p.supplierId}
                         suppliers={suppliers}
                         note={p.note}

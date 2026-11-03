@@ -45,6 +45,25 @@ function parseUnit(value: unknown): UnitValue {
   throw new Error("Unidad invalida.");
 }
 
+/**
+ * Una tasa de impuesto en por ciento, con la que ya tenia la compra como respaldo.
+ *
+ * Vacio quiere decir cero: si alguien borro el numero en pantalla, ese renglon no causa el
+ * impuesto. Ausente quiere decir "no me lo mandaron" y ahi se respeta lo guardado.
+ */
+function parseTaxRate(
+  value: FormDataEntryValue | null,
+  fallback: { toString(): string },
+  label: string,
+): string {
+  if (value === null) return fallback.toString();
+  const raw = String(value).trim();
+  if (raw === "") return "0";
+  const rate = new Decimal(raw);
+  if (rate.lt(0) || rate.gt(100)) throw new Error(`La tasa de ${label} debe ir de 0% a 100%.`);
+  return rate.toString();
+}
+
 export async function updatePurchase(
   _prevState: { error?: string } | undefined,
   formData: FormData,
@@ -87,6 +106,11 @@ export async function updatePurchase(
     if (totalPrice.lte(0)) throw new Error("El precio debe ser mayor a cero.");
 
     const comment = String(formData.get("comment") ?? "").trim() || null;
+    // Las tasas se pueden corregir aqui porque la factura manda: si el producto estaba mal
+    // clasificado, se arregla este renglon sin tocar el catalogo. Un campo ausente deja la
+    // tasa como estaba, que es lo que debe pasar con una compra vieja que no se esta tocando.
+    const ivaRate = parseTaxRate(formData.get("ivaRate"), purchase.ivaRate, "IVA");
+    const iepsRate = parseTaxRate(formData.get("iepsRate"), purchase.iepsRate, "IEPS");
 
     const grossUnitCost = computeUnitCost(
       totalPrice,
@@ -115,6 +139,8 @@ export async function updatePurchase(
         presentationLabel,
         totalPrice: totalPrice.toString(),
         computedUnitCost: computedUnitCost.toString(),
+        ivaRate,
+        iepsRate,
         comment,
       },
     });
