@@ -59,3 +59,16 @@ export function sumTaxes(items: { subtotal: Decimal.Value; rates: TaxRates }[]):
 
 /** Para los selectores del alta de productos. La tasa libre se sigue pudiendo teclear. */
 export const TASAS_IVA_COMUNES = [16, 8, 0];
+
+/**
+ * Quita el IVA de un monto que ya lo trae.
+ *
+ * Es la operacion que necesitan las ventas y los gastos, que se capturan en bruto: el precio
+ * de carta y el total del recibo. No es restar la tasa, es dividir entre 1 mas la tasa; restar
+ * 16% de un precio con IVA deja un numero que no es nada.
+ */
+export function sinIva(conIva: Decimal.Value, ivaRate: number): Decimal {
+  const bruto = new Decimal(conIva);
+  if (ivaRate === 0) return bruto;
+  return bruto.dividedBy(new Decimal(1).plus(new Decimal(ivaRate).dividedBy(100)));
+}

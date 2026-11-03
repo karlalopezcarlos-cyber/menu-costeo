@@ -78,3 +78,23 @@ export async function deleteExpenseCategory(categoryId: string) {
   revalidatePath("/settings/expense-categories");
   revalidatePath("/expenses");
 }
+
+/**
+ * La tasa de IVA del tipo de gasto. No toca los gastos ya capturados: cada uno se quedo con la
+ * tasa que tenia su tipo el dia que se registro, igual que una compra se queda con su costo.
+ */
+export async function setExpenseCategoryIvaRate(categoryId: string, value: string) {
+  const user = await requireOrgSession();
+
+  const rate = Number(value);
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+    throw new Error("La tasa de IVA debe ir de 0% a 100%.");
+  }
+
+  await prisma.expenseCategory.updateMany({
+    where: { id: categoryId, organizationId: user.organizationId },
+    data: { ivaRate: rate.toString() },
+  });
+
+  revalidatePath("/settings/expense-categories");
+}

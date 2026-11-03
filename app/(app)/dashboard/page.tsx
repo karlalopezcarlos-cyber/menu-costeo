@@ -7,6 +7,7 @@ import {
   buildIncomeStatementFooterRows,
   INCOME_STATEMENT_ROW_DESCRIPTIONS,
   type IncomeStatementFooterRow,
+  type IvaView,
   type IncomeStatementRowView,
 } from "@/lib/income-statement";
 import { formatMoney } from "@/lib/format";
@@ -128,7 +129,7 @@ function FooterRow({ row, columnas }: { row: IncomeStatementFooterRow; columnas:
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ initial?: string; final?: string }>;
+  searchParams: Promise<{ initial?: string; final?: string; iva?: string }>;
 }) {
   const params = await searchParams;
   const user = await requireSucursalContext();
@@ -166,18 +167,24 @@ export default async function DashboardPage({
   const orderedInitialId = selectedInitial.date <= selectedFinal.date ? initialCountId : finalCountId;
   const orderedFinalId = selectedInitial.date <= selectedFinal.date ? finalCountId : initialCountId;
 
+  // Sin IVA por omision: es la unica vista en la que la venta y el costo estan medidos con la
+  // misma regla. Hay que pedir expresamente la otra.
+  const ivaView: IvaView = params.iva === "con" ? "conIva" : "sinIva";
   const result = await computeIncomeStatement(
     user.organizationId,
     user.sucursalId,
     orderedInitialId,
     orderedFinalId,
+    ivaView,
   );
   const rows = buildIncomeStatementRows(result);
   const footerRows = buildIncomeStatementFooterRows(result);
   const columnas = columnasDe(result);
   // Concepto + monto y % por cada columna.
   const totalColumnas = 1 + columnas.length * 2;
-  const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}`;
+  const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}&iva=${
+    ivaView === "conIva" ? "con" : "sin"
+  }`;
   const ventaTotal = result.ventaTotal.consolidado;
   const costoPct = ventaTotal !== 0 ? (result.costoDeVentas.consolidado / ventaTotal) * 100 : null;
   const potencialPct = ventaTotal !== 0 ? (result.costoPotencial.consolidado / ventaTotal) * 100 : null;
@@ -194,6 +201,23 @@ export default async function DashboardPage({
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
             {result.initialDateLabel} - {result.finalDateLabel}
+          </p>
+          {/* Que vista se esta leyendo, en el encabezado y no escondido en el filtro: los dos
+              reportes se imprimen igual y se confunden en cuanto salen de la pantalla. */}
+          <p className="mt-1 text-xs text-neutral-500">
+            {ivaView === "conIva" ? (
+              <>
+                <span className="font-medium text-amber-700">Ventas y gastos CON IVA.</span> Los
+                costos siempre son netos, asi que los porcentajes salen mas bajos de lo real.
+                Sirve para cuadrar contra el banco, no para medir el costo.
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-neutral-700">Todo sin IVA.</span> A la venta de
+                carta y a los gastos se les quito el impuesto para medirlos con la misma regla que
+                el costo.
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -248,6 +272,20 @@ export default async function DashboardPage({
                 {formatDate(c.date)}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="iva" className="text-sm font-medium text-neutral-700">
+            IVA
+          </label>
+          <select
+            id="iva"
+            name="iva"
+            defaultValue={ivaView === "conIva" ? "con" : "sin"}
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          >
+            <option value="sin">Sin IVA</option>
+            <option value="con">Con IVA (ventas y gastos)</option>
           </select>
         </div>
         <div className="space-y-1">
@@ -333,7 +371,11 @@ export default async function DashboardPage({
         </table>
       </div>
 
-      <IncomeStatementChat initialCountId={orderedInitialId} finalCountId={orderedFinalId} />
+      <IncomeStatementChat
+        initialCountId={orderedInitialId}
+        finalCountId={orderedFinalId}
+        ivaView={ivaView}
+      />
     </div>
   );
 }

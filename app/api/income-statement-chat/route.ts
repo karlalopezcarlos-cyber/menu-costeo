@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeIncomeStatement, buildIncomeStatementRows } from "@/lib/income-statement";
+import { computeIncomeStatement, buildIncomeStatementRows, type IvaView } from "@/lib/income-statement";
 import { buildIncomeStatementContext, INCOME_STATEMENT_CHAT_SYSTEM_PROMPT } from "@/lib/income-statement-chat";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
   const initialCountId = body?.initialCountId;
   const finalCountId = body?.finalCountId;
   const messages = body?.messages;
+  // La IA tiene que ver exactamente los mismos numeros que la pantalla desde la que se abrio,
+  // o va a explicar un reporte que el usuario no esta viendo.
+  const ivaView: IvaView = body?.ivaView === "conIva" ? "conIva" : "sinIva";
 
   if (typeof initialCountId !== "string" || typeof finalCountId !== "string" || !Array.isArray(messages)) {
     return NextResponse.json({ error: "Solicitud invalida." }, { status: 400 });
@@ -45,7 +48,13 @@ export async function POST(request: NextRequest) {
 
   let result;
   try {
-    result = await computeIncomeStatement(user.organizationId, user.sucursalId, initialCountId, finalCountId);
+    result = await computeIncomeStatement(
+      user.organizationId,
+      user.sucursalId,
+      initialCountId,
+      finalCountId,
+      ivaView,
+    );
   } catch {
     return NextResponse.json({ error: "No se pudo cargar el Estado de Resultados." }, { status: 400 });
   }

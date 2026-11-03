@@ -6,9 +6,12 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export default function IncomeStatementChat({
   initialCountId,
+  ivaView,
   finalCountId,
 }: {
   initialCountId: string;
+  /** La vista que se esta leyendo en pantalla, para que la IA explique esos mismos numeros. */
+  ivaView: "sinIva" | "conIva";
   finalCountId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -36,7 +39,7 @@ export default function IncomeStatementChat({
       const response = await fetch("/api/income-statement-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initialCountId, finalCountId, messages: nextMessages }),
+        body: JSON.stringify({ initialCountId, finalCountId, ivaView, messages: nextMessages }),
       });
 
       if (!response.ok || !response.body) {

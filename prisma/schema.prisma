@@ -94,6 +94,11 @@ model Organization {
   isActive             Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  /// Tasa de IVA de las ventas, en por ciento. Los precios de venta se capturan CON IVA —son
+  /// los de la carta— y esta tasa es la que se les quita para leer la venta neta, que es la
+  /// unica comparable contra un costo que siempre es neto. 16 porque el servicio de alimentos
+  /// va a tasa general.
+  salesIvaRate         Decimal  @default(16) @db.Decimal(5, 2)
   /// Siguiente folio a asignar a un pedido nuevo (contador consecutivo por organizacion).
   nextOrderFolio       Int      @default(1)
   /// Siguiente folio a asignar a una compra nueva (contador consecutivo por organizacion).
@@ -1115,6 +1120,9 @@ model ExpenseCategory {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
+  /// IVA que trae este tipo de gasto, en por ciento. La renta y la luz lo causan; la nomina
+  /// no. Se copia al gasto al capturarlo.
+  ivaRate        Decimal      @default(16) @db.Decimal(5, 2)
   sortOrder      Int          @default(0)
   createdAt      DateTime     @default(now())
 
@@ -1147,7 +1155,12 @@ model Expense {
   productId       String?
   product         Product?         @relation(fields: [productId], references: [id])
   concept         String
+  /// CON IVA, tal como viene el recibo: es lo que de verdad se pago.
   amount          Decimal          @db.Decimal(14, 2)
+  /// Que parte de `amount` es IVA, en por ciento. Copiada del tipo de gasto al capturar, para
+  /// que corregir la tasa de un tipo no cambie recibos viejos. Los gastos anteriores a esta
+  /// funcion quedaron en 0 y se tratan como si no trajeran IVA.
+  ivaRate         Decimal          @default(0) @db.Decimal(5, 2)
   invoiceFolio    String?
   comment         String?
   createdByUserId String?

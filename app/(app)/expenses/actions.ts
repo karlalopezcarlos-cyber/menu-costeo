@@ -49,11 +49,16 @@ export async function createExpense(
     const amount = new Decimal(String(formData.get("amount") ?? "0") || "0");
     if (amount.lte(0)) return { error: "El monto debe ser mayor a cero." };
 
+    // La tasa del tipo de gasto se copia aqui y no se vuelve a leer: corregir manana el IVA
+    // de "Servicios" no puede cambiar lo que decia un recibo de hace seis meses. Un gasto sin
+    // tipo se queda en 0 y se lee como si no trajera IVA, que es lo que se puede afirmar.
+    let ivaRate = "0";
     if (categoryId) {
       const category = await prisma.expenseCategory.findFirst({
         where: { id: categoryId, organizationId: user.organizationId },
       });
       if (!category) return { error: "Tipo de gasto no encontrado." };
+      ivaRate = category.ivaRate.toString();
     }
     if (supplierId) {
       const supplier = await prisma.supplier.findFirst({
@@ -74,6 +79,7 @@ export async function createExpense(
         // cambiar lo que dice un gasto de hace seis meses.
         concept: product.name,
         amount: amount.toString(),
+        ivaRate,
         invoiceFolio,
         comment,
         createdByUserId: user.id,

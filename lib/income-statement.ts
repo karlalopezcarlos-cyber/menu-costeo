@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
+import { computeTaxes, sinIva } from "@/lib/taxes";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 /** Columna del reporte: un grupo de costo de la organizacion. */
 export type CostGroupRef = { id: string; name: string };
@@ -52,6 +53,10 @@ export type IncomeStatementResult = {
   comprasDeGasto: number;
   /// Solo las mermas y las salidas por creditos al costo, valuadas.
   salidasSinVenta: number;
+  /// Con que vista se calculo este resultado.
+  ivaView: IvaView;
+  /// La tasa de IVA de ventas que se uso para desbrutear, en por ciento.
+  salesIvaRate: number;
   costoDeVentas: GroupAmounts;
   costoPotencial: GroupAmounts;
   variacion: GroupAmounts;
@@ -84,6 +89,21 @@ export type IncomeStatementFooterRow = {
   /** Renglon de desglose: cuelga del de arriba y no se suma aparte. */
   detail?: boolean;
 };
+
+/**
+ * Con que numeros se lee el reporte.
+ *
+ * Los costos son SIEMPRE netos: el precio de compra se captura sin impuesto y el IVA de
+ * compras es acreditable, asi que inventarios, compras, costo de ventas y costo potencial no
+ * cambian entre una vista y otra. Lo que cambia son los dos renglones que se capturan en
+ * bruto —las ventas, que son precio de carta, y los gastos, que son el total del recibo— y con
+ * ellos todos los porcentajes, porque el denominador es la venta total.
+ *
+ * "sinIva" es la vista correcta y la que viene por omision: es la unica en la que el costo de
+ * ventas y la venta estan medidos con la misma regla. "conIva" existe porque es como se venia
+ * leyendo el reporte y como se ve el dinero en el banco.
+ */
+export type IvaView = "sinIva" | "conIva";
 
 export type IncomeStatementCell = {
   /** id del grupo, SIN_GRUPO, o "consolidado" para la ultima columna. */
@@ -346,6 +366,7 @@ export async function computeIncomeStatement(
   sucursalId: string,
   initialCountId: string,
   finalCountId: string,
+  ivaView: IvaView = "sinIva",
 ): Promise<IncomeStatementResult> {
   const [
     sucursal,
@@ -357,7 +378,10 @@ export async function computeIncomeStatement(
     finalCount,
   ] = await Promise.all([
     prisma.sucursal.findFirstOrThrow({ where: { id: sucursalId }, select: { name: true } }),
-    prisma.organization.findFirstOrThrow({ where: { id: organizationId }, select: { name: true } }),
+    prisma.organization.findFirstOrThrow({
+      where: { id: organizationId },
+      select: { name: true, salesIvaRate: true },
+    }),
     prisma.costGroup.findMany({
       where: { organizationId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -457,7 +481,7 @@ export async function computeIncomeStatement(
     }),
     prisma.expense.findMany({
       where: { sucursalId, date: dateFilter },
-      select: { amount: true },
+      select: { amount: true, ivaRate: true },
     }),
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
@@ -486,9 +510,14 @@ export async function computeIncomeStatement(
     loadOrgRecipeGraph(sucursalId),
   ]);
 
+  // El precio de venta capturado es el de la carta y trae IVA. En la vista sin IVA se le quita
+  // para poder compararlo contra un costo que siempre es neto; dejarlo bruto hacia que el costo
+  // de ventas saliera mas bajo de lo que es, porque el denominador venia inflado.
+  const salesIvaRate = Number(organization.salesIvaRate);
   const ventasNetasPV = zeroAmounts();
   for (const sale of sales) {
-    const value = new Decimal(sale.quantitySold).times(sale.unitPrice);
+    const bruto = new Decimal(sale.quantitySold).times(sale.unitPrice);
+    const value = ivaView === "sinIva" ? sinIva(bruto, salesIvaRate) : bruto;
     addTo(ventasNetasPV, sale.recipe.category?.costGroupId ?? null, value);
   }
 
@@ -514,15 +543,30 @@ export async function computeIncomeStatement(
   let comprasDeGasto = 0;
   for (const purchase of purchases) {
     if (purchase.product.category?.isExpense) {
-      comprasDeGasto += Number(purchase.totalPrice);
-      gastosDeOperacion.consolidado += Number(purchase.totalPrice);
+      // Estas compras no son costo de lo vendido, son gasto: se leen con la misma regla que el
+      // resto del bloque de gastos. Se capturaron sin impuesto, asi que aqui se le suma.
+      const monto =
+        ivaView === "conIva"
+          ? computeTaxes(purchase.totalPrice, {
+              ivaRate: Number(purchase.ivaRate),
+              iepsRate: Number(purchase.iepsRate),
+            }).total
+          : Number(purchase.totalPrice);
+      comprasDeGasto += monto;
+      gastosDeOperacion.consolidado += monto;
       continue;
     }
     addTo(compras, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
   }
+  // El monto del gasto se captura con IVA, tal como viene el recibo. Cada gasto trae su propia
+  // tasa congelada porque no todos lo causan: la renta si, la nomina no.
   for (const gasto of gastos) {
-    gastosDeModulo += Number(gasto.amount);
-    gastosDeOperacion.consolidado += Number(gasto.amount);
+    const monto =
+      ivaView === "sinIva"
+        ? sinIva(gasto.amount, Number(gasto.ivaRate)).toNumber()
+        : Number(gasto.amount);
+    gastosDeModulo += monto;
+    gastosDeOperacion.consolidado += monto;
   }
 
   // Un producto de gasto puede seguir contandose fisicamente, pero no puede entrar a la
@@ -648,6 +692,8 @@ export async function computeIncomeStatement(
     gastosDeModulo,
     comprasDeGasto,
     salidasSinVenta,
+    ivaView,
+    salesIvaRate,
     costoDeVentas,
     costoPotencial,
     variacion,

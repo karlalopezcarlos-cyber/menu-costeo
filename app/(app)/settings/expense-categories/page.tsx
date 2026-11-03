@@ -3,10 +3,12 @@ import { requireOrgSession } from "@/lib/tenant";
 import { formatMoney } from "@/lib/format";
 import SettingsNav from "../SettingsNav";
 import InlineNameEditor from "../InlineNameEditor";
+import IvaRateInput from "../IvaRateInput";
 import {
   createExpenseCategory,
   deleteExpenseCategory,
   renameExpenseCategory,
+  setExpenseCategoryIvaRate,
 } from "./actions";
 
 export default async function ExpenseCategoriesPage() {
@@ -26,7 +28,8 @@ export default async function ExpenseCategoriesPage() {
         <p className="mt-3 text-sm text-neutral-500">
           Como se clasifican los gastos de operacion: renta, servicios, nomina, mantenimiento.
           Son los que se usan al registrar un gasto, y con ellos se puede ver en que se va el
-          dinero que no es insumo.
+          dinero que no es insumo. El IVA de cada tipo es el que se le quita al gasto para
+          leerlo neto en el Estado de Resultados: la renta y la luz lo traen, la nomina no.
         </p>
       </div>
 
@@ -50,6 +53,7 @@ export default async function ExpenseCategoriesPage() {
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Tipo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">IVA</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Gastos</th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Acumulado
@@ -60,7 +64,7 @@ export default async function ExpenseCategoriesPage() {
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
                   Todavia no hay tipos de gasto.
                 </td>
               </tr>
@@ -72,6 +76,13 @@ export default async function ExpenseCategoriesPage() {
                     id={category.id}
                     initialName={category.name}
                     action={renameExpenseCategory}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <IvaRateInput
+                    id={category.id}
+                    initialValue={category.ivaRate.toString()}
+                    action={setExpenseCategoryIvaRate}
                   />
                 </td>
                 <td className="px-4 py-3 text-neutral-500">{category._count.expenses}</td>
@@ -98,6 +109,8 @@ export default async function ExpenseCategoriesPage() {
 
       <p className="text-xs text-neutral-500">
         Borrar un tipo no borra sus gastos: quedan sin tipo y se siguen sumando al total.
+        Cambiar el IVA de un tipo tampoco toca los gastos ya capturados: cada uno se quedo con
+        la tasa que tenia el dia que se registro.
       </p>
     </div>
   );

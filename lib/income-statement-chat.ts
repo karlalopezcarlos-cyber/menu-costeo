@@ -36,6 +36,13 @@ export function buildIncomeStatementContext(
   lines.push(`Sucursal: ${result.sucursalName} (${result.organizationName})`);
   lines.push(`Grupos de costo: ${result.groups.map((g) => g.name).join(", ") || "sin grupos configurados"}`);
   lines.push(`Periodo: ${result.initialDateLabel} al ${result.finalDateLabel} (${result.diasActivos} dias con venta registrada)`);
+  // Sin esto la IA explica porcentajes sin saber con que regla se midieron, y los dos reportes
+  // se ven identicos.
+  lines.push(
+    result.ivaView === "conIva"
+      ? `Vista: VENTAS Y GASTOS CON IVA (${result.salesIvaRate}% en ventas). Los costos siempre son netos, asi que los porcentajes de costo salen mas bajos que los reales. Si te preguntan por el costo de ventas real, avisa que hay que leer el reporte sin IVA.`
+      : `Vista: TODO SIN IVA. A las ventas de carta se les quito el ${result.salesIvaRate}% y a cada gasto su propia tasa, para medirlos con la misma regla que el costo. Es la vista correcta para hablar de porcentajes de costo.`,
+  );
   lines.push("");
   lines.push("Cada renglon muestra el monto y, cuando aplica, un porcentaje entre parentesis:");
   lines.push("- Para Ventas netas PV, Salidas a otra sucursal y Venta total, el % es la participacion de esa columna dentro del Consolidado.");

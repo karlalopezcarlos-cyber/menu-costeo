@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeIncomeStatement, buildIncomeStatementRows } from "@/lib/income-statement";
+import { computeIncomeStatement, buildIncomeStatementRows, type IvaView } from "@/lib/income-statement";
 import { buildIncomeStatementPdf } from "@/lib/pdf/export-income-statement";
 
 export async function GET(request: NextRequest) {
@@ -13,7 +13,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Faltan las fechas del periodo." }, { status: 400 });
   }
 
-  const result = await computeIncomeStatement(user.organizationId, user.sucursalId, initialCountId, finalCountId);
+  // La misma vista que se eligio en pantalla: un PDF que dice otra cosa que la tabla de la
+  // que salio es peor que no tenerlo.
+  const ivaView: IvaView = request.nextUrl.searchParams.get("iva") === "con" ? "conIva" : "sinIva";
+
+  const result = await computeIncomeStatement(
+    user.organizationId,
+    user.sucursalId,
+    initialCountId,
+    finalCountId,
+    ivaView,
+  );
   const rows = buildIncomeStatementRows(result);
   const buffer = await buildIncomeStatementPdf(result, rows);
 
