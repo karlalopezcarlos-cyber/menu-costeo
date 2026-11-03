@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useActionState, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Decimal from "decimal.js";
 import {
@@ -60,9 +60,20 @@ type Row = {
   presentationChoiceId: string;
   /** Solo UI: cuantas piezas de la presentacion elegida. */
   presentationPieceCount: string;
+  /**
+   * Tasa de IVA tecleada para ESTA compra, o null para usar la del producto.
+   *
+   * Se guarda como "lo que el usuario cambio" y no como la tasa final para que cambiar de
+   * producto vuelva a traer la del catalogo sola: si guardaramos el numero, el 16 de un
+   * producto se quedaria pegado en el renglon al elegir otro que va en 0.
+   */
+  ivaRateOverride: string | null;
+  /** Lo mismo para el IEPS. */
+  iepsRateOverride: string | null;
 };
 
-const GRID_COLS = "grid-cols-[1.5rem_minmax(0,2.2fr)_7rem_5rem_6rem_minmax(0,1.8fr)_1.5rem]";
+const GRID_COLS =
+  "grid-cols-[1.5rem_minmax(0,2.2fr)_7rem_5rem_6rem_5.5rem_minmax(0,1.8fr)_1.5rem]";
 
 /** Si el texto es de un solo tramo tipo "1 COSTAL 25 KG" (no compuesto con " + "), separa el
  * numero de piezas del nombre de la presentacion para intentar matchearlo contra el catalogo. */
@@ -87,6 +98,8 @@ function emptyRow(key: string): Row {
     pieceCount: "",
     presentationChoiceId: "",
     presentationPieceCount: "",
+    ivaRateOverride: null,
+    iepsRateOverride: null,
   };
 }
 
@@ -214,6 +227,9 @@ export default function PurchaseForm({
       pieceCount: "",
       presentationChoiceId: "",
       presentationPieceCount: "",
+      // Las tasas vuelven a las del producto nuevo: lo tecleado era para el producto anterior.
+      ivaRateOverride: null,
+      iepsRateOverride: null,
     });
   }
 
@@ -285,23 +301,32 @@ export default function PurchaseForm({
     }
   }
 
-  // El impuesto se calcula renglon por renglon con las tasas de cada producto: una compra
-  // normal mezcla cosas en 0% y cosas en 16%, y una tasa sola sobre el total seria inventada.
+  /** La tasa que de verdad se va a usar: la tecleada en el renglon, o la del producto. */
+  const ratesFor = useCallback(
+    (row: Row) => {
+      const product = productById.get(row.productId);
+      return {
+        ivaRate: row.ivaRateOverride ?? product?.ivaRate ?? "0",
+        iepsRate: row.iepsRateOverride ?? product?.iepsRate ?? "0",
+      };
+    },
+    [productById],
+  );
+
+  // El impuesto se calcula renglon por renglon: una compra normal mezcla cosas en 0% y cosas
+  // en 16%, y una tasa sola sobre el total seria inventada.
   const totales = useMemo(
     () =>
       sumTaxes(
         rows.map((row) => {
-          const product = productById.get(row.productId);
+          const rates = ratesFor(row);
           return {
             subtotal: Number(row.totalPrice) || 0,
-            rates: {
-              ivaRate: Number(product?.ivaRate ?? 0),
-              iepsRate: Number(product?.iepsRate ?? 0),
-            },
+            rates: { ivaRate: Number(rates.ivaRate), iepsRate: Number(rates.iepsRate) },
           };
         }),
       ),
-    [rows, productById],
+    [rows, ratesFor],
   );
 
   const hasYieldAdjustedRow = rows.some((row) => {
@@ -318,9 +343,12 @@ export default function PurchaseForm({
           presentationQty: row.presentationQty,
           presentationUnit: row.presentationUnit,
           totalPrice: row.totalPrice,
+          // Se mandan siempre las dos, tecleadas o no: el servidor guarda lo que se vio en
+          // pantalla y no vuelve a consultar el catalogo, que para entonces pudo cambiar.
+          ...ratesFor(row),
         })),
       ),
-    [rows],
+    [rows, ratesFor],
   );
 
   return (
@@ -432,6 +460,7 @@ export default function PurchaseForm({
             <span>Cantidad</span>
             <span>Unidad</span>
             <span>Total</span>
+            <span>Impuesto</span>
             <span>Costo resultante</span>
             <span></span>
           </div>
@@ -573,6 +602,41 @@ export default function PurchaseForm({
                     placeholder="30"
                     className="w-full rounded-md border border-neutral-200 py-2 pl-5 pr-2 text-sm font-medium"
                   />
+                </div>
+
+                {/* La tasa se puede corregir aqui mismo: viene del producto, pero una factura
+                    puede traer otra cosa y no hay por que irse a editar el catalogo. */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="100"
+                      value={ratesFor(row).ivaRate}
+                      onChange={(e) => updateRow(row.key, { ivaRateOverride: e.target.value })}
+                      className="w-full rounded-md border border-neutral-200 px-1.5 py-2 text-right text-sm tabular-nums"
+                      title="IVA de este renglon, en por ciento"
+                    />
+                    <span className="text-xs text-neutral-400">%</span>
+                  </label>
+                  {/* Se muestra si el producto lo causa o si ya se toco el campo: medirlo con
+                      el valor actual hacia que el renglon desapareciera al borrar el numero. */}
+                  {(row.iepsRateOverride !== null ||
+                    Number(productById.get(row.productId)?.iepsRate ?? 0) > 0) && (
+                    <label className="flex items-center gap-1" title="IEPS de este renglon, en por ciento">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        max="100"
+                        value={ratesFor(row).iepsRate}
+                        onChange={(e) => updateRow(row.key, { iepsRateOverride: e.target.value })}
+                        className="w-full rounded-md border border-neutral-200 px-1.5 py-1 text-right text-xs tabular-nums text-neutral-600"
+                      />
+                      <span className="text-[10px] text-neutral-400">IEPS</span>
+                    </label>
+                  )}
                 </div>
 
                 <div className="text-sm leading-tight">{costCell}</div>

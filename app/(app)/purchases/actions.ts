@@ -23,7 +23,32 @@ type PurchaseRowInput = {
   presentationQty: string;
   presentationUnit: string;
   totalPrice: string;
+  /** Tasas tal como se vieron en pantalla. Se pueden corregir renglon por renglon. */
+  ivaRate?: string;
+  iepsRate?: string;
 };
+
+/**
+ * La tasa del renglon, con la del producto como respaldo.
+ *
+ * El formulario manda siempre las dos, pero una compra guardada por otra via (o un payload
+ * viejo en una pestana que lleva rato abierta) puede no traerlas, y en ese caso vale mas la
+ * del catalogo que un cero inventado.
+ */
+function parseRowTaxRate(
+  value: string | undefined,
+  fallback: { toString(): string },
+  label: string,
+): string {
+  // Ausente y vacio no son lo mismo. Ausente es un payload que no trae el campo y ahi vale
+  // mas el catalogo; vacio es que alguien borro el numero en pantalla, y eso quiere decir
+  // que ese renglon no causa el impuesto.
+  if (value === undefined) return fallback.toString();
+  if (String(value).trim() === "") return "0";
+  const rate = new Decimal(String(value));
+  if (rate.lt(0) || rate.gt(100)) throw new Error(`La tasa de ${label} debe ir de 0% a 100%.`);
+  return rate.toString();
+}
 
 export async function createPurchase(
   _prevState: { error?: string } | undefined,
@@ -125,10 +150,11 @@ export async function createPurchase(
         presentationUnit,
         totalPrice: totalPrice.toString(),
         computedUnitCost: computedUnitCost.toString(),
-        // Las tasas se copian del producto AQUI y no se vuelven a leer: corregir manana la
-        // tasa de un producto no puede cambiar lo que decia esta factura.
-        ivaRate: product.ivaRate.toString(),
-        iepsRate: product.iepsRate.toString(),
+        // Lo que se vio en pantalla, no lo que diga el catalogo manana: corregir despues la
+        // tasa de un producto no puede cambiar lo que decia esta factura. Y si se corrigio el
+        // renglon al capturar, manda esa, porque la factura es la factura.
+        ivaRate: parseRowTaxRate(row.ivaRate, product.ivaRate, "IVA"),
+        iepsRate: parseRowTaxRate(row.iepsRate, product.iepsRate, "IEPS"),
         supplierId,
         createdByUserId: user.id,
       };
