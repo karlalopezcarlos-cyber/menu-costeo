@@ -86,10 +86,11 @@ function FooterRow({ row, columnas }: { row: IncomeStatementFooterRow; columnas:
     <tr
       className={`border-t border-neutral-100 transition-colors hover:bg-neutral-50 ${
         row.bold ? "font-semibold" : ""
-      } ${row.highlight ? "bg-amber-50" : ""}`}
+      } ${row.highlight ? "bg-amber-50" : ""} ${row.detail ? "text-neutral-500" : ""}`}
     >
-      <td className="px-2 py-2" title={description}>
-        {row.label}
+      {/* El desglose va sangrado y en gris: cuelga del renglon de arriba y no se suma aparte. */}
+      <td className={`py-2 ${row.detail ? "pl-6 pr-2 text-xs" : "px-2"}`} title={description}>
+        {row.detail ? `— ${row.label}` : row.label}
       </td>
       {columnas.map((col, index) => {
         if (col.key !== "consolidado") {
