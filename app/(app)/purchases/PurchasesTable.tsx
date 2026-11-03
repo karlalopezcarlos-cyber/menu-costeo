@@ -49,6 +49,8 @@ export default function PurchasesTable({
   rows,
   supplierOptions,
   categoryOptions,
+  filteredTotal,
+  filteredCount,
   filters,
   isDefaultToday,
   today,
@@ -57,6 +59,10 @@ export default function PurchasesTable({
   rows: PurchaseRow[];
   supplierOptions: string[];
   categoryOptions: CategoryOption[];
+  /** Suma de TODO lo filtrado, calculada en la base: no depende del tope de filas en pantalla. */
+  filteredTotal: number;
+  /** Cuantas compras hay en lo filtrado, tambien de la base. */
+  filteredCount: number;
   filters: PurchaseListFilterValues;
   isDefaultToday: boolean;
   today: string;
@@ -82,6 +88,29 @@ export default function PurchasesTable({
   const [supplierFilter, setSupplierFilter] = useState(filters.supplier);
   const [categoryFilter, setCategoryFilter] = useState(filters.category);
   const [costGroupFilter, setCostGroupFilter] = useState(filters.costGroup);
+
+  // Se guarda lo DESCARTADO y no lo seleccionado: lo normal es querer todo lo filtrado y quitar
+  // dos o tres renglones. Guardado al reves, cada cambio de filtro tendria que volver a marcar
+  // cientos de ids, y los que no alcanzaron a caber en pantalla no se podrian marcar nunca.
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+
+  // Al cambiar el filtro, la seleccion se suelta: conservar descartes de una busqueda anterior
+  // restaria renglones que ya ni se estan viendo. Se ajusta durante el render y no en un efecto
+  // para no pintar primero el total viejo y corregirlo despues.
+  const [rowsVistas, setRowsVistas] = useState(rows);
+  if (rowsVistas !== rows) {
+    setRowsVistas(rows);
+    setExcludedIds(new Set());
+  }
+
+  function toggleRow(id: string) {
+    setExcludedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function navigate(next: Partial<PurchaseListFilterValues>) {
     const merged: PurchaseListFilterValues = {
@@ -166,6 +195,21 @@ export default function PurchasesTable({
   // La tendencia se calcula sobre las filas ya filtradas por el servidor, para que refleje el
   // comportamiento del costo dentro de lo que se esta viendo, sin importar el orden elegido.
   const costTrends = useMemo(() => computeCostTrends(rows), [rows]);
+
+  // Se recorren las filas y no el set: asi un id que quedo de un filtro anterior no resta nada
+  // ni se cuenta, pase lo que pase con el momento en que se suelta la seleccion.
+  const descartado = useMemo(() => {
+    let amount = 0;
+    let count = 0;
+    for (const row of rows) {
+      if (!excludedIds.has(row.id)) continue;
+      amount += row.totalPrice;
+      count += 1;
+    }
+    return { amount, count };
+  }, [rows, excludedIds]);
+  const totalSeleccionado = filteredTotal - descartado.amount;
+  const todosDescartados = rows.length > 0 && descartado.count === rows.length;
 
   const exportHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -357,10 +401,49 @@ export default function PurchasesTable({
           Exportar a Excel
         </a>
       </div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+            Total filtrado
+          </span>
+          <span className="text-xl font-semibold tabular-nums text-neutral-900">
+            {formatMoney(totalSeleccionado)}
+          </span>
+        </div>
+        <p className="text-sm text-neutral-500">
+          {filteredCount - descartado.count} de {filteredCount}{" "}
+          {filteredCount === 1 ? "compra" : "compras"}
+          {descartado.count > 0 && (
+            <span className="text-neutral-400">
+              {" "}
+              · {descartado.count} sin contar (−{formatMoney(descartado.amount)})
+            </span>
+          )}
+          {truncated && (
+            <span className="text-amber-600">
+              {" "}
+              · el total cuenta las {filteredCount}, aunque en pantalla solo caben {rows.length}
+            </span>
+          )}
+        </p>
+      </div>
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label={todosDescartados ? "Contar todo" : "No contar nada"}
+                  title={todosDescartados ? "Contar todo" : "No contar nada"}
+                  checked={!todosDescartados}
+                  disabled={rows.length === 0}
+                  onChange={() =>
+                    setExcludedIds(todosDescartados ? new Set() : new Set(rows.map((r) => r.id)))
+                  }
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+              </th>
               {COLUMNS.slice(0, 4).map((column) => (
                 <th key={column.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
@@ -391,7 +474,7 @@ export default function PurchasesTable({
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
                   {isDefaultToday
                     ? "No se registraron compras hoy."
                     : "Ninguna compra coincide con los filtros."}
@@ -399,7 +482,21 @@ export default function PurchasesTable({
               </tr>
             )}
             {sortedRows.map((purchase) => (
-              <tr key={purchase.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
+              <tr
+                key={purchase.id}
+                className={`border-t border-neutral-100 transition-colors hover:bg-neutral-50 ${
+                  excludedIds.has(purchase.id) ? "text-neutral-400 opacity-60" : ""
+                }`}
+              >
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    aria-label={`Contar ${purchase.productName} en el total`}
+                    checked={!excludedIds.has(purchase.id)}
+                    onChange={() => toggleRow(purchase.id)}
+                    className="h-4 w-4 rounded border-neutral-300"
+                  />
+                </td>
                 <td className="px-4 py-3">
                   {/* El folio de la factura manda: es el que el usuario trae en el papel. El
                       consecutivo del sistema queda abajo, para poder rastrear el registro. */}

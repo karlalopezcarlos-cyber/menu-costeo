@@ -115,12 +115,17 @@ export default async function PurchasesPage({
     effectiveFilters.pendingOnly ? pendingProductIds : null,
   );
 
-  const purchases = await prisma.purchase.findMany({
-    where,
-    orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
-    take: ROW_LIMIT,
-    include: { product: true, supplier: true },
-  });
+  // El total se suma en la base, no sobre las filas que se alcanzaron a traer: con el tope de
+  // 500 renglones un total calculado en pantalla seria menor que lo filtrado y nadie lo notaria.
+  const [purchases, totales] = await Promise.all([
+    prisma.purchase.findMany({
+      where,
+      orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
+      take: ROW_LIMIT,
+      include: { product: true, supplier: true },
+    }),
+    prisma.purchase.aggregate({ where, _sum: { totalPrice: true }, _count: { _all: true } }),
+  ]);
 
   const rows: PurchaseRow[] = purchases.map((purchase) =>
     toPurchaseRow(purchase, pendingIdSet.has(purchase.productId)),
@@ -132,6 +137,8 @@ export default async function PurchasesPage({
         rows={rows}
         supplierOptions={supplierOptions}
         categoryOptions={categoryOptions}
+        filteredTotal={Number(totales._sum.totalPrice ?? 0)}
+        filteredCount={totales._count._all}
         filters={filters}
         isDefaultToday={isDefaultToday}
         today={today}
