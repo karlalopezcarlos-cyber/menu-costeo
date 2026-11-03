@@ -9,7 +9,7 @@ import DailySalesTable, { type DailySalesInput } from "./DailySalesTable";
 import SalesLogTable, { type SaleLogRow } from "./SalesLogTable";
 import DeletedDaysPanel, { type DeletedDay } from "./DeletedDaysPanel";
 import PeriodFilter from "./PeriodFilter";
-import type { IvaMode } from "@/lib/menu-engineering";
+import { loadSalesIvaRate, type IvaMode } from "@/lib/menu-engineering";
 
 function toDateInputValue(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -28,6 +28,7 @@ export default async function SalesPage({
 }) {
   const params = await searchParams;
   const user = await requireSucursalContext();
+  const salesIvaRate = await loadSalesIvaRate(user.sucursalId);
 
   const vistaDiaria = params.vista === "dia";
   // Llega con ?cargado=<lote> justo despues de terminar una importacion: ahi se dice que entro.
@@ -431,7 +432,7 @@ export default async function SalesPage({
           <SalesLogTable rows={bitacoraRows} />
         </div>
       ) : vistaDiaria ? (
-        <DailySalesTable days={dias} iva={ivaMode} />
+        <DailySalesTable days={dias} iva={ivaMode} ivaRate={salesIvaRate} />
       ) : (
         <>
           {recipes.length === 0 && (

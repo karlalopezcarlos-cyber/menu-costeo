@@ -1,6 +1,5 @@
 import { formatMoney } from "@/lib/format";
 import DeleteDayButton from "./DeleteDayButton";
-import { IVA_RATE } from "@/lib/menu-engineering";
 import type { IvaMode } from "@/lib/menu-engineering";
 
 export type DailySalesInput = {
@@ -24,11 +23,14 @@ export type DailySalesInput = {
 export default function DailySalesTable({
   days,
   iva,
+  ivaRate,
 }: {
   days: DailySalesInput[];
   iva: IvaMode;
+  /** La tasa configurada en Configuracion > Impuestos, en por ciento. */
+  ivaRate: number;
 }) {
-  const factor = iva === "sin" ? 1 / (1 + IVA_RATE) : 1;
+  const factor = iva === "sin" ? 1 / (1 + ivaRate / 100) : 1;
 
   const totalPeriodo = days.reduce((sum, d) => sum + d.grossTotal, 0) * factor;
   const unidades = days.reduce((sum, d) => sum + d.quantity, 0);
@@ -149,7 +151,7 @@ export default function DailySalesTable({
       {iva === "sin" && (
         <p className="text-xs text-neutral-500">
           Los precios se capturan como precio de menu, con IVA incluido. &quot;Sin IVA&quot; le
-          quita el {Math.round(IVA_RATE * 100)}% a lo capturado (total ÷ {1 + IVA_RATE}).
+          quita el {ivaRate}% a lo capturado (total entre {1 + ivaRate / 100}).
         </p>
       )}
     </div>

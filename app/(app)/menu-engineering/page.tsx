@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeMenuEngineeringReport, type IvaMode } from "@/lib/menu-engineering";
+import { computeMenuEngineeringReport, loadSalesIvaRate, type IvaMode } from "@/lib/menu-engineering";
 import MenuEngineeringTable, { type MenuEngineeringRowView } from "./MenuEngineeringTable";
 import MenuEngineeringChatDialog from "./MenuEngineeringChatDialog";
 
@@ -24,7 +24,10 @@ export default async function MenuEngineeringPage({
   const toDate = params.to ? new Date(`${params.to}T00:00:00Z`) : defaultTo;
   const ivaMode: IvaMode = params.iva === "sin" ? "sin" : "con";
 
-  const rows = await computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode);
+  const [rows, salesIvaRate] = await Promise.all([
+    computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode),
+    loadSalesIvaRate(user.sucursalId),
+  ]);
   const rowViews: MenuEngineeringRowView[] = rows.map((row) => ({
     recipeId: row.recipeId,
     recipeName: row.recipeName,
@@ -118,8 +121,9 @@ export default async function MenuEngineeringPage({
 
       {ivaMode === "sin" && (
         <p className="text-xs text-neutral-500">
-          El precio de venta se divide entre 1.16 (se le quita el IVA incluido) antes de calcular margen,
-          costo % y clasificacion.
+          El precio de venta se divide entre {1 + salesIvaRate / 100} (se le quita el{" "}
+          {salesIvaRate}% de IVA incluido) antes de calcular margen, costo % y clasificacion. La
+          tasa sale de Configuracion &gt; Impuestos, la misma que usa el Estado de Resultados.
         </p>
       )}
 

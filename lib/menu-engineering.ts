@@ -12,8 +12,20 @@ export const CLASSIFICATION_LABELS: Record<MenuEngineeringClassification, string
   DOG: "Perro",
 };
 
-/** Tasa de IVA. El precio de venta ya incluye IVA; la base sin IVA es precio / (1 + IVA_RATE). */
-export const IVA_RATE = 0.16;
+/**
+ * La tasa de IVA de ventas de la organizacion dueña de esta sucursal, en por ciento.
+ *
+ * Estaba escrita a mano como 0.16 aqui y en la tabla de ventas. Desde que la tasa es
+ * configurable (Configuracion > Impuestos) eso significaba que cambiarla movia el Estado de
+ * Resultados y dejaba a Ingenieria de menu diciendo otra cosa, sin que nada avisara.
+ */
+export async function loadSalesIvaRate(sucursalId: string): Promise<number> {
+  const sucursal = await prisma.sucursal.findFirstOrThrow({
+    where: { id: sucursalId },
+    select: { organization: { select: { salesIvaRate: true } } },
+  });
+  return Number(sucursal.organization.salesIvaRate);
+}
 
 export type MenuEngineeringRow = {
   recipeId: string;
@@ -38,6 +50,7 @@ export async function computeMenuEngineeringReport(
   toDate: Date,
   ivaMode: IvaMode = "con",
 ): Promise<MenuEngineeringRow[]> {
+  const ivaRate = ivaMode === "sin" ? await loadSalesIvaRate(sucursalId) : 0;
   const sales = await prisma.dailySale.findMany({
     where: { sucursalId, date: { gte: fromDate, lte: toDate } },
     include: { recipe: true },
@@ -80,7 +93,8 @@ export async function computeMenuEngineeringReport(
 
     const quantitySold = agg.quantitySold;
     const grossUnitPrice = quantitySold.isZero() ? new Decimal(0) : agg.weightedPriceSum.dividedBy(quantitySold);
-    const unitPrice = ivaMode === "sin" ? grossUnitPrice.dividedBy(1 + IVA_RATE) : grossUnitPrice;
+    const unitPrice =
+      ivaMode === "sin" ? grossUnitPrice.dividedBy(1 + ivaRate / 100) : grossUnitPrice;
     const margin = unitPrice.minus(cost);
     const costPct = unitPrice.isZero() ? null : cost.dividedBy(unitPrice).times(100);
     const popularity = totalQty.isZero() ? new Decimal(0) : quantitySold.dividedBy(totalQty);

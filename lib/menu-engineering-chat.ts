@@ -12,6 +12,8 @@ export type MenuEngineeringChatMeta = {
   fromLabel: string;
   toLabel: string;
   ivaMode: IvaMode;
+  /** La tasa configurada en Configuracion > Impuestos, en por ciento. */
+  ivaRate: number;
 };
 
 function rowLine(row: MenuEngineeringRow): string {
@@ -32,7 +34,7 @@ export function buildMenuEngineeringContext(rows: MenuEngineeringRow[], meta: Me
   lines.push(`Periodo: ${meta.fromLabel} al ${meta.toLabel}`);
   lines.push(
     meta.ivaMode === "sin"
-      ? "Precios analizados SIN IVA (ya se le quito el 16% incluido)."
+      ? `Precios analizados SIN IVA (ya se le quito el ${meta.ivaRate}% incluido).`
       : "Precios analizados CON IVA incluido.",
   );
   lines.push("");

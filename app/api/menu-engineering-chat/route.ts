@@ -61,7 +61,10 @@ export async function POST(request: NextRequest) {
     computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode),
     prisma.sucursal.findUnique({
       where: { id: user.sucursalId },
-      select: { name: true, organization: { select: { name: true } } },
+      select: {
+        name: true,
+        organization: { select: { name: true, salesIvaRate: true } },
+      },
     }),
   ]);
 
@@ -78,6 +81,7 @@ export async function POST(request: NextRequest) {
     fromLabel: fromDate.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     toLabel: toDate.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     ivaMode,
+    ivaRate: Number(sucursal?.organization.salesIvaRate ?? 0),
   });
   const systemPrompt = MENU_ENGINEERING_CHAT_SYSTEM_PROMPT(context);
 
