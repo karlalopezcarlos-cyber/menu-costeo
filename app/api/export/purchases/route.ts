@@ -31,8 +31,10 @@ export async function GET(request: NextRequest) {
   const sortDir: SortDir = params.get("sortDir") === "asc" ? "asc" : "desc";
   const pendingOnly = params.get("pendingOnly") === "1";
   const supplier = params.get("supplier") ?? "";
+  const category = params.get("category") ?? "";
+  const costGroup = params.get("costGroup") ?? "";
 
-  const filters = { search, folio, dateFrom, dateTo, pendingOnly, supplier };
+  const filters = { search, folio, dateFrom, dateTo, pendingOnly, supplier, category, costGroup };
   const pendingProductIds = pendingOnly ? await resolvePendingProductIds(user.sucursalId) : null;
   const where = buildPurchaseWhere(user.sucursalId, filters, pendingProductIds);
 

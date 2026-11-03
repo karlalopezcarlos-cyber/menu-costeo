@@ -12,6 +12,7 @@ import {
   type SortDir,
 } from "./purchase-rows";
 import { formatMoney } from "@/lib/format";
+import { SIN_ASIGNAR } from "@/lib/purchases/filters";
 
 const TREND_STYLE: Record<CostTrend, { dot: string; title: string }> = {
   up: { dot: "bg-red-500", title: "Por encima del promedio de este producto en lo filtrado" },
@@ -28,7 +29,11 @@ export type PurchaseListFilterValues = {
   dateTo: string;
   pendingOnly: boolean;
   supplier: string;
+  category: string;
+  costGroup: string;
 };
+
+export type CategoryOption = { name: string; groupName: string | null };
 
 const COLUMNS: { key: PurchaseSortKey; label: string }[] = [
   { key: "folio", label: "Factura" },
@@ -43,6 +48,7 @@ const COLUMNS: { key: PurchaseSortKey; label: string }[] = [
 export default function PurchasesTable({
   rows,
   supplierOptions,
+  categoryOptions,
   filters,
   isDefaultToday,
   today,
@@ -50,6 +56,7 @@ export default function PurchasesTable({
 }: {
   rows: PurchaseRow[];
   supplierOptions: string[];
+  categoryOptions: CategoryOption[];
   filters: PurchaseListFilterValues;
   isDefaultToday: boolean;
   today: string;
@@ -73,6 +80,8 @@ export default function PurchasesTable({
   const [dateTo, setDateTo] = useState(isDefaultToday ? today : filters.dateTo);
   const [pendingOnly, setPendingOnly] = useState(filters.pendingOnly);
   const [supplierFilter, setSupplierFilter] = useState(filters.supplier);
+  const [categoryFilter, setCategoryFilter] = useState(filters.category);
+  const [costGroupFilter, setCostGroupFilter] = useState(filters.costGroup);
 
   function navigate(next: Partial<PurchaseListFilterValues>) {
     const merged: PurchaseListFilterValues = {
@@ -82,6 +91,8 @@ export default function PurchasesTable({
       dateTo: next.dateTo ?? dateTo,
       pendingOnly: next.pendingOnly ?? pendingOnly,
       supplier: next.supplier ?? supplierFilter,
+      category: next.category ?? categoryFilter,
+      costGroup: next.costGroup ?? costGroupFilter,
     };
     const params = new URLSearchParams();
     if (merged.search.trim()) params.set("q", merged.search.trim());
@@ -90,6 +101,8 @@ export default function PurchasesTable({
     if (merged.dateTo) params.set("to", merged.dateTo);
     if (merged.pendingOnly) params.set("pendingOnly", "1");
     if (merged.supplier) params.set("supplier", merged.supplier);
+    if (merged.category) params.set("category", merged.category);
+    if (merged.costGroup) params.set("costGroup", merged.costGroup);
     // Una vez que el usuario toca cualquier filtro, ya no se vuelve a aplicar el default de "hoy":
     // si limpia las fechas, se queda viendo todo el historial en vez de regresar a hoy.
     params.set("touched", "1");
@@ -131,6 +144,25 @@ export default function PurchasesTable({
 
   const sortedRows = useMemo(() => sortPurchaseRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
 
+  const groupOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const option of categoryOptions) if (option.groupName) names.add(option.groupName);
+    return [...names].sort((a, b) => a.localeCompare(b, "es"));
+  }, [categoryOptions]);
+
+  const hayCategoriaSinGrupo = useMemo(
+    () => categoryOptions.some((option) => option.groupName === null),
+    [categoryOptions],
+  );
+
+  // Con un grupo elegido, el selector de categoria solo ofrece las de ese grupo: la lista
+  // completa deja elegir combinaciones que no pueden dar ninguna compra.
+  const visibleCategories = useMemo(() => {
+    if (!costGroupFilter) return categoryOptions;
+    if (costGroupFilter === SIN_ASIGNAR) return categoryOptions.filter((o) => o.groupName === null);
+    return categoryOptions.filter((o) => o.groupName === costGroupFilter);
+  }, [categoryOptions, costGroupFilter]);
+
   // La tendencia se calcula sobre las filas ya filtradas por el servidor, para que refleje el
   // comportamiento del costo dentro de lo que se esta viendo, sin importar el orden elegido.
   const costTrends = useMemo(() => computeCostTrends(rows), [rows]);
@@ -143,10 +175,23 @@ export default function PurchasesTable({
     if (dateTo) params.set("to", dateTo);
     if (pendingOnly) params.set("pendingOnly", "1");
     if (supplierFilter) params.set("supplier", supplierFilter);
+    if (categoryFilter) params.set("category", categoryFilter);
+    if (costGroupFilter) params.set("costGroup", costGroupFilter);
     params.set("sortKey", sortKey);
     params.set("sortDir", sortDir);
     return `/api/export/purchases?${params.toString()}`;
-  }, [searchInput, folioInput, dateFrom, dateTo, pendingOnly, supplierFilter, sortKey, sortDir]);
+  }, [
+    searchInput,
+    folioInput,
+    dateFrom,
+    dateTo,
+    pendingOnly,
+    supplierFilter,
+    categoryFilter,
+    costGroupFilter,
+    sortKey,
+    sortDir,
+  ]);
 
   return (
     <div className="space-y-3">
@@ -214,6 +259,64 @@ export default function PurchasesTable({
             Limpiar fechas
           </button>
         )}
+        <div className="space-y-1">
+          <label htmlFor="costGroupFilter" className="text-xs font-medium text-neutral-500">
+            Grupo
+          </label>
+          <select
+            id="costGroupFilter"
+            value={costGroupFilter}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCostGroupFilter(value);
+              // Si la categoria elegida no pertenece al grupo nuevo, se suelta: dejarla puesta
+              // mostraria la lista vacia sin que se vea por que.
+              const sigueValiendo =
+                !categoryFilter ||
+                categoryFilter === SIN_ASIGNAR ||
+                !value ||
+                categoryOptions.some(
+                  (o) =>
+                    o.name === categoryFilter &&
+                    (value === SIN_ASIGNAR ? o.groupName === null : o.groupName === value),
+                );
+              const category = sigueValiendo ? categoryFilter : "";
+              if (!sigueValiendo) setCategoryFilter("");
+              navigate({ costGroup: value, category });
+            }}
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          >
+            <option value="">Todos los grupos</option>
+            {groupOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+            {hayCategoriaSinGrupo && <option value={SIN_ASIGNAR}>Sin grupo</option>}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="categoryFilter" className="text-xs font-medium text-neutral-500">
+            Categoria
+          </label>
+          <select
+            id="categoryFilter"
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              navigate({ category: e.target.value });
+            }}
+            className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          >
+            <option value="">Todas las categorias</option>
+            {visibleCategories.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.name}
+              </option>
+            ))}
+            <option value={SIN_ASIGNAR}>Sin categoria</option>
+          </select>
+        </div>
         <div className="space-y-1">
           <label htmlFor="supplierFilter" className="text-xs font-medium text-neutral-500">
             Proveedor

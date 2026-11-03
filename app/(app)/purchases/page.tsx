@@ -35,6 +35,8 @@ export default async function PurchasesPage({
     dateTo: readParam(raw.to),
     pendingOnly: readParam(raw.pendingOnly) === "1",
     supplier: readParam(raw.supplier),
+    category: readParam(raw.category),
+    costGroup: readParam(raw.costGroup),
   };
   const touched = readParam(raw.touched) === "1";
 
@@ -51,6 +53,19 @@ export default async function PurchasesPage({
     select: { name: true },
   });
   const supplierOptions = suppliersForFilter.map((s) => s.name);
+
+  // El catalogo completo, no solo las categorias que aparecen en lo que ya se trajo: si las
+  // opciones se recortaran a lo visible, con el filtro de "hoy" puesto el selector saldria casi
+  // vacio y no se podria elegir una categoria que no se compro hoy.
+  const categoriesForFilter = await prisma.productCategory.findMany({
+    where: { organizationId: user.organizationId },
+    orderBy: { name: "asc" },
+    select: { name: true, costGroup: { select: { name: true } } },
+  });
+  const categoryOptions = categoriesForFilter.map((c) => ({
+    name: c.name,
+    groupName: c.costGroup?.name ?? null,
+  }));
 
   if (tab === "facturas") {
     // Aqui el periodo por omision es el mes en curso, no el dia: la pregunta de esta pestana es
@@ -116,6 +131,7 @@ export default async function PurchasesPage({
       <PurchasesTable
         rows={rows}
         supplierOptions={supplierOptions}
+        categoryOptions={categoryOptions}
         filters={filters}
         isDefaultToday={isDefaultToday}
         today={today}

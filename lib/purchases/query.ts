@@ -1,26 +1,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parsePurchaseFolio } from "./folio";
+import { SIN_ASIGNAR, type PurchaseListFilters } from "./filters";
 
-export type PurchaseListFilters = {
-  search: string;
-  folio: string;
-  dateFrom: string;
-  dateTo: string;
-  pendingOnly: boolean;
-  supplier: string;
-};
-
-export function hasAnyPurchaseFilter(filters: PurchaseListFilters): boolean {
-  return Boolean(
-    filters.search.trim() ||
-      filters.folio.trim() ||
-      filters.dateFrom ||
-      filters.dateTo ||
-      filters.pendingOnly ||
-      filters.supplier,
-  );
-}
+export type { PurchaseListFilters } from "./filters";
+export { SIN_ASIGNAR, hasAnyPurchaseFilter } from "./filters";
 
 export { todayDateInputValue } from "@/lib/date-inputs";
 
@@ -67,6 +51,26 @@ export function buildPurchaseWhere(
   if (filters.supplier) {
     where.supplier = { name: filters.supplier };
   }
+
+  // Categoria y grupo de costo cuelgan los dos del producto, asi que se arman en un solo filtro
+  // de producto: escribir where.product dos veces dejaria solo el ultimo y el otro filtro se
+  // perderia en silencio.
+  const productWhere: Prisma.ProductWhereInput = {};
+  const categoryWhere: Prisma.ProductCategoryWhereInput = {};
+
+  if (filters.category === SIN_ASIGNAR) productWhere.categoryId = null;
+  else if (filters.category) categoryWhere.name = filters.category;
+
+  if (filters.costGroup === SIN_ASIGNAR) {
+    // Sin grupo son dos casos y los dos cuentan: el producto que no tiene categoria, y el que la
+    // tiene pero esa categoria no esta colgada de ningun grupo de costo.
+    productWhere.OR = [{ categoryId: null }, { category: { costGroupId: null } }];
+  } else if (filters.costGroup) {
+    categoryWhere.costGroup = { name: filters.costGroup };
+  }
+
+  if (Object.keys(categoryWhere).length > 0) productWhere.category = categoryWhere;
+  if (Object.keys(productWhere).length > 0) where.product = productWhere;
 
   if (pendingProductIds) {
     where.productId = { in: pendingProductIds };
