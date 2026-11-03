@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import { formatMoney } from "@/lib/format";
+import { computeTaxes, type TaxBreakdown } from "@/lib/taxes";
 
 export type PurchaseRow = {
   id: string;
@@ -19,7 +20,13 @@ export type PurchaseRow = {
   quantityValue: number;
   unitLabel: string;
   supplierName: string | null;
+  /** Siempre sin impuesto: es lo que cuesta y lo que entra al costeo. */
   totalPrice: number;
+  /** Tasas congeladas al capturar la compra, en por ciento. */
+  ivaRate: number;
+  iepsRate: number;
+  /** El subtotal, el IEPS, el IVA y lo que se le paga al proveedor. */
+  taxes: TaxBreakdown;
   unitCostLabel: string;
   unitCostValue: number;
   note: string | null;
@@ -52,6 +59,8 @@ type PurchaseWithRelations = {
   presentationUnit: string;
   totalPrice: Decimal;
   computedUnitCost: Decimal;
+  ivaRate: Decimal;
+  iepsRate: Decimal;
   note: string | null;
   invoiceFolio: string | null;
   product: { name: string; baseUnit: string };
@@ -67,6 +76,8 @@ export function toPurchaseRow(purchase: PurchaseWithRelations, hasPendingOrder: 
     quantityInBase = new Decimal(purchase.presentationQty);
   }
   const quantityValue = quantityInBase.toNumber();
+  const ivaRate = Number(purchase.ivaRate);
+  const iepsRate = Number(purchase.iepsRate);
 
   return {
     id: purchase.id,
@@ -83,6 +94,9 @@ export function toPurchaseRow(purchase: PurchaseWithRelations, hasPendingOrder: 
     unitLabel: UNIT_LABELS[baseUnit],
     supplierName: purchase.supplier?.name ?? null,
     totalPrice: Number(purchase.totalPrice),
+    ivaRate,
+    iepsRate,
+    taxes: computeTaxes(purchase.totalPrice, { ivaRate, iepsRate }),
     unitCostLabel: `${formatMoney(Number(purchase.computedUnitCost), 4)} / ${UNIT_LABELS[baseUnit]}`,
     unitCostValue: Number(purchase.computedUnitCost),
     note: purchase.note,

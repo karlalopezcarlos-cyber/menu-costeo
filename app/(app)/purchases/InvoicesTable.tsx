@@ -6,12 +6,14 @@ import { useEffect, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/format";
 import { deletePurchaseGroupFromList } from "./[folio]/actions";
 import type { InvoiceFilters, InvoiceRow, SupplierTotal } from "@/lib/purchases/invoices";
+import type { TaxBreakdown } from "@/lib/taxes";
 
 export default function InvoicesTable({
   rows,
   bySupplier,
   invoiceCount,
   total,
+  taxes,
   supplierOptions,
   filters,
   isDefaultMonth,
@@ -22,6 +24,8 @@ export default function InvoicesTable({
   bySupplier: SupplierTotal[];
   invoiceCount: number;
   total: number;
+  /** Subtotal, IEPS, IVA y lo que hay que pagar, de todo lo filtrado. */
+  taxes: TaxBreakdown;
   supplierOptions: string[];
   filters: InvoiceFilters;
   isDefaultMonth: boolean;
@@ -197,7 +201,20 @@ export default function InvoicesTable({
           <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-neutral-900">
             {formatMoney(total)}
           </p>
-          <p className="mt-1 text-xs text-neutral-500">Suma de todas las facturas</p>
+          {/* El numero grande es el subtotal, que es el costo. Lo que se le paga al proveedor
+              va abajo y solo cuando hay impuesto de por medio. */}
+          {taxes.total !== total ? (
+            <p className="mt-1 text-xs text-neutral-500">
+              Subtotal sin impuesto
+              {taxes.ieps !== 0 && <> · IEPS {formatMoney(taxes.ieps)}</>} · IVA{" "}
+              {formatMoney(taxes.iva)} ·{" "}
+              <span className="font-medium text-neutral-700">
+                a pagar {formatMoney(taxes.total)}
+              </span>
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-neutral-500">Suma de todas las facturas</p>
+          )}
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
@@ -221,14 +238,17 @@ export default function InvoicesTable({
                 Facturas
               </th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Total
+                Subtotal
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                A pagar
               </th>
             </tr>
           </thead>
           <tbody>
             {bySupplier.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-neutral-400">
                   No hay compras en el periodo.
                 </td>
               </tr>
@@ -239,8 +259,14 @@ export default function InvoicesTable({
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-500">
                   {supplier.invoiceCount}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums font-medium">
+                <td className="px-4 py-3 text-right tabular-nums text-neutral-500">
                   {formatMoney(supplier.total)}
+                </td>
+                <td
+                  className="px-4 py-3 text-right tabular-nums font-medium"
+                  title="Subtotal mas IEPS mas IVA: lo que dice la factura."
+                >
+                  {formatMoney(supplier.totalConImpuestos)}
                 </td>
               </tr>
             ))}
@@ -259,7 +285,13 @@ export default function InvoicesTable({
                 Productos
               </th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Total
+                Subtotal
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                IVA
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                A pagar
               </th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]" />
             </tr>
@@ -267,7 +299,7 @@ export default function InvoicesTable({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
                   Ninguna factura coincide con los filtros.
                 </td>
               </tr>
@@ -290,7 +322,18 @@ export default function InvoicesTable({
                 <td className="px-4 py-3 text-neutral-500">{row.dateLabel}</td>
                 <td className="px-4 py-3 text-neutral-500">{row.supplierName ?? "-"}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-neutral-500">{row.lineCount}</td>
-                <td className="px-4 py-3 text-right tabular-nums font-medium">{formatMoney(row.total)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-neutral-500">
+                  {formatMoney(row.total)}
+                </td>
+                <td
+                  className="px-4 py-3 text-right tabular-nums text-neutral-500"
+                  title={row.taxes.ieps !== 0 ? `Incluye IEPS de ${formatMoney(row.taxes.ieps)}` : undefined}
+                >
+                  {formatMoney(row.taxes.iva + row.taxes.ieps)}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-medium">
+                  {formatMoney(row.taxes.total)}
+                </td>
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"

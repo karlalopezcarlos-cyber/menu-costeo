@@ -32,6 +32,19 @@ function parseYieldPercentage(value: FormDataEntryValue | null): Decimal {
   return pct;
 }
 
+/**
+ * Una tasa de impuesto en por ciento. Se admite cualquier valor de 0 a 100 y no solo las tasas
+ * de hoy: las tasas cambian por decreto y el catalogo no se puede quedar sin poder capturarlas.
+ */
+function parseTaxRate(value: FormDataEntryValue | null, label: string): Decimal {
+  const raw = String(value ?? "0").trim();
+  const pct = new Decimal(raw || "0");
+  if (pct.lt(0) || pct.gt(100)) {
+    throw new Error(`La tasa de ${label} debe ir de 0% a 100%.`);
+  }
+  return pct;
+}
+
 function parseCategoryId(value: FormDataEntryValue | null): string | null {
   const raw = String(value ?? "").trim();
   return raw || null;
@@ -97,6 +110,8 @@ export async function createProduct(
     const categoryId = parseCategoryId(formData.get("categoryId"));
     const baseUnit = parseUnit(formData.get("baseUnit"));
     const yieldPercentage = parseYieldPercentage(formData.get("yieldPercentage"));
+    const ivaRate = parseTaxRate(formData.get("ivaRate"), "IVA");
+    const iepsRate = parseTaxRate(formData.get("iepsRate"), "IEPS");
     const presentation = parsePresentationUnit(formData);
     const defaultSupplierId = parseSupplierId(formData.get("defaultSupplierId"));
 
@@ -121,6 +136,8 @@ export async function createProduct(
         categoryId,
         baseUnit,
         yieldPercentage: yieldPercentage.toString(),
+        ivaRate: ivaRate.toString(),
+        iepsRate: iepsRate.toString(),
         presentationUnitLabel: presentation.label,
         presentationUnitQty: presentation.qty,
         defaultSupplierId,
@@ -147,6 +164,8 @@ export async function updateProduct(
     const categoryId = parseCategoryId(formData.get("categoryId"));
     const baseUnit = parseUnit(formData.get("baseUnit"));
     const yieldPercentage = parseYieldPercentage(formData.get("yieldPercentage"));
+    const ivaRate = parseTaxRate(formData.get("ivaRate"), "IVA");
+    const iepsRate = parseTaxRate(formData.get("iepsRate"), "IEPS");
     const presentation = parsePresentationUnit(formData);
     const defaultSupplierId = parseSupplierId(formData.get("defaultSupplierId"));
     if (!name) throw new Error("El nombre es obligatorio.");
@@ -222,6 +241,8 @@ export async function updateProduct(
         categoryId,
         baseUnit,
         yieldPercentage: yieldPercentage.toString(),
+        ivaRate: ivaRate.toString(),
+        iepsRate: iepsRate.toString(),
         presentationUnitLabel: presentation.label,
         presentationUnitQty: presentation.qty,
         defaultSupplierId,

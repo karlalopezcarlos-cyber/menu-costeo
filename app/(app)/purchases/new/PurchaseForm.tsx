@@ -16,6 +16,7 @@ import { createPurchase } from "../actions";
 import { deletePurchaseOrder } from "../../orders/[orderId]/actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 import type { PresentationOption } from "../../_components/PresentationQuantityInput";
+import { sumTaxes } from "@/lib/taxes";
 import { formatMoney } from "@/lib/format";
 import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
 
@@ -24,6 +25,8 @@ type ProductOption = {
   name: string;
   baseUnit: UnitValue;
   yieldPercentage: string;
+  ivaRate: string;
+  iepsRate: string;
   presentationUnitLabel: string | null;
   presentationUnitQty: string | null;
   presentations: PresentationOption[];
@@ -282,9 +285,23 @@ export default function PurchaseForm({
     }
   }
 
-  const grandTotal = useMemo(
-    () => rows.reduce((sum, row) => sum + (Number(row.totalPrice) || 0), 0),
-    [rows],
+  // El impuesto se calcula renglon por renglon con las tasas de cada producto: una compra
+  // normal mezcla cosas en 0% y cosas en 16%, y una tasa sola sobre el total seria inventada.
+  const totales = useMemo(
+    () =>
+      sumTaxes(
+        rows.map((row) => {
+          const product = productById.get(row.productId);
+          return {
+            subtotal: Number(row.totalPrice) || 0,
+            rates: {
+              ivaRate: Number(product?.ivaRate ?? 0),
+              iepsRate: Number(product?.iepsRate ?? 0),
+            },
+          };
+        }),
+      ),
+    [rows, productById],
   );
 
   const hasYieldAdjustedRow = rows.some((row) => {
@@ -584,10 +601,20 @@ export default function PurchaseForm({
           </p>
         )}
 
-        <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
-          <p className="text-sm text-neutral-700">
-            Total de la compra: <strong className="text-base">{formatMoney(grandTotal)}</strong>
+        <div className="mt-3 flex flex-wrap justify-end gap-x-5 gap-y-1 border-t border-neutral-100 pt-3 text-sm text-neutral-700">
+          {/* El subtotal es lo que se costea; el total con impuestos es contra lo que se cuadra
+              el papel del proveedor. Los dos se ven solo cuando hay impuesto de por medio. */}
+          <p>
+            Subtotal: <strong className="text-base">{formatMoney(totales.subtotal)}</strong>
           </p>
+          {totales.ieps !== 0 && <p className="text-neutral-500">IEPS: {formatMoney(totales.ieps)}</p>}
+          {totales.iva !== 0 && <p className="text-neutral-500">IVA: {formatMoney(totales.iva)}</p>}
+          {totales.total !== totales.subtotal && (
+            <p>
+              Total con impuestos:{" "}
+              <strong className="text-base">{formatMoney(totales.total)}</strong>
+            </p>
+          )}
         </div>
       </div>
 

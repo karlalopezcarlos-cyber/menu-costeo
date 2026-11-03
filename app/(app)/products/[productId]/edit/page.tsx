@@ -38,6 +38,8 @@ export default async function EditProductPage({
           categoryId: product.categoryId,
           baseUnit: product.baseUnit as UnitValue,
           yieldPercentage: product.yieldPercentage.toString(),
+          ivaRate: product.ivaRate.toString(),
+          iepsRate: product.iepsRate.toString(),
           presentationUnitLabel: product.presentationUnitLabel,
           presentationUnitQty: product.presentationUnitQty ? product.presentationUnitQty.toString() : null,
           defaultSupplierId: product.defaultSupplierId,

@@ -13,6 +13,7 @@ import {
 } from "./purchase-rows";
 import { formatMoney } from "@/lib/format";
 import { SIN_ASIGNAR } from "@/lib/purchases/filters";
+import { emptyBreakdown, type TaxBreakdown } from "@/lib/taxes";
 
 const TREND_STYLE: Record<CostTrend, { dot: string; title: string }> = {
   up: { dot: "bg-red-500", title: "Por encima del promedio de este producto en lo filtrado" },
@@ -49,7 +50,7 @@ export default function PurchasesTable({
   rows,
   supplierOptions,
   categoryOptions,
-  filteredTotal,
+  filteredTaxes,
   filteredCount,
   filters,
   isDefaultToday,
@@ -59,8 +60,9 @@ export default function PurchasesTable({
   rows: PurchaseRow[];
   supplierOptions: string[];
   categoryOptions: CategoryOption[];
-  /** Suma de TODO lo filtrado, calculada en la base: no depende del tope de filas en pantalla. */
-  filteredTotal: number;
+  /** Subtotal, IEPS, IVA y total de TODO lo filtrado, sumados en la base: no dependen del tope
+   *  de filas en pantalla. */
+  filteredTaxes: TaxBreakdown;
   /** Cuantas compras hay en lo filtrado, tambien de la base. */
   filteredCount: number;
   filters: PurchaseListFilterValues;
@@ -199,16 +201,25 @@ export default function PurchasesTable({
   // Se recorren las filas y no el set: asi un id que quedo de un filtro anterior no resta nada
   // ni se cuenta, pase lo que pase con el momento en que se suelta la seleccion.
   const descartado = useMemo(() => {
-    let amount = 0;
+    const taxes = emptyBreakdown();
     let count = 0;
     for (const row of rows) {
       if (!excludedIds.has(row.id)) continue;
-      amount += row.totalPrice;
+      taxes.subtotal += row.taxes.subtotal;
+      taxes.ieps += row.taxes.ieps;
+      taxes.iva += row.taxes.iva;
+      taxes.total += row.taxes.total;
       count += 1;
     }
-    return { amount, count };
+    return { taxes, count };
   }, [rows, excludedIds]);
-  const totalSeleccionado = filteredTotal - descartado.amount;
+  const seleccionado: TaxBreakdown = {
+    subtotal: filteredTaxes.subtotal - descartado.taxes.subtotal,
+    ieps: filteredTaxes.ieps - descartado.taxes.ieps,
+    iva: filteredTaxes.iva - descartado.taxes.iva,
+    total: filteredTaxes.total - descartado.taxes.total,
+  };
+  const hayImpuestos = seleccionado.iva !== 0 || seleccionado.ieps !== 0;
   const todosDescartados = rows.length > 0 && descartado.count === rows.length;
 
   const exportHref = useMemo(() => {
@@ -402,13 +413,50 @@ export default function PurchasesTable({
         </a>
       </div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
-            Total filtrado
-          </span>
-          <span className="text-xl font-semibold tabular-nums text-neutral-900">
-            {formatMoney(totalSeleccionado)}
-          </span>
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+              {hayImpuestos ? "Subtotal" : "Total filtrado"}
+            </span>
+            <span className="text-xl font-semibold tabular-nums text-neutral-900">
+              {formatMoney(seleccionado.subtotal)}
+            </span>
+          </div>
+          {/* El desglose solo aparece cuando hay algo que desglosar: en un filtro de puros
+              productos en tasa 0 serian tres ceros estorbando. */}
+          {hayImpuestos && (
+            <>
+              {seleccionado.ieps !== 0 && (
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+                    IEPS
+                  </span>
+                  <span className="text-sm tabular-nums text-neutral-600">
+                    {formatMoney(seleccionado.ieps)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+                  IVA
+                </span>
+                <span className="text-sm tabular-nums text-neutral-600">
+                  {formatMoney(seleccionado.iva)}
+                </span>
+              </div>
+              <div
+                className="flex items-baseline gap-2"
+                title="Lo que se le paga al proveedor. El costo del negocio es el subtotal: el IVA es acreditable."
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+                  Total con impuestos
+                </span>
+                <span className="text-xl font-semibold tabular-nums text-neutral-900">
+                  {formatMoney(seleccionado.total)}
+                </span>
+              </div>
+            </>
+          )}
         </div>
         <p className="text-sm text-neutral-500">
           {filteredCount - descartado.count} de {filteredCount}{" "}
@@ -416,7 +464,7 @@ export default function PurchasesTable({
           {descartado.count > 0 && (
             <span className="text-neutral-400">
               {" "}
-              · {descartado.count} sin contar (−{formatMoney(descartado.amount)})
+              · {descartado.count} sin contar (−{formatMoney(descartado.taxes.subtotal)})
             </span>
           )}
           {truncated && (

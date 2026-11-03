@@ -362,6 +362,13 @@ model Product {
   categoryId               String?
   category                 ProductCategory? @relation(fields: [categoryId], references: [id])
   baseUnit                 Unit
+  /// Tasa de IVA del producto, en por ciento. 16 por omision, que es la tasa general; los
+  /// alimentos que van en tasa 0 se corrigen producto por producto. No afecta el costeo: el
+  /// precio de compra se captura sin impuesto y el IVA es acreditable, no es costo del negocio.
+  ivaRate                  Decimal          @default(16) @db.Decimal(5, 2)
+  /// Tasa de IEPS, en por ciento. 0 = no lo causa, que es el caso de casi todo. Se calcula
+  /// sobre el subtotal y forma parte de la base del IVA, como en la ley.
+  iepsRate                 Decimal          @default(0) @db.Decimal(5, 2)
   /// % de rendimiento neto (100 = sin merma). Ej. cilantro con 20% de merma -> 80.
   /// El costo unitario de cada compra se divide entre este factor para costear con el neto aprovechable.
   yieldPercentage          Decimal          @default(100) @db.Decimal(5, 2)
@@ -419,13 +426,13 @@ model Product {
   transformationOutputs           PortioningOutput[]
   transformationTemplatesAsSource TransformationTemplate[]       @relation("TransformationTemplateSource")
   transformationTemplateOutputs   TransformationTemplateOutput[] @relation("TransformationTemplateOutput")
+  expenses                        Expense[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([defaultSupplierId])
   @@index([defaultSourceProductId])
   @@map("products")
-  expenses                  Expense[]
 }
 
 /// Catalogo de presentaciones nombradas de un producto (ej. "Lata 2.75kg" = 2.75 KG, "Bulto 25kg" =
@@ -462,8 +469,15 @@ model Purchase {
   presentationLabel String
   presentationQty   Decimal      @db.Decimal(14, 4)
   presentationUnit  Unit
+  /// Siempre sin impuesto: es el subtotal de la factura. El IVA y el IEPS se calculan encima
+  /// con las tasas congeladas de abajo y nunca entran al costo.
   totalPrice        Decimal      @db.Decimal(12, 2)
   computedUnitCost  Decimal      @db.Decimal(14, 6)
+  /// Tasas copiadas del producto al momento de capturar, igual que el costo unitario: corregir
+  /// la tasa de un producto no puede cambiar lo que decia una factura de hace tres meses.
+  /// Las compras anteriores a esta funcion se quedaron en 0, no se les invento impuesto.
+  ivaRate           Decimal      @default(0) @db.Decimal(5, 2)
+  iepsRate          Decimal      @default(0) @db.Decimal(5, 2)
   supplierId        String?
   supplier          Supplier?    @relation(fields: [supplierId], references: [id])
   createdByUserId   String?

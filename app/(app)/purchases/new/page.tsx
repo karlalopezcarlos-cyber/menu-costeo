@@ -34,6 +34,8 @@ export default async function NewPurchasePage({
         name: true,
         baseUnit: true,
         yieldPercentage: true,
+        ivaRate: true,
+        iepsRate: true,
         presentationUnitLabel: true,
         presentationUnitQty: true,
         presentations: true,
@@ -125,6 +127,8 @@ export default async function NewPurchasePage({
             ...p,
             baseUnit: p.baseUnit as UnitValue,
             yieldPercentage: p.yieldPercentage.toString(),
+            ivaRate: p.ivaRate.toString(),
+            iepsRate: p.iepsRate.toString(),
             presentationUnitQty: p.presentationUnitQty ? p.presentationUnitQty.toString() : null,
             presentations: p.presentations.map((pres) => ({
               id: pres.id,

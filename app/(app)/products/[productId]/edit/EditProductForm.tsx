@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
+import TaxFields from "../../TaxFields";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { updateProduct } from "../../actions";
 
@@ -18,6 +19,8 @@ export default function EditProductForm({
     categoryId: string | null;
     baseUnit: UnitValue;
     yieldPercentage: string;
+    ivaRate: string;
+    iepsRate: string;
     presentationUnitLabel: string | null;
     presentationUnitQty: string | null;
     defaultSupplierId: string | null;
@@ -140,6 +143,8 @@ export default function EditProductForm({
           producto.
         </p>
       </div>
+
+      <TaxFields ivaRate={product.ivaRate} iepsRate={product.iepsRate} />
 
       <div className="space-y-2 rounded-md border border-neutral-200 p-3">
         <p className="text-sm font-medium text-neutral-700">Presentacion de compra fija (opcional)</p>

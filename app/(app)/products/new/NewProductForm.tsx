@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import TaxFields from "../TaxFields";
 import { UNITS, UNIT_LABELS } from "@/lib/units";
 import { createProduct } from "../actions";
 
@@ -116,6 +117,8 @@ export default function NewProductForm({
           aprovechas y el costo se ajustara automaticamente al registrar compras.
         </p>
       </div>
+
+      <TaxFields />
 
       <div className="space-y-1 rounded-md border border-neutral-200 p-3">
         <div className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import PurchasesTable, { type PurchaseRow } from "./PurchasesTable";
 import InvoicesTable from "./InvoicesTable";
 import { toPurchaseRow } from "./purchase-rows";
+import { sumTaxes } from "@/lib/taxes";
 import { buildPurchaseWhere, hasAnyPurchaseFilter, resolvePendingProductIds, todayDateInputValue } from "@/lib/purchases/query";
 import {
   hasAnyInvoiceFilter,
@@ -96,6 +97,7 @@ export default async function PurchasesPage({
           bySupplier={summary.bySupplier}
           invoiceCount={summary.invoiceCount}
           total={summary.total}
+          taxes={summary.taxes}
           supplierOptions={supplierOptions}
           filters={invoiceFilters}
           isDefaultMonth={isDefaultMonth}
@@ -117,15 +119,31 @@ export default async function PurchasesPage({
 
   // El total se suma en la base, no sobre las filas que se alcanzaron a traer: con el tope de
   // 500 renglones un total calculado en pantalla seria menor que lo filtrado y nadie lo notaria.
-  const [purchases, totales] = await Promise.all([
+  //
+  // Se agrupa por par de tasas en vez de sumar y nada mas, porque cada renglon puede traer un
+  // IVA distinto: sumar todo y multiplicar por una tasa promedio daria un impuesto inventado.
+  // Los pares de tasas son un punado, asi que son un punado de renglones.
+  const [purchases, porTasa] = await Promise.all([
     prisma.purchase.findMany({
       where,
       orderBy: [{ purchaseDate: "desc" }, { folio: "desc" }],
       take: ROW_LIMIT,
       include: { product: true, supplier: true },
     }),
-    prisma.purchase.aggregate({ where, _sum: { totalPrice: true }, _count: { _all: true } }),
+    prisma.purchase.groupBy({
+      by: ["ivaRate", "iepsRate"],
+      where,
+      _sum: { totalPrice: true },
+      _count: { _all: true },
+    }),
   ]);
+  const filteredTaxes = sumTaxes(
+    porTasa.map((grupo) => ({
+      subtotal: grupo._sum.totalPrice ?? 0,
+      rates: { ivaRate: Number(grupo.ivaRate), iepsRate: Number(grupo.iepsRate) },
+    })),
+  );
+  const filteredCount = porTasa.reduce((n, grupo) => n + grupo._count._all, 0);
 
   const rows: PurchaseRow[] = purchases.map((purchase) =>
     toPurchaseRow(purchase, pendingIdSet.has(purchase.productId)),
@@ -137,8 +155,8 @@ export default async function PurchasesPage({
         rows={rows}
         supplierOptions={supplierOptions}
         categoryOptions={categoryOptions}
-        filteredTotal={Number(totales._sum.totalPrice ?? 0)}
-        filteredCount={totales._count._all}
+        filteredTaxes={filteredTaxes}
+        filteredCount={filteredCount}
         filters={filters}
         isDefaultToday={isDefaultToday}
         today={today}

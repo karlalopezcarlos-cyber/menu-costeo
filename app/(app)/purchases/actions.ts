@@ -125,6 +125,10 @@ export async function createPurchase(
         presentationUnit,
         totalPrice: totalPrice.toString(),
         computedUnitCost: computedUnitCost.toString(),
+        // Las tasas se copian del producto AQUI y no se vuelven a leer: corregir manana la
+        // tasa de un producto no puede cambiar lo que decia esta factura.
+        ivaRate: product.ivaRate.toString(),
+        iepsRate: product.iepsRate.toString(),
         supplierId,
         createdByUserId: user.id,
       };
