@@ -10,6 +10,7 @@ import {
 } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { sumVarianceAmounts } from "@/lib/audit-filters";
+import { sinIva } from "@/lib/taxes";
 import { formatRequisicionFolio } from "@/lib/requisitions/folio";
 
 export { filterAuditRows, sumVarianceAmounts, type AuditRowFilters } from "@/lib/audit-filters";
@@ -56,6 +57,13 @@ export type AuditResult = {
   rows: AuditRow[];
   totalShortageAmount: number;
   totalSurplusAmount: number;
+  /**
+   * Venta del periodo, sin IVA. Es el denominador con el que se lee la variacion: un faltante
+   * de $48,000 no significa lo mismo en un mes de $300,000 que en uno de $1,200,000. Va sin IVA
+   * porque la variacion esta valuada al costo, que tambien es neto; dividir un costo neto entre
+   * una venta con IVA baja el porcentaje por una razon que no tiene nada que ver con el almacen.
+   */
+  salesTotal: number;
 };
 
 function toDecimalMap(entries: { key: string; quantity: Decimal | number }[]): Map<string, Decimal> {
@@ -126,6 +134,7 @@ export async function computeInventoryAudit(
     transformaciones,
     graph,
     comments,
+    organization,
   ] = await Promise.all([
     prisma.product.findMany({
       where: { organizationId, archivedAt: null },
@@ -151,7 +160,7 @@ export async function computeInventoryAudit(
     }),
     prisma.dailySale.findMany({
       where: { sucursalId, date: dateFilter },
-      select: { recipeId: true, quantitySold: true },
+      select: { recipeId: true, quantitySold: true, unitPrice: true },
     }),
     prisma.requisicionItem.findMany({
       where: { requisicion: { fromSucursalId: sucursalId, date: dateFilter } },
@@ -177,6 +186,10 @@ export async function computeInventoryAudit(
     finalCountId
       ? prisma.auditComment.findMany({ where: { sucursalId, finalCountId } })
       : Promise.resolve([]),
+    prisma.organization.findUniqueOrThrow({
+      where: { id: organizationId },
+      select: { salesIvaRate: true },
+    }),
   ]);
 
   const productCosts = await getSucursalProductCosts(
@@ -483,6 +496,14 @@ export async function computeInventoryAudit(
 
   const { totalShortageAmount, totalSurplusAmount } = sumVarianceAmounts(rows);
 
+  // El precio de venta capturado es el de la carta y trae IVA, igual que en el Estado de
+  // resultados. Se le quita aqui una sola vez: lo que sale de esta funcion ya es venta neta.
+  const ventaBruta = sales.reduce(
+    (total, sale) => total.plus(new Decimal(sale.quantitySold).times(sale.unitPrice)),
+    new Decimal(0),
+  );
+  const salesTotal = sinIva(ventaBruta, Number(organization.salesIvaRate)).toNumber();
+
   return {
     initialDateLabel: initialCount.date.toLocaleDateString("es-MX", { timeZone: "UTC" }),
     finalDateLabel: finalCount ? finalCount.date.toLocaleDateString("es-MX", { timeZone: "UTC" }) : null,
@@ -490,6 +511,7 @@ export async function computeInventoryAudit(
     rows,
     totalShortageAmount,
     totalSurplusAmount,
+    salesTotal,
   };
 }
 

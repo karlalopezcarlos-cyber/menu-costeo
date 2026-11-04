@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       filtersSummary,
       totalShortageAmount,
       totalSurplusAmount,
+      salesTotal: result.salesTotal,
       rows: pdfRows,
     },
     logo,

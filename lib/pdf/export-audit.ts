@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { formatMoney } from "@/lib/format";
+import { varianceSharePct } from "@/lib/audit-filters";
 
 export type AuditPdfRow = {
   categoryName: string | null;
@@ -22,6 +23,8 @@ export type AuditPdfData = {
   filtersSummary: string[];
   totalShortageAmount: number;
   totalSurplusAmount: number;
+  /** Venta neta del periodo: el denominador del porcentaje que llevan los dos tableros. */
+  salesTotal: number;
   rows: AuditPdfRow[];
 };
 
@@ -114,6 +117,9 @@ export async function buildAuditPdf(data: AuditPdfData, logo: Buffer | null = nu
     const cardWidth = usableWidth / 2 - 10;
     const cardHeight = 70;
 
+    const sharePct = (amount: number): string =>
+      data.salesTotal ? `${varianceSharePct(amount, data.salesTotal)!.toFixed(2)}% de la venta` : "Sin venta en el periodo";
+
     doc.roundedRect(left, cardY, cardWidth, cardHeight, 6).strokeColor("#dddddd").stroke();
     doc.font("Helvetica").fontSize(10).fillColor("#555555").text("Monto total de faltantes", left + 14, cardY + 14);
     doc
@@ -121,6 +127,11 @@ export async function buildAuditPdf(data: AuditPdfData, logo: Buffer | null = nu
       .fontSize(20)
       .fillColor("#dc2626")
       .text(`-${formatMoney(data.totalShortageAmount)}`, left + 14, cardY + 32);
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor("#555555")
+      .text(sharePct(data.totalShortageAmount), left + 14, cardY + 56);
 
     const card2X = left + cardWidth + 20;
     doc.roundedRect(card2X, cardY, cardWidth, cardHeight, 6).strokeColor("#dddddd").stroke();
@@ -130,6 +141,26 @@ export async function buildAuditPdf(data: AuditPdfData, logo: Buffer | null = nu
       .fontSize(20)
       .fillColor("#059669")
       .text(`+${formatMoney(data.totalSurplusAmount)}`, card2X + 14, cardY + 32);
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor("#555555")
+      .text(sharePct(data.totalSurplusAmount), card2X + 14, cardY + 56);
+
+    // El porcentaje de arriba sale de lo filtrado; la venta no se filtra. Sin esta linea el PDF
+    // se lleva un porcentaje que nadie puede reconstruir despues.
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#888888")
+      .text(
+        data.salesTotal > 0
+          ? `Porcentaje sobre la venta del periodo: ${formatMoney(data.salesTotal)} sin IVA.`
+          : "No hay ventas capturadas en este periodo.",
+        left,
+        cardY + cardHeight + 10,
+        { width: usableWidth, align: "center" },
+      );
 
     doc.fillColor("#000000");
 

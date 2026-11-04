@@ -125,7 +125,12 @@ export default async function AuditPage({
         </p>
       )}
 
-      <AuditTable rows={result.rows} initialCountId={initialCountId} finalCountId={finalCountId || null} />
+      <AuditTable
+        rows={result.rows}
+        initialCountId={initialCountId}
+        finalCountId={finalCountId || null}
+        salesTotal={result.salesTotal}
+      />
     </div>
   );
 }

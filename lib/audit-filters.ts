@@ -72,6 +72,19 @@ export function filterAuditRows(rows: AuditRow[], filters: AuditRowFilters): Aud
   });
 }
 
+/**
+ * Que tanto pesa un monto de variacion sobre la venta del periodo. Vive aqui, junto al filtro,
+ * porque el numerador sale de las filas visibles y el denominador no: la pantalla y el PDF
+ * tienen que calcularlo igual o el mismo periodo da dos porcentajes distintos.
+ *
+ * Devuelve null cuando no hubo venta. Dividir entre cero no da "0%": da que la pregunta no
+ * aplica, y pintar 0% ahi diria que no hay problema justo cuando hay faltante sin venta.
+ */
+export function varianceSharePct(amount: number, salesTotal: number): number | null {
+  if (!salesTotal) return null;
+  return (amount / salesTotal) * 100;
+}
+
 export function sumVarianceAmounts(rows: AuditRow[]): { totalShortageAmount: number; totalSurplusAmount: number } {
   let totalShortageAmount = 0;
   let totalSurplusAmount = 0;

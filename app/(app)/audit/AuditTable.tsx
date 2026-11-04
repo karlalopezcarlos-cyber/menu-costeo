@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AuditRow } from "@/lib/audit";
-import { filterAuditRows, sumVarianceAmounts, type VarianceFilter } from "@/lib/audit-filters";
+import {
+  filterAuditRows,
+  sumVarianceAmounts,
+  varianceSharePct,
+  type VarianceFilter,
+} from "@/lib/audit-filters";
 import { saveAuditComments } from "./actions";
 import { formatMoney } from "@/lib/format";
 
@@ -96,10 +101,13 @@ export default function AuditTable({
   rows,
   initialCountId,
   finalCountId,
+  salesTotal,
 }: {
   rows: AuditRow[];
   initialCountId: string;
   finalCountId: string | null;
+  /** Venta neta del periodo. Es el denominador de los dos tableros y no depende del filtro. */
+  salesTotal: number;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("category");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -204,6 +212,11 @@ export default function AuditTable({
   );
 
   const { totalShortageAmount, totalSurplusAmount } = useMemo(() => sumVarianceAmounts(visibleRows), [visibleRows]);
+  // El numerador se mueve con el filtro y el denominador no: filtrar por CARNES responde "cuanto
+  // de mi venta se esta yendo en carnes", que es la pregunta. Repartir la venta entre categorias
+  // no se puede: se vende por platillo, y un platillo toca varias categorias a la vez.
+  const shortagePct = varianceSharePct(totalShortageAmount, salesTotal);
+  const surplusPct = varianceSharePct(totalSurplusAmount, salesTotal);
 
   const hasFilters =
     !!search ||
@@ -536,19 +549,40 @@ export default function AuditTable({
   const cards = (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
-        <p className="text-sm text-neutral-500">Monto total de faltantes</p>
+        <p className="text-sm text-neutral-500">
+          Monto total de faltantes{hasFilters ? " (filtrado)" : ""}
+        </p>
         <p className="mt-1 text-2xl font-semibold text-red-600">-{formatMoney(totalShortageAmount)}</p>
+        <p className="mt-1 text-sm font-medium text-neutral-700">
+          {shortagePct !== null ? `${shortagePct.toFixed(2)}% de la venta` : "Sin venta en el periodo"}
+        </p>
       </div>
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
-        <p className="text-sm text-neutral-500">Monto total de sobrantes</p>
+        <p className="text-sm text-neutral-500">
+          Monto total de sobrantes{hasFilters ? " (filtrado)" : ""}
+        </p>
         <p className="mt-1 text-2xl font-semibold text-emerald-700">+{formatMoney(totalSurplusAmount)}</p>
+        <p className="mt-1 text-sm font-medium text-neutral-700">
+          {surplusPct !== null ? `${surplusPct.toFixed(2)}% de la venta` : "Sin venta en el periodo"}
+        </p>
       </div>
     </div>
+  );
+
+  // El denominador se escribe una vez, debajo de las dos tarjetas: un porcentaje sin su base es
+  // justo el tipo de numero que no se puede cuadrar contra nada.
+  const salesBasis = (
+    <p className="text-xs text-neutral-400">
+      {salesTotal > 0
+        ? `Sobre la venta del periodo: ${formatMoney(salesTotal)} sin IVA. El porcentaje se calcula sobre lo que esta filtrado en la tabla; la venta no se filtra, porque se vende por platillo y un platillo toca varias categorias.`
+        : "No hay ventas capturadas en este periodo, asi que la variacion no se puede leer como porcentaje de la venta."}
+    </p>
   );
 
   return (
     <form action={boundSaveComments} className="space-y-3">
       {cards}
+      {salesBasis}
       {filterBar}
       {table}
       <button
