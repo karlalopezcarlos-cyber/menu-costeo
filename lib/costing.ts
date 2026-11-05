@@ -17,7 +17,7 @@ type RecipeItemWithProduct = {
   subRecipeId: string | null;
   quantity: Decimal;
   unit: UnitValue;
-  product: { baseUnit: UnitValue; currentUnitCost: Decimal } | null;
+  product: { name: string; baseUnit: UnitValue; currentUnitCost: Decimal } | null;
 };
 
 type RecipeNode = {
@@ -87,7 +87,7 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
     where: { sucursalId, archivedAt: null },
     include: {
       items: {
-        include: { product: { select: { id: true, baseUnit: true } } },
+        include: { product: { select: { id: true, name: true, baseUnit: true } } },
       },
     },
   });
@@ -118,6 +118,7 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
             unit: i.unit as UnitValue,
             product: i.product
               ? {
+                  name: i.product.name,
                   baseUnit: i.product.baseUnit as UnitValue,
                   currentUnitCost: productCosts.get(i.product.id) ?? new Decimal(0),
                 }
@@ -176,6 +177,61 @@ export function getRecipeCost(
   stack.delete(recipeId);
   memo.set(recipeId, total);
   return total;
+}
+
+/**
+ * Por que NO se puede confiar en el costo de una receta.
+ *
+ * getRecipeCost suma lo que encuentra y calla lo que falta: un insumo sin costo suma cero, una
+ * receta vacia da cero, una subreceta con rendimiento cero aporta cero. El numero sale siempre,
+ * se ve razonable y nadie se entera. El caso peligroso no es el costo en $0 (ese salta a la
+ * vista): es el costo A MEDIAS, un nigiri de salmon que cuesta el arroz y el alga porque el
+ * salmon nunca se compro en esta sucursal. Da $4.87, parece un costo, y con el se clasifica el
+ * platillo y se corre el promedio de todos los demas.
+ *
+ * Esta funcion recorre el mismo arbol que el costeo y devuelve, en texto, cada agujero que
+ * encontro. Lista vacia significa que el costo esta completo.
+ */
+export function collectRecipeCostIssues(
+  recipeId: string,
+  graph: RecipeGraph,
+  stack: Set<string> = new Set(),
+  depth = 0,
+): string[] {
+  if (depth > MAX_DEPTH) return ["La receta se anida demasiado (posible dato corrupto)."];
+  const recipe = graph.recipes.get(recipeId);
+  if (!recipe) return ["La receta no existe."];
+  if (stack.has(recipeId)) return [`La receta "${recipe.name}" se referencia a si misma.`];
+  stack.add(recipeId);
+
+  const issues: string[] = [];
+  if (recipe.items.length === 0) {
+    issues.push(`"${recipe.name}" no tiene ingredientes capturados.`);
+  }
+
+  for (const item of recipe.items) {
+    if (item.productId) {
+      if (!item.product) {
+        issues.push(`"${recipe.name}" usa un producto que ya no existe en el catalogo.`);
+      } else if (item.product.currentUnitCost.lte(0)) {
+        // Sin compras en esta sucursal y sin costo de catalogo: el insumo entra en $0 al costeo.
+        issues.push(`${item.product.name} no tiene costo (sin compras capturadas).`);
+      }
+    } else if (item.subRecipeId) {
+      const sub = graph.recipes.get(item.subRecipeId);
+      if (!sub) {
+        issues.push(`"${recipe.name}" usa una subreceta que ya no existe.`);
+      } else {
+        if (sub.yieldQty.isZero()) {
+          issues.push(`La subreceta "${sub.name}" tiene rendimiento 0, asi que aporta $0.`);
+        }
+        issues.push(...collectRecipeCostIssues(item.subRecipeId, graph, stack, depth + 1));
+      }
+    }
+  }
+
+  stack.delete(recipeId);
+  return [...new Set(issues)];
 }
 
 /**

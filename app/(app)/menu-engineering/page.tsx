@@ -41,6 +41,7 @@ export default async function MenuEngineeringPage({
     popularity: row.popularity.toNumber(),
     classification: row.classification,
     costUnreliable: row.costUnreliable,
+    costIssues: row.costIssues,
   }));
 
   const baseQuery = `from=${toDateInputValue(fromDate)}&to=${toDateInputValue(toDate)}`;

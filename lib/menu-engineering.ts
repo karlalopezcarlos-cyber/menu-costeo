@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import { collectRecipeCostIssues, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 
 export type MenuEngineeringClassification = "STAR" | "PLOWHORSE" | "PUZZLE" | "DOG";
 export type IvaMode = "con" | "sin";
@@ -42,8 +42,11 @@ export type MenuEngineeringRow = {
   totalMargin: Decimal;
   costPct: Decimal | null;
   popularity: Decimal;
-  classification: MenuEngineeringClassification;
+  /** null cuando el costo no es confiable: clasificar con un costo incompleto es inventar. */
+  classification: MenuEngineeringClassification | null;
   costUnreliable: boolean;
+  /** Por que no se confia en el costo. Vacio cuando el costeo esta completo. */
+  costIssues: string[];
 };
 
 /** Umbral clasico de Kasavana & Smith: 70% de la popularidad promedio (1/N por platillo). */
@@ -88,13 +91,19 @@ export async function computeMenuEngineeringReport(
 
   const partial = [...byRecipe.entries()].map(([recipeId, agg]) => {
     let cost = new Decimal(0);
-    let costUnreliable = false;
+    let costIssues: string[] = [];
     try {
       cost = getRecipeCost(recipeId, graph, memo);
-      if (cost.isZero()) costUnreliable = true;
-    } catch {
-      costUnreliable = true;
+      costIssues = collectRecipeCostIssues(recipeId, graph);
+      // Un costo en cero sin agujero detectado tampoco es un costo: es una receta que no se
+      // pudo recorrer por una razon que no previmos.
+      if (cost.lte(0) && costIssues.length === 0) {
+        costIssues = ["El costeo de esta receta da $0 y no se pudo determinar por que."];
+      }
+    } catch (error) {
+      costIssues = [error instanceof Error ? error.message : "No se pudo costear la receta."];
     }
+    const costUnreliable = costIssues.length > 0;
 
     const quantitySold = agg.quantitySold;
     const grossUnitPrice = quantitySold.isZero() ? new Decimal(0) : agg.weightedPriceSum.dividedBy(quantitySold);
@@ -121,10 +130,11 @@ export async function computeMenuEngineeringReport(
       costPct,
       popularity,
       costUnreliable,
+      costIssues,
     };
   });
 
-  return classifyMenuItems(partial, totalQty);
+  return classifyMenuItems(partial);
 }
 
 export type MenuEngineeringThresholds = {
@@ -147,13 +157,24 @@ export type MenuEngineeringThresholds = {
  * Es deliberado que el costo porcentual no entre: el metodo compara dinero, no porcentajes,
  * justo porque un platillo de costo bajo puede dejar menos pesos que uno de costo alto.
  */
-export function classifyMenuItems<T extends { margin: Decimal; quantitySold: Decimal; popularity: Decimal }>(
+export type ClassifiableItem = {
+  margin: Decimal;
+  quantitySold: Decimal;
+  popularity: Decimal;
+  costUnreliable: boolean;
+};
+
+export function classifyMenuItems<T extends ClassifiableItem>(
   items: T[],
-  totalQty: Decimal,
-): (T & { classification: MenuEngineeringClassification })[] {
-  const { averageMargin, popularityThreshold } = menuEngineeringThresholds(items, totalQty);
+): (T & { classification: MenuEngineeringClassification | null })[] {
+  const { averageMargin, popularityThreshold } = menuEngineeringThresholds(items);
 
   return items.map((row) => {
+    // Un platillo que no se pudo costear no se clasifica. Su margen es el precio completo o
+    // casi, asi que caeria siempre del lado alto y la pantalla diria "promueve este platillo"
+    // de algo cuyo costo nadie conoce. Decir "revisa la receta" es la respuesta honesta.
+    if (row.costUnreliable) return { ...row, classification: null };
+
     const highMargin = row.margin.gte(averageMargin);
     const highPopularity = row.popularity.gte(popularityThreshold);
 
@@ -167,16 +188,24 @@ export function classifyMenuItems<T extends { margin: Decimal; quantitySold: Dec
   });
 }
 
-export function menuEngineeringThresholds(
-  items: { margin: Decimal; quantitySold: Decimal }[],
-  totalQty: Decimal,
-): MenuEngineeringThresholds {
-  const weightedMarginSum = items.reduce(
+/**
+ * El umbral de margen se calcula SOLO con los platillos bien costeados. Un platillo sin costo
+ * tiene margen igual a su precio, y meterlo al promedio corre el umbral hacia arriba y
+ * reclasifica platillos que no tenian nada malo: en una prueba, un solo platillo asi movio el
+ * promedio de $89.89 a $105.45.
+ *
+ * El de popularidad si cuenta a todos. Lo que se vendio se vendio; que no sepamos costearlo no
+ * lo borra de la mezcla de ventas.
+ */
+export function menuEngineeringThresholds(items: ClassifiableItem[]): MenuEngineeringThresholds {
+  const confiables = items.filter((row) => !row.costUnreliable);
+  const qtyConfiable = confiables.reduce((sum, row) => sum.plus(row.quantitySold), new Decimal(0));
+  const weightedMarginSum = confiables.reduce(
     (sum, row) => sum.plus(row.margin.times(row.quantitySold)),
     new Decimal(0),
   );
   return {
-    averageMargin: totalQty.isZero() ? new Decimal(0) : weightedMarginSum.dividedBy(totalQty),
+    averageMargin: qtyConfiable.isZero() ? new Decimal(0) : weightedMarginSum.dividedBy(qtyConfiable),
     popularityThreshold:
       items.length === 0
         ? new Decimal(0)

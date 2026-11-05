@@ -23,6 +23,9 @@ const BADGE_CLASSES: Record<MenuEngineeringClassification, string> = {
   DOG: "bg-red-100 text-red-800",
 };
 
+/** Valor del filtro para los platillos que no se pudieron costear. */
+const SIN_CLASIFICAR = "none";
+
 /** De mejor a peor, que es como se lee el reporte y como conviene ofrecerlas en el filtro. */
 const CLASSIFICATION_ORDER: MenuEngineeringClassification[] = ["STAR", "PLOWHORSE", "PUZZLE", "DOG"];
 
@@ -46,8 +49,9 @@ export type MenuEngineeringRowView = {
   totalMargin: number;
   costPct: number | null;
   popularity: number;
-  classification: MenuEngineeringClassification;
+  classification: MenuEngineeringClassification | null;
   costUnreliable: boolean;
+  costIssues: string[];
 };
 
 type SortKey = "name" | "quantitySold" | "unitPrice" | "cost" | "margin" | "costPct" | "popularity" | "classification";
@@ -85,7 +89,8 @@ function sortValue(row: MenuEngineeringRowView, key: SortKey): string | number |
     case "popularity":
       return row.popularity;
     case "classification":
-      return CLASSIFICATION_LABELS[row.classification];
+      // Los sin clasificar al final: son tarea pendiente, no un quinto cuadrante.
+      return row.classification ? CLASSIFICATION_LABELS[row.classification] : "zzz";
   }
 }
 
@@ -99,7 +104,9 @@ export default function MenuEngineeringTable({
   const [sortKey, setSortKey] = useState<SortKey>("quantitySold");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
-  const [classificationFilter, setClassificationFilter] = useState<"all" | MenuEngineeringClassification>("all");
+  const [classificationFilter, setClassificationFilter] = useState<
+    "all" | MenuEngineeringClassification | typeof SIN_CLASIFICAR
+  >("all");
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -129,7 +136,14 @@ export default function MenuEngineeringTable({
     const term = search.trim().toLowerCase();
     return sortedRows.filter((row) => {
       if (term && !row.recipeName.toLowerCase().includes(term)) return false;
-      if (classificationFilter !== "all" && row.classification !== classificationFilter) return false;
+      if (classificationFilter === SIN_CLASIFICAR && row.classification !== null) return false;
+      if (
+        classificationFilter !== "all" &&
+        classificationFilter !== SIN_CLASIFICAR &&
+        row.classification !== classificationFilter
+      ) {
+        return false;
+      }
       return true;
     });
   }, [sortedRows, search, classificationFilter]);
@@ -150,6 +164,7 @@ export default function MenuEngineeringTable({
   );
 
   const hasFilters = !!search.trim() || classificationFilter !== "all";
+  const sinCostear = visibleRows.filter((row) => row.costUnreliable).length;
 
   return (
     <div className="space-y-3">
@@ -163,7 +178,9 @@ export default function MenuEngineeringTable({
         />
         <select
           value={classificationFilter}
-          onChange={(e) => setClassificationFilter(e.target.value as "all" | MenuEngineeringClassification)}
+          onChange={(e) =>
+            setClassificationFilter(e.target.value as "all" | MenuEngineeringClassification | typeof SIN_CLASIFICAR)
+          }
           className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
         >
           <option value="all">Todas las clasificaciones</option>
@@ -172,6 +189,7 @@ export default function MenuEngineeringTable({
               {CLASSIFICATION_ICONS[c]} {CLASSIFICATION_LABELS[c]}
             </option>
           ))}
+          <option value={SIN_CLASIFICAR}>⚠ Sin clasificar (revisar receta)</option>
         </select>
         {hasFilters && (
           <button
@@ -224,12 +242,12 @@ export default function MenuEngineeringTable({
                 <td className="px-4 py-3">
                   {row.recipeName}
                   {row.costUnreliable && (
-                    <span
-                      title="Este platillo tiene costo $0 o no confiable; probablemente falte capturar compras del insumo."
-                      className="ml-2 text-amber-500"
-                    >
+                    <span title={row.costIssues.join("\n")} className="ml-2 text-amber-500">
                       ⚠
                     </span>
+                  )}
+                  {row.costUnreliable && row.costIssues.length > 0 && (
+                    <p className="mt-0.5 text-xs text-amber-600">{row.costIssues[0]}</p>
                   )}
                 </td>
                 <td className="px-4 py-3">{row.quantitySold}</td>
@@ -263,9 +281,18 @@ export default function MenuEngineeringTable({
                 </td>
                 <td className="px-4 py-3">{(row.popularity * 100).toFixed(1)}%</td>
                 <td className="px-4 py-3">
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium ${BADGE_CLASSES[row.classification]}`}>
-                    {CLASSIFICATION_ICONS[row.classification]} {CLASSIFICATION_LABELS[row.classification]}
-                  </span>
+                  {row.classification ? (
+                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${BADGE_CLASSES[row.classification]}`}>
+                      {CLASSIFICATION_ICONS[row.classification]} {CLASSIFICATION_LABELS[row.classification]}
+                    </span>
+                  ) : (
+                    <span
+                      title={row.costIssues.join("\n")}
+                      className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600"
+                    >
+                      ⚠ Revisar receta
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -286,6 +313,17 @@ export default function MenuEngineeringTable({
           )}
         </table>
       </div>
+
+      {sinCostear > 0 && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {sinCostear === 1
+            ? "1 platillo no se pudo costear completo"
+            : `${sinCostear} platillos no se pudieron costear completos`}{" "}
+          y por eso quedaron sin clasificar. Su margen aparece mas alto de lo real, asi que el
+          total de arriba esta sobrestimado. No entraron al promedio con el que se clasifico a
+          los demas, para que un costo incompleto no reclasifique platillos que si estan bien.
+        </p>
+      )}
     </div>
   );
 }

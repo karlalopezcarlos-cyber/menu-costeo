@@ -19,8 +19,10 @@ export type MenuEngineeringChatMeta = {
 function rowLine(row: MenuEngineeringRow): string {
   const popularityPct = `${row.popularity.times(100).toFixed(1)}%`;
   const costPctText = row.costPct !== null ? `${row.costPct.toFixed(1)}%` : "N/D";
-  const flag = row.costUnreliable ? " (costo no confiable, posiblemente falten compras capturadas)" : "";
-  return `- ${row.recipeName}: ${row.quantitySold.toString()} vendidos (${popularityPct} de popularidad), precio ${formatMoney(row.unitPrice.toNumber())}, costo unitario ${formatMoney(row.cost.toNumber())} (${costPctText} del precio), costo total del periodo ${formatMoney(row.totalCost.toNumber())}, margen unitario ${formatMoney(row.margin.toNumber())}, margen total del periodo ${formatMoney(row.totalMargin.toNumber())} -- ${CLASSIFICATION_LABELS[row.classification]}${flag}`;
+  const flag = row.costUnreliable
+    ? ` (SIN CLASIFICAR, el costo no es confiable: ${row.costIssues.join(" ")})`
+    : "";
+  return `- ${row.recipeName}: ${row.quantitySold.toString()} vendidos (${popularityPct} de popularidad), precio ${formatMoney(row.unitPrice.toNumber())}, costo unitario ${formatMoney(row.cost.toNumber())} (${costPctText} del precio), costo total del periodo ${formatMoney(row.totalCost.toNumber())}, margen unitario ${formatMoney(row.margin.toNumber())}, margen total del periodo ${formatMoney(row.totalMargin.toNumber())} -- ${row.classification ? CLASSIFICATION_LABELS[row.classification] : "sin clasificar"}${flag}`;
 }
 
 /**
@@ -48,10 +50,19 @@ export function buildMenuEngineeringContext(rows: MenuEngineeringRow[], meta: Me
 
   lines.push("");
   const counts: Record<MenuEngineeringClassification, number> = { STAR: 0, PLOWHORSE: 0, PUZZLE: 0, DOG: 0 };
-  for (const row of rows) counts[row.classification] += 1;
+  let sinClasificar = 0;
+  for (const row of rows) {
+    if (row.classification) counts[row.classification] += 1;
+    else sinClasificar += 1;
+  }
   lines.push(
     `Resumen: ${counts.STAR} Estrella, ${counts.PLOWHORSE} Caballo de batalla, ${counts.PUZZLE} Acertijo, ${counts.DOG} Perro (de ${rows.length} platillos en total).`,
   );
+  if (sinClasificar > 0) {
+    lines.push(
+      `${sinClasificar} platillos quedaron SIN CLASIFICAR porque su receta no se puede costear completa. No afirmes nada sobre su rentabilidad ni los recomiendes: lo que procede con ellos es corregir la receta o capturar las compras que faltan. Tampoco entraron al promedio con el que se clasifico a los demas.`,
+    );
+  }
   return lines.join("\n");
 }
 

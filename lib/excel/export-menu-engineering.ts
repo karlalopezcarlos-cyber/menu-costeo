@@ -30,6 +30,7 @@ export async function buildMenuEngineeringWorkbook(
     { header: "Costo %", key: "costPct", width: 12 },
     { header: "% Popularidad", key: "popularity", width: 16 },
     { header: "Clasificacion", key: "classification", width: 20 },
+    { header: "Por que no se pudo costear", key: "costIssues", width: 50 },
   ];
   sheet.getRow(1).font = { bold: true };
 
@@ -45,7 +46,8 @@ export async function buildMenuEngineeringWorkbook(
       totalMargin: Number(row.totalMargin),
       costPct: row.costPct ? Number(row.costPct.toFixed(2)) : "",
       popularity: Number(row.popularity.times(100).toFixed(2)),
-      classification: CLASSIFICATION_LABELS[row.classification],
+      classification: row.classification ? CLASSIFICATION_LABELS[row.classification] : "Revisar receta",
+      costIssues: row.costIssues.join(" "),
     });
   }
 
