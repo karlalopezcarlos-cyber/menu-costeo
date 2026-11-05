@@ -34,7 +34,10 @@ export type MenuEngineeringRow = {
   grossUnitPrice: Decimal;
   unitPrice: Decimal;
   cost: Decimal;
+  /** Lo que deja UNA pieza: precio - costo. Es lo que clasifica el platillo. */
   margin: Decimal;
+  /** Lo que dejo el platillo en todo el periodo: margen unitario x cantidad vendida. */
+  totalMargin: Decimal;
   costPct: Decimal | null;
   popularity: Decimal;
   classification: MenuEngineeringClassification;
@@ -96,6 +99,9 @@ export async function computeMenuEngineeringReport(
     const unitPrice =
       ivaMode === "sin" ? grossUnitPrice.dividedBy(1 + ivaRate / 100) : grossUnitPrice;
     const margin = unitPrice.minus(cost);
+    // Un margen unitario alto no es dinero hasta que se multiplica por lo que se vendio: un
+    // platillo de $150 de margen que sale 3 veces al mes deja menos que uno de $28 que sale 345.
+    const totalMargin = margin.times(quantitySold);
     const costPct = unitPrice.isZero() ? null : cost.dividedBy(unitPrice).times(100);
     const popularity = totalQty.isZero() ? new Decimal(0) : quantitySold.dividedBy(totalQty);
 
@@ -107,6 +113,7 @@ export async function computeMenuEngineeringReport(
       unitPrice,
       cost,
       margin,
+      totalMargin,
       costPct,
       popularity,
       costUnreliable,

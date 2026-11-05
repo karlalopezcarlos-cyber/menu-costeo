@@ -35,6 +35,7 @@ export default async function MenuEngineeringPage({
     unitPrice: row.unitPrice.toNumber(),
     cost: row.cost.toNumber(),
     margin: row.margin.toNumber(),
+    totalMargin: row.totalMargin.toNumber(),
     costPct: row.costPct !== null ? row.costPct.toNumber() : null,
     popularity: row.popularity.toNumber(),
     classification: row.classification,

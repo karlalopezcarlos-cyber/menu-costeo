@@ -39,6 +39,7 @@ export type MenuEngineeringRowView = {
   unitPrice: number;
   cost: number;
   margin: number;
+  totalMargin: number;
   costPct: number | null;
   popularity: number;
   classification: MenuEngineeringClassification;
@@ -53,7 +54,7 @@ const COLUMNS: { key: SortKey; label: (ivaMode: IvaMode) => string }[] = [
   { key: "quantitySold", label: () => "Cantidad vendida" },
   { key: "unitPrice", label: (iva) => `Precio${iva === "sin" ? " (sin IVA)" : ""}` },
   { key: "cost", label: () => "Costo" },
-  { key: "margin", label: () => "Margen" },
+  { key: "margin", label: () => "Margen total" },
   { key: "costPct", label: () => "Costo %" },
   { key: "popularity", label: () => "% Popularidad" },
   { key: "classification", label: () => "Clasificacion" },
@@ -70,7 +71,9 @@ function sortValue(row: MenuEngineeringRowView, key: SortKey): string | number |
     case "cost":
       return row.cost;
     case "margin":
-      return row.margin;
+      // La columna muestra el margen del periodo, asi que ordenar por ella tiene que ordenar
+      // por eso mismo y no por el unitario, que es un ranking distinto.
+      return row.totalMargin;
     case "costPct":
       return row.costPct;
     case "popularity":
@@ -98,6 +101,20 @@ export default function MenuEngineeringTable({
       setSortDir("asc");
     }
   }
+
+  // Ahora que la columna es aditiva, sumarla significa algo: lo que dejo el menu completo en el
+  // periodo. Sumar margenes unitarios no significaba nada, por eso antes no habia total.
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, row) => ({
+          quantitySold: acc.quantitySold + row.quantitySold,
+          totalMargin: acc.totalMargin + row.totalMargin,
+        }),
+        { quantitySold: 0, totalMargin: 0 },
+      ),
+    [rows],
+  );
 
   const sortedRows = useMemo(() => {
     const dirMultiplier = sortDir === "asc" ? 1 : -1;
@@ -153,7 +170,12 @@ export default function MenuEngineeringTable({
               <td className="px-4 py-3">{row.quantitySold}</td>
               <td className="px-4 py-3">{formatMoney(row.unitPrice)}</td>
               <td className="px-4 py-3">{formatMoney(row.cost)}</td>
-              <td className="px-4 py-3">{formatMoney(row.margin)}</td>
+              <td className="px-4 py-3">
+                {formatMoney(row.totalMargin)}
+                {/* El unitario se queda a la vista en chico: es el que decide la clasificacion
+                    de la ultima columna, y sin el la etiqueta parece salida de la nada. */}
+                <p className="text-xs text-neutral-400">{formatMoney(row.margin)} c/u</p>
+              </td>
               <td className="px-4 py-3">
                 {row.costPct !== null ? (
                   <span
@@ -180,6 +202,20 @@ export default function MenuEngineeringTable({
             </tr>
           ))}
         </tbody>
+        {sortedRows.length > 0 && (
+          <tfoot className="border-t-2 border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
+            <tr>
+              <td className="px-4 py-3">Total del periodo</td>
+              <td className="px-4 py-3">{totals.quantitySold}</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3">{formatMoney(totals.totalMargin)}</td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3"></td>
+              <td className="px-4 py-3"></td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
