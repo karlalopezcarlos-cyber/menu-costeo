@@ -219,18 +219,14 @@ export function buildIncomeStatementFooterRows(
     },
     { label: "Utilidad bruta", amount: utilidadBruta, pct: pct(utilidadBruta) },
     { label: "Gastos de operacion", amount: gastos, pct: pct(gastos) },
-    // El desglose no es adorno: juntos, los tres montos no cuadran contra ningun modulo, y
-    // cada renglon de aqui se compara contra una pantalla distinta de la app.
+    // El desglose no es adorno: el total no cuadra contra ningun modulo, y cada renglon de
+    // aqui se compara contra una pantalla distinta de la app. El tercer componente —mermas y
+    // salidas sin venta— no lleva renglon propio: ya tiene los suyos mas arriba, y repetirlo
+    // aqui era leer el mismo dinero dos veces en la misma hoja.
     { label: "Gastos (modulo de Gastos)", amount: result.gastosDeModulo, pct: null, detail: true },
     {
       label: "Compras de categorias de gasto",
       amount: result.comprasDeGasto,
-      pct: null,
-      detail: true,
-    },
-    {
-      label: "Mermas y salidas sin venta",
-      amount: result.salidasSinVenta,
       pct: null,
       detail: true,
     },
@@ -258,13 +254,11 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
     "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
   "Gastos de operacion":
-    "Suma de los tres renglones de abajo: el modulo de Gastos (renta, luz, nomina), las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza), y lo que salio del inventario sin venderse (mermas y salidas por creditos al costo). Por eso NO cuadra contra el modulo de Gastos solo: ese es nada mas el primero de los tres. No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
+    "Suma de tres cosas: el modulo de Gastos (renta, luz, nomina) y las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza), que son los dos renglones de abajo, mas lo que salio del inventario sin venderse, que son los renglones de Mermas y de Salidas por creditos al costo de mas arriba. Por eso los dos renglones de abajo no suman el total, y por eso NO cuadra contra el modulo de Gastos solo: ese es nada mas el primero. No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
   "Gastos (modulo de Gastos)":
     "La parte de Gastos de operacion que sale del modulo de Gastos: renta, luz, nomina. Este renglon si cuadra contra el total de esa pantalla para las mismas fechas.",
   "Compras de categorias de gasto":
     "La parte de Gastos de operacion que son compras de productos cuya categoria esta marcada como gasto en Configuracion > Categorias. Es exactamente lo que le falta al renglon de Compras para cuadrar contra el modulo de Compras.",
-  "Mermas y salidas sin venta":
-    "La parte de Gastos de operacion que salio del inventario sin venderse: las mermas mas las salidas por creditos al costo, los mismos montos de esos dos renglones de arriba. Se cobran aqui porque se restaron del costo de ventas.",
   "Utilidad bruta":
     "Venta total - Costo de ventas: lo que deja la operacion antes de los gastos. El % es respecto a la Venta total.",
   "Utilidad despues de gastos":
