@@ -117,7 +117,9 @@ export function purchaseSortValue(row: PurchaseRow, key: PurchaseSortKey): strin
     case "supplier":
       return row.supplierName ? row.supplierName.toLowerCase() : null;
     case "price":
-      return row.totalPrice;
+      // La columna muestra lo que se le paga al proveedor, asi que ordena por eso. Con tasas
+      // distintas entre renglones, ordenar por subtotal daria otro orden que el que se ve.
+      return row.taxes.total;
     case "cost":
       return row.unitCostValue;
   }

@@ -17,7 +17,8 @@ export async function buildPurchasesWorkbook(rows: PurchaseRow[]): Promise<Buffe
     // El costo unitario va pegado a la unidad porque se leen juntos: $195.00 / KG. El importe
     // y el proveedor quedan al final, que es por donde se revisa contra la factura.
     { header: "Costo unitario", key: "unitCost", width: 14, style: { numFmt: '"$"#,##0.0000' } },
-    { header: "Importe total", key: "price", width: 14, style: { numFmt: '"$"#,##0.00' } },
+    // "Importe total" junto a "Total con impuestos" no decia cual era cual.
+    { header: "Subtotal", key: "price", width: 14, style: { numFmt: '"$"#,##0.00' } },
     // El desglose va despues del importe y antes del proveedor: se lee de izquierda a derecha
     // como viene en la factura, subtotal primero y lo que se paga al final. Las tasas salen
     // junto a su monto para poder auditar de donde salio cada cifra.

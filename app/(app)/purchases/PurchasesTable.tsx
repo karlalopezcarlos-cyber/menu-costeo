@@ -36,14 +36,22 @@ export type PurchaseListFilterValues = {
 
 export type CategoryOption = { name: string; groupName: string | null };
 
-const COLUMNS: { key: PurchaseSortKey; label: string }[] = [
+const COLUMNS: { key: PurchaseSortKey; label: string; hint?: string }[] = [
   { key: "folio", label: "Factura" },
   { key: "date", label: "Fecha" },
   { key: "product", label: "Producto" },
   { key: "quantity", label: "Cantidad" },
   { key: "supplier", label: "Proveedor" },
-  { key: "price", label: "Precio" },
-  { key: "cost", label: "Costo unitario resultante" },
+  {
+    key: "price",
+    label: "Precio",
+    hint: "Lo que se le paga al proveedor, con IVA y IEPS. Debajo, el subtotal, que es lo que entra al costeo.",
+  },
+  {
+    key: "cost",
+    label: "Costo unitario resultante",
+    hint: "Sale del subtotal, no del total: el IVA de compras es acreditable y no es costo del negocio.",
+  },
 ];
 
 export default function PurchasesTable({
@@ -496,6 +504,7 @@ export default function PurchasesTable({
                 <th key={column.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
+                    title={column.hint}
                     onClick={() => handleSort(column.key)}
                     className="flex items-center gap-1 hover:text-neutral-900"
                   >
@@ -509,6 +518,7 @@ export default function PurchasesTable({
                 <th key={column.key} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   <button
                     type="button"
+                    title={column.hint}
                     onClick={() => handleSort(column.key)}
                     className="flex items-center gap-1 hover:text-neutral-900"
                   >
@@ -575,7 +585,17 @@ export default function PurchasesTable({
                 <td className="px-4 py-3 text-neutral-500">{purchase.quantityLabel}</td>
                 <td className="px-4 py-3 text-neutral-500">{purchase.unitLabel}</td>
                 <td className="px-4 py-3 text-neutral-500">{purchase.supplierName ?? "-"}</td>
-                <td className="px-4 py-3">{formatMoney(purchase.totalPrice)}</td>
+                <td className="px-4 py-3">
+                  {formatMoney(purchase.taxes.total)}
+                  {/* Cuando hay impuesto, el subtotal se queda a la vista: es el numero del
+                      que sale el costo unitario de la columna de al lado, y sin el la division
+                      no cuadra (232 / 2 no da 100). */}
+                  {purchase.taxes.total !== purchase.taxes.subtotal && (
+                    <p className="text-xs text-neutral-400">
+                      {formatMoney(purchase.taxes.subtotal)} + imp.
+                    </p>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center">
                     <span className="mr-1.5 inline-flex w-2 shrink-0 justify-center">
