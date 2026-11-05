@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { CLASSIFICATION_LABELS, type IvaMode, type MenuEngineeringRow } from "@/lib/menu-engineering";
+import { excelSheetName } from "@/lib/excel/sheet-name";
 
 export async function buildMenuEngineeringWorkbook(
   rows: MenuEngineeringRow[],
@@ -8,8 +9,9 @@ export async function buildMenuEngineeringWorkbook(
   ivaMode: IvaMode,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const periodLabel = `${fromDate.toLocaleDateString("es-MX", { timeZone: "UTC" })} a ${toDate.toLocaleDateString("es-MX", { timeZone: "UTC" })}`;
-  const sheet = workbook.addWorksheet(`Ingenieria de menu (${periodLabel})`.slice(0, 31));
+  // El periodo no cabe en el nombre de la pestana (Excel corta en 31 y lo dejaba partido a la
+  // mitad, "Ingenieria de menu (1-10-2026 a"). Ya va completo en el nombre del archivo.
+  const sheet = workbook.addWorksheet(excelSheetName("Ingenieria de menu"));
 
   sheet.columns = [
     { header: "Platillo", key: "recipeName", width: 30 },

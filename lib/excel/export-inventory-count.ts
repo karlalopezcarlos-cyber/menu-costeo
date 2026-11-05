@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { excelSheetName } from "@/lib/excel/sheet-name";
 
 export type InventoryCountExportRow = {
   categoryName: string | null;
@@ -15,7 +16,7 @@ export async function buildInventoryCountWorkbook(
   rows: InventoryCountExportRow[],
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheetName = `Conteo ${dateLabel}`.replace(/[*?:\\/[\]]/g, "-").slice(0, 31);
+  const sheetName = excelSheetName(`Conteo ${dateLabel}`);
   const sheet = workbook.addWorksheet(sheetName);
 
   sheet.columns = [

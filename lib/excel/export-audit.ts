@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { excelSheetName } from "@/lib/excel/sheet-name";
 import type { AuditRow } from "@/lib/audit";
 
 const QTY_FMT = "#,##0.00";
@@ -18,8 +19,8 @@ export async function buildAuditWorkbook(
   finalLabel: string | null,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const periodLabel = `${initialLabel}${finalLabel ? ` a ${finalLabel}` : ""}`.replace(/[*?:\\/[\]]/g, "-");
-  const sheet = workbook.addWorksheet(`Auditoria (${periodLabel})`.slice(0, 31));
+  const periodLabel = `${initialLabel}${finalLabel ? ` a ${finalLabel}` : ""}`;
+  const sheet = workbook.addWorksheet(excelSheetName(`Auditoria (${periodLabel})`));
 
   sheet.columns = [
     { header: "Grupo", key: "costGroup", width: 16 },
