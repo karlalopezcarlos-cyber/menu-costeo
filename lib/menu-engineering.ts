@@ -34,6 +34,8 @@ export type MenuEngineeringRow = {
   grossUnitPrice: Decimal;
   unitPrice: Decimal;
   cost: Decimal;
+  /** Lo que costo el platillo en todo el periodo: costo unitario x cantidad vendida. */
+  totalCost: Decimal;
   /** Lo que deja UNA pieza: precio - costo. Es lo que clasifica el platillo. */
   margin: Decimal;
   /** Lo que dejo el platillo en todo el periodo: margen unitario x cantidad vendida. */
@@ -102,6 +104,7 @@ export async function computeMenuEngineeringReport(
     // Un margen unitario alto no es dinero hasta que se multiplica por lo que se vendio: un
     // platillo de $150 de margen que sale 3 veces al mes deja menos que uno de $28 que sale 345.
     const totalMargin = margin.times(quantitySold);
+    const totalCost = cost.times(quantitySold);
     const costPct = unitPrice.isZero() ? null : cost.dividedBy(unitPrice).times(100);
     const popularity = totalQty.isZero() ? new Decimal(0) : quantitySold.dividedBy(totalQty);
 
@@ -112,6 +115,7 @@ export async function computeMenuEngineeringReport(
       grossUnitPrice,
       unitPrice,
       cost,
+      totalCost,
       margin,
       totalMargin,
       costPct,
@@ -120,14 +124,36 @@ export async function computeMenuEngineeringReport(
     };
   });
 
-  const weightedMarginSum = partial.reduce(
-    (sum, row) => sum.plus(row.margin.times(row.quantitySold)),
-    new Decimal(0),
-  );
-  const averageMargin = totalQty.isZero() ? new Decimal(0) : weightedMarginSum.dividedBy(totalQty);
-  const popularityThreshold = new Decimal(1).dividedBy(partial.length).times(POPULARITY_THRESHOLD_FACTOR);
+  return classifyMenuItems(partial, totalQty);
+}
 
-  return partial.map((row) => {
+export type MenuEngineeringThresholds = {
+  /** Margen de contribucion promedio ponderado: margen total del menu / piezas vendidas. */
+  averageMargin: Decimal;
+  /** 70% de la popularidad esperada si todo se vendiera por igual (1/N). */
+  popularityThreshold: Decimal;
+};
+
+/**
+ * Kasavana & Smith, los dos ejes del metodo:
+ *
+ *   - Margen: el margen de contribucion UNITARIO contra el promedio PONDERADO del menu
+ *     (margen total / piezas vendidas), no contra el promedio simple de los platillos. Un
+ *     promedio simple le daria el mismo peso a un platillo que sale 3 veces al mes que a uno
+ *     que sale 345, y correria el umbral hacia los platillos raros y caros.
+ *   - Popularidad: la participacion en piezas contra el 70% de 1/N. El 70% es el umbral
+ *     original del metodo: exigir el 100% condenaria por definicion a la mitad del menu.
+ *
+ * Es deliberado que el costo porcentual no entre: el metodo compara dinero, no porcentajes,
+ * justo porque un platillo de costo bajo puede dejar menos pesos que uno de costo alto.
+ */
+export function classifyMenuItems<T extends { margin: Decimal; quantitySold: Decimal; popularity: Decimal }>(
+  items: T[],
+  totalQty: Decimal,
+): (T & { classification: MenuEngineeringClassification })[] {
+  const { averageMargin, popularityThreshold } = menuEngineeringThresholds(items, totalQty);
+
+  return items.map((row) => {
     const highMargin = row.margin.gte(averageMargin);
     const highPopularity = row.popularity.gte(popularityThreshold);
 
@@ -139,4 +165,21 @@ export async function computeMenuEngineeringReport(
 
     return { ...row, classification };
   });
+}
+
+export function menuEngineeringThresholds(
+  items: { margin: Decimal; quantitySold: Decimal }[],
+  totalQty: Decimal,
+): MenuEngineeringThresholds {
+  const weightedMarginSum = items.reduce(
+    (sum, row) => sum.plus(row.margin.times(row.quantitySold)),
+    new Decimal(0),
+  );
+  return {
+    averageMargin: totalQty.isZero() ? new Decimal(0) : weightedMarginSum.dividedBy(totalQty),
+    popularityThreshold:
+      items.length === 0
+        ? new Decimal(0)
+        : new Decimal(1).dividedBy(items.length).times(POPULARITY_THRESHOLD_FACTOR),
+  };
 }

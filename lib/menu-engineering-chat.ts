@@ -20,7 +20,7 @@ function rowLine(row: MenuEngineeringRow): string {
   const popularityPct = `${row.popularity.times(100).toFixed(1)}%`;
   const costPctText = row.costPct !== null ? `${row.costPct.toFixed(1)}%` : "N/D";
   const flag = row.costUnreliable ? " (costo no confiable, posiblemente falten compras capturadas)" : "";
-  return `- ${row.recipeName}: ${row.quantitySold.toString()} vendidos (${popularityPct} de popularidad), precio ${formatMoney(row.unitPrice.toNumber())}, costo ${formatMoney(row.cost.toNumber())} (${costPctText} del precio), margen unitario ${formatMoney(row.margin.toNumber())}, margen total del periodo ${formatMoney(row.totalMargin.toNumber())} -- ${CLASSIFICATION_LABELS[row.classification]}${flag}`;
+  return `- ${row.recipeName}: ${row.quantitySold.toString()} vendidos (${popularityPct} de popularidad), precio ${formatMoney(row.unitPrice.toNumber())}, costo unitario ${formatMoney(row.cost.toNumber())} (${costPctText} del precio), costo total del periodo ${formatMoney(row.totalCost.toNumber())}, margen unitario ${formatMoney(row.margin.toNumber())}, margen total del periodo ${formatMoney(row.totalMargin.toNumber())} -- ${CLASSIFICATION_LABELS[row.classification]}${flag}`;
 }
 
 /**

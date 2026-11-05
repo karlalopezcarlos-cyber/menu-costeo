@@ -41,6 +41,7 @@ export type MenuEngineeringRowView = {
   quantitySold: number;
   unitPrice: number;
   cost: number;
+  totalCost: number;
   margin: number;
   totalMargin: number;
   costPct: number | null;
@@ -56,7 +57,7 @@ const COLUMNS: { key: SortKey; label: (ivaMode: IvaMode) => string }[] = [
   { key: "name", label: () => "Platillo" },
   { key: "quantitySold", label: () => "Cantidad vendida" },
   { key: "unitPrice", label: (iva) => `Precio${iva === "sin" ? " (sin IVA)" : ""}` },
-  { key: "cost", label: () => "Costo" },
+  { key: "cost", label: () => "Costo total" },
   { key: "margin", label: () => "Margen total" },
   { key: "costPct", label: () => "Costo %" },
   { key: "popularity", label: () => "% Popularidad" },
@@ -72,7 +73,9 @@ function sortValue(row: MenuEngineeringRowView, key: SortKey): string | number |
     case "unitPrice":
       return row.unitPrice;
     case "cost":
-      return row.cost;
+      // Misma regla que en el margen: la columna muestra el costo del periodo, asi que
+      // ordenar por ella ordena por eso.
+      return row.totalCost;
     case "margin":
       // La columna muestra el margen del periodo, asi que ordenar por ella tiene que ordenar
       // por eso mismo y no por el unitario, que es un ranking distinto.
@@ -138,9 +141,10 @@ export default function MenuEngineeringTable({
       visibleRows.reduce(
         (acc, row) => ({
           quantitySold: acc.quantitySold + row.quantitySold,
+          totalCost: acc.totalCost + row.totalCost,
           totalMargin: acc.totalMargin + row.totalMargin,
         }),
-        { quantitySold: 0, totalMargin: 0 },
+        { quantitySold: 0, totalCost: 0, totalMargin: 0 },
       ),
     [visibleRows],
   );
@@ -230,7 +234,10 @@ export default function MenuEngineeringTable({
                 </td>
                 <td className="px-4 py-3">{row.quantitySold}</td>
                 <td className="px-4 py-3">{formatMoney(row.unitPrice)}</td>
-                <td className="px-4 py-3">{formatMoney(row.cost)}</td>
+                <td className="px-4 py-3">
+                  {formatMoney(row.totalCost)}
+                  <p className="text-xs text-neutral-400">{formatMoney(row.cost)} c/u</p>
+                </td>
                 <td className="px-4 py-3">
                   {formatMoney(row.totalMargin)}
                   {/* El unitario se queda a la vista en chico: es el que decide la clasificacion
@@ -269,7 +276,7 @@ export default function MenuEngineeringTable({
                 <td className="px-4 py-3">Total del periodo{hasFilters ? " (filtrado)" : ""}</td>
                 <td className="px-4 py-3">{totals.quantitySold}</td>
                 <td className="px-4 py-3"></td>
-                <td className="px-4 py-3"></td>
+                <td className="px-4 py-3">{formatMoney(totals.totalCost)}</td>
                 <td className="px-4 py-3">{formatMoney(totals.totalMargin)}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3"></td>
