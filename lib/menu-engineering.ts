@@ -30,6 +30,8 @@ export async function loadSalesIvaRate(sucursalId: string): Promise<number> {
 export type MenuEngineeringRow = {
   recipeId: string;
   recipeName: string;
+  /** Categoria de la receta, para poder analizar grupos comparables por separado. */
+  categoryName: string | null;
   quantitySold: Decimal;
   grossUnitPrice: Decimal;
   unitPrice: Decimal;
@@ -61,14 +63,17 @@ export async function computeMenuEngineeringReport(
   const ivaRate = ivaMode === "sin" ? await loadSalesIvaRate(sucursalId) : 0;
   const sales = await prisma.dailySale.findMany({
     where: { sucursalId, date: { gte: fromDate, lte: toDate } },
-    include: { recipe: true },
+    include: { recipe: { include: { category: { select: { name: true } } } } },
   });
 
   if (sales.length === 0) return [];
 
   // Puede haber varias filas por receta (una por dia) dentro del periodo; se agrupan sumando
   // la cantidad y usando un precio promedio ponderado por cantidad.
-  const byRecipe = new Map<string, { recipeName: string; quantitySold: Decimal; weightedPriceSum: Decimal }>();
+  const byRecipe = new Map<
+    string,
+    { recipeName: string; categoryName: string | null; quantitySold: Decimal; weightedPriceSum: Decimal }
+  >();
   for (const sale of sales) {
     const qty = new Decimal(sale.quantitySold);
     const existing = byRecipe.get(sale.recipeId);
@@ -78,6 +83,7 @@ export async function computeMenuEngineeringReport(
     } else {
       byRecipe.set(sale.recipeId, {
         recipeName: sale.recipe.name,
+        categoryName: sale.recipe.category?.name ?? null,
         quantitySold: qty,
         weightedPriceSum: qty.times(sale.unitPrice),
       });
@@ -120,6 +126,7 @@ export async function computeMenuEngineeringReport(
     return {
       recipeId,
       recipeName: agg.recipeName,
+      categoryName: agg.categoryName,
       quantitySold,
       grossUnitPrice,
       unitPrice,

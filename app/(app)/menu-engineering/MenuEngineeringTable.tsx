@@ -3,56 +3,13 @@
 import { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/format";
 
-// No importamos lib/menu-engineering aqui (aunque sea solo por tipos): ese modulo carga
-// @/lib/prisma en su cadena de imports, lo cual rompe el bundle de cliente. Duplicamos las
-// constantes minimas que necesita esta tabla.
-export type MenuEngineeringClassification = "STAR" | "PLOWHORSE" | "PUZZLE" | "DOG";
-export type IvaMode = "con" | "sin";
-
-const CLASSIFICATION_LABELS: Record<MenuEngineeringClassification, string> = {
-  STAR: "Estrella",
-  PLOWHORSE: "Caballo de batalla",
-  PUZZLE: "Acertijo",
-  DOG: "Perro",
-};
-
-const BADGE_CLASSES: Record<MenuEngineeringClassification, string> = {
-  STAR: "bg-green-100 text-green-800",
-  PLOWHORSE: "bg-blue-100 text-blue-800",
-  PUZZLE: "bg-amber-100 text-amber-800",
-  DOG: "bg-red-100 text-red-800",
-};
-
-/** Valor del filtro para los platillos que no se pudieron costear. */
-const SIN_CLASIFICAR = "none";
-
-/** De mejor a peor, que es como se lee el reporte y como conviene ofrecerlas en el filtro. */
-const CLASSIFICATION_ORDER: MenuEngineeringClassification[] = ["STAR", "PLOWHORSE", "PUZZLE", "DOG"];
-
-const CLASSIFICATION_ICONS: Record<MenuEngineeringClassification, string> = {
-  STAR: "⭐",
-  PLOWHORSE: "🐴",
-  PUZZLE: "🧩",
-  DOG: "🐶",
-};
-
-/** Version con numeros planos de MenuEngineeringRow (Decimal.js no es serializable de Server a
- * Client Component), armada en page.tsx antes de pasarla a esta tabla. */
-export type MenuEngineeringRowView = {
-  recipeId: string;
-  recipeName: string;
-  quantitySold: number;
-  unitPrice: number;
-  cost: number;
-  totalCost: number;
-  margin: number;
-  totalMargin: number;
-  costPct: number | null;
-  popularity: number;
-  classification: MenuEngineeringClassification | null;
-  costUnreliable: boolean;
-  costIssues: string[];
-};
+import {
+  BADGE_CLASSES,
+  CLASSIFICATION_ICONS,
+  CLASSIFICATION_LABELS,
+  type IvaMode,
+  type MenuEngineeringRowView,
+} from "@/lib/menu-engineering-view";
 
 type SortKey = "name" | "quantitySold" | "unitPrice" | "cost" | "margin" | "costPct" | "popularity" | "classification";
 type SortDir = "asc" | "desc";
@@ -103,10 +60,6 @@ export default function MenuEngineeringTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("quantitySold");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [search, setSearch] = useState("");
-  const [classificationFilter, setClassificationFilter] = useState<
-    "all" | MenuEngineeringClassification | typeof SIN_CLASIFICAR
-  >("all");
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -132,24 +85,10 @@ export default function MenuEngineeringTable({
     });
   }, [rows, sortKey, sortDir]);
 
-  const visibleRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return sortedRows.filter((row) => {
-      if (term && !row.recipeName.toLowerCase().includes(term)) return false;
-      if (classificationFilter === SIN_CLASIFICAR && row.classification !== null) return false;
-      if (
-        classificationFilter !== "all" &&
-        classificationFilter !== SIN_CLASIFICAR &&
-        row.classification !== classificationFilter
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [sortedRows, search, classificationFilter]);
+  // Las filas llegan ya filtradas por la vista: tabla y matriz comparten el mismo filtro para
+  // que nunca muestren conjuntos distintos.
+  const visibleRows = sortedRows;
 
-  // El total sigue al filtro: preguntar "cuanto me dejaron los perros" es justo para lo que
-  // sirve el filtro, y un total que ignora lo filtrado no responde nada.
   const totals = useMemo(
     () =>
       visibleRows.reduce(
@@ -163,51 +102,10 @@ export default function MenuEngineeringTable({
     [visibleRows],
   );
 
-  const hasFilters = !!search.trim() || classificationFilter !== "all";
   const sinCostear = visibleRows.filter((row) => row.costUnreliable).length;
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar platillo..."
-          className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
-        />
-        <select
-          value={classificationFilter}
-          onChange={(e) =>
-            setClassificationFilter(e.target.value as "all" | MenuEngineeringClassification | typeof SIN_CLASIFICAR)
-          }
-          className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
-        >
-          <option value="all">Todas las clasificaciones</option>
-          {CLASSIFICATION_ORDER.map((c) => (
-            <option key={c} value={c}>
-              {CLASSIFICATION_ICONS[c]} {CLASSIFICATION_LABELS[c]}
-            </option>
-          ))}
-          <option value={SIN_CLASIFICAR}>⚠ Sin clasificar (revisar receta)</option>
-        </select>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("");
-              setClassificationFilter("all");
-            }}
-            className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
-          >
-            Limpiar
-          </button>
-        )}
-        <p className="text-sm text-neutral-500">
-          {visibleRows.length} de {rows.length} platillos
-        </p>
-      </div>
-
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           {/* top-16, no top-0: la barra de la app es sticky y mide h-16, asi que con
@@ -230,7 +128,7 @@ export default function MenuEngineeringTable({
             </tr>
           </thead>
           <tbody>
-            {rows.length > 0 && visibleRows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
                 <td colSpan={COLUMNS.length} className="px-4 py-6 text-center text-neutral-400">
                   Ningun platillo coincide con el filtro.
@@ -300,7 +198,7 @@ export default function MenuEngineeringTable({
           {visibleRows.length > 0 && (
             <tfoot className="border-t-2 border-neutral-200 bg-neutral-50 font-semibold text-neutral-900">
               <tr>
-                <td className="px-4 py-3">Total del periodo{hasFilters ? " (filtrado)" : ""}</td>
+                <td className="px-4 py-3">Total del periodo</td>
                 <td className="px-4 py-3">{totals.quantitySold}</td>
                 <td className="px-4 py-3"></td>
                 <td className="px-4 py-3">{formatMoney(totals.totalCost)}</td>

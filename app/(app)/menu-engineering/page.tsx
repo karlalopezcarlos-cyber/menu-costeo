@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { requireSucursalContext } from "@/lib/tenant";
-import { computeMenuEngineeringReport, loadSalesIvaRate, type IvaMode } from "@/lib/menu-engineering";
-import MenuEngineeringTable, { type MenuEngineeringRowView } from "./MenuEngineeringTable";
+import {
+  computeMenuEngineeringReport,
+  loadSalesIvaRate,
+  menuEngineeringThresholds,
+  type IvaMode,
+} from "@/lib/menu-engineering";
+import type { MenuEngineeringRowView } from "@/lib/menu-engineering-view";
+import MenuEngineeringView from "./MenuEngineeringView";
 import MenuEngineeringChatDialog from "./MenuEngineeringChatDialog";
 
 function toDateInputValue(d: Date): string {
@@ -28,9 +34,14 @@ export default async function MenuEngineeringPage({
     computeMenuEngineeringReport(user.sucursalId, fromDate, toDate, ivaMode),
     loadSalesIvaRate(user.sucursalId),
   ]);
+  // Los mismos umbrales con los que se clasifico, para que la matriz dibuje sus rayas justo
+  // donde el reporte partio los cuadrantes y no en un promedio recalculado aparte.
+  const thresholds = menuEngineeringThresholds(rows);
+
   const rowViews: MenuEngineeringRowView[] = rows.map((row) => ({
     recipeId: row.recipeId,
     recipeName: row.recipeName,
+    categoryName: row.categoryName,
     quantitySold: row.quantitySold.toNumber(),
     unitPrice: row.unitPrice.toNumber(),
     cost: row.cost.toNumber(),
@@ -135,7 +146,12 @@ export default async function MenuEngineeringPage({
           No hay ventas capturadas para este periodo todavia.
         </p>
       ) : (
-        <MenuEngineeringTable rows={rowViews} ivaMode={ivaMode} />
+        <MenuEngineeringView
+          rows={rowViews}
+          ivaMode={ivaMode}
+          averageMargin={thresholds.averageMargin.toNumber()}
+          popularityThreshold={thresholds.popularityThreshold.toNumber()}
+        />
       )}
     </div>
   );
