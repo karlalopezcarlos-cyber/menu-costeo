@@ -45,8 +45,8 @@ export function buildIncomeStatementContext(
   );
   lines.push("");
   lines.push("Cada renglon muestra el monto y, cuando aplica, un porcentaje entre parentesis:");
-  lines.push("- Para Ventas netas PV, Salidas a otra sucursal y Venta total, el % es la participacion de esa columna dentro del Consolidado.");
-  lines.push("- Para Costo de ventas, Costo potencial y Variacion, el % es respecto a la Venta total de esa misma columna.");
+  lines.push("- Para Venta servicio, Otras ventas y Venta total, el % es la participacion de esa columna dentro del Consolidado.");
+  lines.push("- Para los renglones de costo y la Variacion, el % es respecto a la Venta total de esa misma columna.");
   lines.push("");
   for (const row of rows) {
     lines.push(rowLine(row, nombres));

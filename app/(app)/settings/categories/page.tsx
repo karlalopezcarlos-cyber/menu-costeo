@@ -2,16 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import {
   deleteCategory,
+  updateCategoryExpense,
+  updateCategoryExpenseGroup,
   updateCategoryGroup,
   updateCategoryInventoriable,
   updateCategoryName,
-  updateCategoryExpense,
   updateCategoryTransformable,
 } from "./actions";
 import NewCategoryForm from "./NewCategoryForm";
 import SettingsNav from "../SettingsNav";
 import CategoryGroupSelect from "../CategoryGroupSelect";
 import InlineNameEditor from "../InlineNameEditor";
+import ExpenseGroupSelect from "../ExpenseGroupSelect";
 import InventoriableToggle from "../InventoriableToggle";
 
 export default async function ProductCategoriesPage() {
@@ -104,6 +106,17 @@ export default async function ProductCategoriesPage() {
                     action={updateCategoryExpense}
                     label="Es gasto"
                   />
+                  {/* Solo cuando es gasto: en las demas categorias la compra va al costo de
+                      ventas y el grupo no aplica. */}
+                  {category.isExpense && (
+                    <div className="mt-1.5">
+                      <ExpenseGroupSelect
+                        id={category.id}
+                        initialValue={category.expenseGroup}
+                        action={updateCategoryExpenseGroup}
+                      />
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <form

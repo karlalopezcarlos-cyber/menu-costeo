@@ -187,7 +187,10 @@ export default async function DashboardPage({
     ivaView === "conIva" ? "con" : "sin"
   }`;
   const ventaTotal = result.ventaTotal.consolidado;
-  const costoPct = ventaTotal !== 0 ? (result.costoDeVentas.consolidado / ventaTotal) * 100 : null;
+  // El neto, no el bruto: es el que se compara contra el costo teorico del mosaico de al lado,
+  // y la Variacion del tercero es exactamente la resta de esos dos. Con el bruto, los tres
+  // numeros de esta fila no cerrarian entre si.
+  const costoPct = ventaTotal !== 0 ? (result.costoNetoDeVentas.consolidado / ventaTotal) * 100 : null;
   const potencialPct = ventaTotal !== 0 ? (result.costoPotencial.consolidado / ventaTotal) * 100 : null;
 
   return (
@@ -240,14 +243,14 @@ export default async function DashboardPage({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Venta total" value={formatMoney(result.ventaTotal.consolidado)} hint="Periodo seleccionado" />
         <StatTile
-          label="Costo de ventas"
-          value={formatMoney(result.costoDeVentas.consolidado)}
+          label="Costo neto de ventas"
+          value={formatMoney(result.costoNetoDeVentas.consolidado)}
           hint={costoPct !== null ? `${costoPct.toFixed(2)}% de la venta total` : "Sin venta en el periodo"}
         />
         <StatTile
-          label="Costo potencial"
+          label="Costo teorico"
           value={potencialPct !== null ? `${potencialPct.toFixed(2)}%` : "-"}
-          hint={`Teorico segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
+          hint={`Segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
         />
         <StatTile
           label="Variacion"

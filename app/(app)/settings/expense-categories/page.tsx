@@ -4,10 +4,12 @@ import { formatMoney } from "@/lib/format";
 import SettingsNav from "../SettingsNav";
 import InlineNameEditor from "../InlineNameEditor";
 import IvaRateInput from "../IvaRateInput";
+import ExpenseGroupSelect from "../ExpenseGroupSelect";
 import {
   createExpenseCategory,
   deleteExpenseCategory,
   renameExpenseCategory,
+  setExpenseCategoryGroup,
   setExpenseCategoryIvaRate,
 } from "./actions";
 
@@ -32,6 +34,11 @@ export default async function ExpenseCategoriesPage() {
           leerlo neto en el Estado de Resultados. Arranca en 0: ponle 16 a los que si lo traen
           en el recibo, como la renta y la luz, y dejale 0 a los que no, como la nomina.
         </p>
+        <p className="mt-2 text-sm text-neutral-500">
+          El grupo decide en que renglon de gastos cae cada tipo en el Estado de Resultados. Lo
+          que dejes sin asignar no se pierde: se suma al total en un renglon aparte, &quot;Sin
+          grupo asignado&quot;, para que se vea que falta acomodarlo.
+        </p>
       </div>
 
       <form action={createExpenseCategory} className="flex gap-2">
@@ -54,6 +61,9 @@ export default async function ExpenseCategoriesPage() {
           <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             <tr>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Tipo</th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                Grupo en el Estado de Resultados
+              </th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">IVA</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Gastos</th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
@@ -65,7 +75,7 @@ export default async function ExpenseCategoriesPage() {
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
                   Todavia no hay tipos de gasto.
                 </td>
               </tr>
@@ -77,6 +87,13 @@ export default async function ExpenseCategoriesPage() {
                     id={category.id}
                     initialName={category.name}
                     action={renameExpenseCategory}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <ExpenseGroupSelect
+                    id={category.id}
+                    initialValue={category.expenseGroup}
+                    action={setExpenseCategoryGroup}
                   />
                 </td>
                 <td className="px-4 py-3">

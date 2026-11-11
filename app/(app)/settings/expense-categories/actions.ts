@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseExpenseGroup } from "@/lib/expense-groups";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { Prisma } from "@/generated/prisma/client";
@@ -97,4 +98,21 @@ export async function setExpenseCategoryIvaRate(categoryId: string, value: strin
   });
 
   revalidatePath("/settings/expense-categories");
+}
+
+/**
+ * El renglon del Estado de Resultados donde caen los gastos de este tipo. No toca nada mas:
+ * los gastos ya capturados siguen apuntando a su tipo, asi que cambiar el grupo los reacomoda
+ * en el reporte sin reescribirles nada.
+ */
+export async function setExpenseCategoryGroup(categoryId: string, value: string) {
+  const user = await requireOrgSession();
+
+  await prisma.expenseCategory.updateMany({
+    where: { id: categoryId, organizationId: user.organizationId },
+    data: { expenseGroup: parseExpenseGroup(value) },
+  });
+
+  revalidatePath("/settings/expense-categories");
+  revalidatePath("/dashboard");
 }

@@ -2,6 +2,13 @@ import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { computeTaxes, sinIva } from "@/lib/taxes";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import type { ExpenseGroup } from "@/generated/prisma/client";
+import {
+  EXPENSE_GROUP_LABELS,
+  EXPENSE_GROUP_ORDER,
+  SIN_GRUPO_GASTO,
+  type ExpenseGroupKey,
+} from "@/lib/expense-groups";
 /** Columna del reporte: un grupo de costo de la organizacion. */
 export type CostGroupRef = { id: string; name: string };
 
@@ -53,6 +60,12 @@ export type IncomeStatementResult = {
   comprasDeGasto: number;
   /// Solo las mermas y las salidas por creditos al costo, valuadas.
   salidasSinVenta: number;
+  /// Los gastos partidos en los cuatro grupos del reporte, mas lo que falta por clasificar.
+  gastosPorGrupo: Record<ExpenseGroupKey, number>;
+  /// Merma + consumo operativo + pruebas de menu, en un solo renglon.
+  creditosYMermas: GroupAmounts;
+  /// Costo de ventas menos los creditos al costo: lo que costo exclusivamente lo que se vendio.
+  costoNetoDeVentas: GroupAmounts;
   /// Con que vista se calculo este resultado.
   ivaView: IvaView;
   /// La tasa de IVA de ventas que se uso para desbrutear, en por ciento.
@@ -71,6 +84,13 @@ export type IncomeStatementResult = {
 };
 
 export type PctMode = "share" | "costPct" | "none";
+
+export {
+  SIN_GRUPO_GASTO,
+  EXPENSE_GROUP_LABELS,
+  EXPENSE_GROUP_ORDER,
+  type ExpenseGroupKey,
+} from "@/lib/expense-groups";
 
 /**
  * Renglon del pie del reporte: un solo numero consolidado, sin desglose por grupo de costo.
@@ -170,26 +190,29 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
   const columns = result.groups.map((g) => g.id);
   const con = (opts: Parameters<typeof buildRow>[3] = {}) => ({ ...opts, columns });
   return [
-    buildRow("Ventas netas PV", result.ventasNetasPV, "share", con()),
-    buildRow("Salidas a otra sucursal", result.salidasAOtraSucursal, "share", con()),
+    buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
+    buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con()),
     buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
     buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
-    buildRow("Entradas desde otra sucursal", result.entradasDesdeOtraSucursal, "none", con()),
-    buildRow("Compras", result.compras, "costPct", con({ ventaTotal: result.ventaTotal })),
+    buildRow("Otras compras", result.entradasDesdeOtraSucursal, "none", con()),
+    buildRow("Compras directas", result.compras, "costPct", con({ ventaTotal: result.ventaTotal })),
     // "Existencia" (inicial + entradas + compras) se sigue calculando porque el costo de ventas
     // sale de ahi, pero no se muestra: es un subtotal intermedio que nadie lee y que solo hace
     // mas larga la tabla.
     buildRow("Inventario final", result.inventarioFinal, "none", con()),
-    buildRow("Salidas por creditos al costo", result.creditosAlCosto, "costPct", con({
-      ventaTotal: result.ventaTotal,
-    })),
-    buildRow("Mermas", result.mermas, "costPct", con({ ventaTotal: result.ventaTotal })),
     buildRow("Costo de ventas", result.costoDeVentas, "costPct", con({
       bold: true,
       highlight: true,
       ventaTotal: result.ventaTotal,
     })),
-    buildRow("Costo potencial", result.costoPotencial, "costPct", con({
+    buildRow("Creditos al costo", result.creditosYMermas, "costPct", con({
+      ventaTotal: result.ventaTotal,
+    })),
+    buildRow("Costo neto de ventas", result.costoNetoDeVentas, "costPct", con({
+      bold: true,
+      ventaTotal: result.ventaTotal,
+    })),
+    buildRow("Costo teorico de ventas", result.costoPotencial, "costPct", con({
       highlight: true,
       ventaTotal: result.ventaTotal,
     })),
@@ -206,10 +229,51 @@ export function buildIncomeStatementFooterRows(
 ): IncomeStatementFooterRow[] {
   const ventaTotal = result.ventaTotal.consolidado;
   const pct = (n: number) => (ventaTotal !== 0 ? (n / ventaTotal) * 100 : null);
-  const utilidadBruta = ventaTotal - result.costoDeVentas.consolidado;
-  const gastos = result.gastosDeOperacion.consolidado;
-  const utilidad = utilidadBruta - gastos;
-  return [
+  const utilidadAntesDeGastos = ventaTotal - result.costoDeVentas.consolidado;
+  const totalGastos = result.gastosDeOperacion.consolidado;
+  const utilidad = utilidadAntesDeGastos - totalGastos;
+
+  const rows: IncomeStatementFooterRow[] = [
+    {
+      label: "Utilidad antes de gastos",
+      amount: utilidadAntesDeGastos,
+      pct: pct(utilidadAntesDeGastos),
+      bold: true,
+    },
+  ];
+
+  // Un renglon por grupo. Los que estan en cero no se pintan: un reporte lleno de ceros hace
+  // trabajar al ojo para nada. "Sin grupo asignado" es la excepcion -si trae dinero hay que
+  // verlo, porque es justo lo que falta clasificar.
+  for (const key of EXPENSE_GROUP_ORDER) {
+    const monto = result.gastosPorGrupo[key] ?? 0;
+    if (monto === 0) continue;
+    rows.push({ label: EXPENSE_GROUP_LABELS[key], amount: monto, pct: null, detail: true });
+  }
+
+  rows.push({ label: "Total de gastos", amount: totalGastos, pct: pct(totalGastos) });
+
+  // El desglose por modulo se queda, debajo del total: es lo unico que permite cuadrar los
+  // gastos contra cada pantalla de la app por separado. Los grupos de arriba parten el mismo
+  // dinero por tipo; estos dos lo parten por de donde salio.
+  rows.push(
+    { label: "— Gastos (modulo de Gastos)", amount: result.gastosDeModulo, pct: null, detail: true },
+    { label: "— Compras de categorias de gasto", amount: result.comprasDeGasto, pct: null, detail: true },
+  );
+
+  rows.push({
+    label: "Utilidad antes de impuestos",
+    amount: utilidad,
+    pct: pct(utilidad),
+    bold: true,
+    highlight: true,
+  });
+
+  // Va al final, despues de la utilidad y no entre la utilidad y los gastos: es una deuda
+  // acumulada, no un costo del periodo. Metida en medio de la resta se leeria como si tambien
+  // se restara.
+  rows.push(
+    { label: "Saldo a proveedores al dia", amount: result.saldoProveedores, pct: null },
     { label: "Monto pagado", amount: result.montoPagado, pct: null },
     {
       label: "Venta promedio diaria",
@@ -217,66 +281,52 @@ export function buildIncomeStatementFooterRows(
       pct: null,
       bold: true,
     },
-    { label: "Utilidad bruta", amount: utilidadBruta, pct: pct(utilidadBruta) },
-    { label: "Gastos de operacion", amount: gastos, pct: pct(gastos) },
-    // El desglose no es adorno: el total no cuadra contra ningun modulo, y cada renglon de
-    // aqui se compara contra una pantalla distinta de la app. El tercer componente —mermas y
-    // salidas sin venta— no lleva renglon propio: ya tiene los suyos mas arriba, y repetirlo
-    // aqui era leer el mismo dinero dos veces en la misma hoja.
-    { label: "Gastos (modulo de Gastos)", amount: result.gastosDeModulo, pct: null, detail: true },
-    {
-      label: "Compras de categorias de gasto",
-      amount: result.comprasDeGasto,
-      pct: null,
-      detail: true,
-    },
-    {
-      label: "Utilidad despues de gastos",
-      amount: utilidad,
-      pct: pct(utilidad),
-      bold: true,
-      highlight: true,
-    },
-    // Va al final, despues de la utilidad y no entre la utilidad bruta y los gastos: es una
-    // deuda acumulada, no un costo del periodo. Metida en medio de la resta se leeria como si
-    // tambien se restara.
-    { label: "Saldo a proveedores", amount: result.saldoProveedores, pct: null },
-  ];
+  );
+
+  return rows;
 }
 
 export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
-  "Ventas netas PV": "Ingresos por venta directa en esta sucursal (cantidad vendida x precio de venta).",
-  "Salidas a otra sucursal": "Valor, a costo, de productos y subrecetas enviados a otra sucursal por requisicion.",
-  "Venta total": "Ventas netas PV + Salidas a otra sucursal.",
+  "Venta servicio": "Ingresos por venta directa en esta sucursal (cantidad vendida x precio de venta).",
+  "Otras ventas": "Valor, a costo, de productos y subrecetas enviados a otra sucursal por requisicion.",
+  "Venta total": "Venta servicio + Otras ventas.",
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
-  "Entradas desde otra sucursal": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
-  Compras:
-    "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas a Gastos de operacion. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
+  "Otras compras": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
+  "Compras directas":
+    "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas al bloque de gastos. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
-  "Gastos de operacion":
-    "Suma de tres cosas: el modulo de Gastos (renta, luz, nomina) y las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza), que son los dos renglones de abajo, mas lo que salio del inventario sin venderse, que son los renglones de Mermas y de Salidas por creditos al costo de mas arriba. Por eso los dos renglones de abajo no suman el total, y por eso NO cuadra contra el modulo de Gastos solo: ese es nada mas el primero. No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
-  "Gastos (modulo de Gastos)":
-    "La parte de Gastos de operacion que sale del modulo de Gastos: renta, luz, nomina. Este renglon si cuadra contra el total de esa pantalla para las mismas fechas.",
-  "Compras de categorias de gasto":
-    "La parte de Gastos de operacion que son compras de productos cuya categoria esta marcada como gasto en Configuracion > Categorias. Es exactamente lo que le falta al renglon de Compras para cuadrar contra el modulo de Compras.",
-  "Utilidad bruta":
-    "Venta total - Costo de ventas: lo que deja la operacion antes de los gastos. El % es respecto a la Venta total.",
-  "Utilidad despues de gastos":
-    "Utilidad bruta - Gastos de operacion: lo que queda despues de pagar la renta, la luz, la nomina y todo lo que no es producto. El % es respecto a la Venta total.",
-  Mermas:
-    "Lo que se echo a perder, se cayo o caduco, registrado en Mermas y salidas. Se RESTA del costo de ventas —no se vendio— y se suma a Gastos de operacion, asi que tirar producto sigue pesando igual en la utilidad, solo que en su propio renglon y no escondido dentro del costo. El % es respecto a la Venta total.",
-  "Salidas por creditos al costo":
-    "Lo que salio del inventario sin ser venta: cortesias y consumo de personal (salida a servicio) y pruebas de cocina. Se registran en Mermas y salidas. Se restan del costo de ventas porque no se vendieron y se suman a Gastos de operacion, igual que la merma, que va en su propio renglon.",
   "Costo de ventas":
-    "Inventario inicial + Entradas + Compras - Inventario final - Salidas por creditos al costo - Mermas: lo que costo exclusivamente lo que se vendio. Todo lo que salio sin venderse se saca de aqui y se cobra en Gastos de operacion. Es el numero que se compara contra el costo potencial. El % es respecto a la Venta total.",
-  "Costo potencial":
-    "Costo teorico segun receta de lo que realmente se vendio (mismo calculo que Ingenieria de menu). El % es respecto a la Venta total.",
-  Variacion: "Costo potencial - Costo de ventas: positivo significa que el costo real fue menor al teorico (favorable).",
+    "Lo que salio del almacen en el periodo: inventario inicial + otras compras + compras directas - inventario final. Es todo lo que salio, se haya vendido o no: la merma y las cortesias todavia estan aqui adentro, y se leen en el renglon de abajo. El % es respecto a la Venta total.",
+  "Creditos al costo":
+    "Lo que salio del inventario sin venderse: merma (se echo a perder, se cayo, caduco), consumo operativo (cortesias y consumo de personal) y pruebas de menu. Los tres se capturan en el modulo de Mermas y salidas. No se restan de la utilidad por separado porque ya vienen dentro del Costo de ventas de arriba; este renglon sirve para saber cuanto de ese costo no fue venta.",
+  "Costo neto de ventas":
+    "Costo de ventas - Creditos al costo: lo que costo exclusivamente lo que si se vendio. Es el numero que se compara contra el Costo teorico de ventas, porque el teorico solo habla de los platillos vendidos.",
+  "Costo teorico de ventas":
+    "Lo que, segun las recetas, debieron costar los platillos vendidos en el periodo. El % es respecto a la Venta total.",
+  Variacion:
+    "Costo teorico de ventas - Costo neto de ventas: positivo significa que lo vendido costo menos que lo que decian las recetas (favorable). Se compara contra el costo NETO para no contar la merma dos veces: la merma ya tiene su propio renglon.",
+  "Utilidad antes de gastos":
+    "Venta total - Costo de ventas. Es lo que deja la operacion antes de los gastos del negocio. El % es respecto a la Venta total.",
+  "Gastos de administracion": "La parte de los gastos del periodo cuyo tipo esta marcado como administracion en Configuracion > Tipos de gasto.",
+  "Gastos de operacion": "La parte de los gastos del periodo cuyo tipo esta marcado como operacion en Configuracion > Tipos de gasto.",
+  "Gastos de personal": "La parte de los gastos del periodo cuyo tipo esta marcado como personal en Configuracion > Tipos de gasto.",
+  "Gastos financieros": "La parte de los gastos del periodo cuyo tipo esta marcado como financieros en Configuracion > Tipos de gasto.",
+  "Sin grupo asignado":
+    "Gastos cuyo tipo todavia no tiene grupo. No se reparten a ningun renglon porque nadie ha dicho a cual van: asignales grupo en Configuracion > Tipos de gasto (o en Configuracion > Categorias, si son compras de categorias de gasto) y este renglon desaparece.",
+  "Total de gastos":
+    "Suma de todos los grupos de gastos: el modulo de Gastos (renta, luz, nomina) mas las compras de categorias marcadas como gasto (agua, gas, desechables, limpieza). No entran al costo de ventas porque no son parte de lo que se vende, y no se reparten entre las columnas porque no son de alimentos ni de bebidas: son del negocio entero. El % es respecto a la Venta total.",
+  "— Gastos (modulo de Gastos)":
+    "El mismo dinero de arriba, partido por de donde salio en vez de por tipo. Esta parte sale del modulo de Gastos y cuadra contra el total de esa pantalla para las mismas fechas.",
+  "— Compras de categorias de gasto":
+    "La parte del total de gastos que son compras de productos cuya categoria esta marcada como gasto en Configuracion > Categorias. Es exactamente lo que le falta al renglon de Compras directas para cuadrar contra el modulo de Compras.",
+  "Utilidad antes de impuestos":
+    "Utilidad antes de gastos - Total de gastos. El % es respecto a la Venta total.",
   "Monto pagado": "Total pagado a proveedores (modulo de Pagos) con fecha de pago dentro del periodo.",
-  "Saldo a proveedores":
+  "Saldo a proveedores al dia":
     "Lo que se les debe a los proveedores al cierre del periodo: todo lo comprado con proveedor asignado hasta la fecha final, menos todo lo pagado hasta esa misma fecha. Es un saldo acumulado que viene arrastrando de periodos anteriores, no un gasto de este periodo, por eso no se resta de la utilidad. Las compras sin proveedor no cuentan: no hay a quien deberle.",
   "Venta promedio diaria": "Venta total del periodo entre los dias con venta registrada.",
 };
+
 
 function zeroAmounts(): GroupAmounts {
   return { byGroup: {}, consolidado: 0 };
@@ -475,7 +525,7 @@ export async function computeIncomeStatement(
     }),
     prisma.expense.findMany({
       where: { sucursalId, date: dateFilter },
-      select: { amount: true, ivaRate: true },
+      select: { amount: true, ivaRate: true, category: { select: { expenseGroup: true } } },
     }),
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
@@ -535,6 +585,13 @@ export async function computeIncomeStatement(
   // contra nada, porque cada una vive en un modulo distinto de la app.
   let gastosDeModulo = 0;
   let comprasDeGasto = 0;
+  // Cada peso de gasto cae en el renglon de su grupo. SIN_GRUPO_GASTO no es un grupo: es la
+  // lista de lo que nadie ha clasificado todavia, y se muestra aparte para que se note.
+  const gastosPorGrupo = new Map<ExpenseGroupKey, number>();
+  const sumarGasto = (grupo: ExpenseGroup | null, monto: number) => {
+    const key: ExpenseGroupKey = grupo ?? SIN_GRUPO_GASTO;
+    gastosPorGrupo.set(key, (gastosPorGrupo.get(key) ?? 0) + monto);
+  };
   for (const purchase of purchases) {
     if (purchase.product.category?.isExpense) {
       // Estas compras no son costo de lo vendido, son gasto: se leen con la misma regla que el
@@ -548,6 +605,7 @@ export async function computeIncomeStatement(
           : Number(purchase.totalPrice);
       comprasDeGasto += monto;
       gastosDeOperacion.consolidado += monto;
+      sumarGasto(purchase.product.category?.expenseGroup ?? null, monto);
       continue;
     }
     addTo(compras, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
@@ -561,6 +619,7 @@ export async function computeIncomeStatement(
         : Number(gasto.amount);
     gastosDeModulo += monto;
     gastosDeOperacion.consolidado += monto;
+    sumarGasto(gasto.category?.expenseGroup ?? null, monto);
   }
 
   // Un producto de gasto puede seguir contandose fisicamente, pero no puede entrar a la
@@ -595,17 +654,18 @@ export async function computeIncomeStatement(
   // descontado del inventario, asi que venia inflando el costo de ventas como si se hubiera
   // vendido. Restarlo deja el costo hablando solo de la venta, que es contra lo que se compara
   // el costo potencial.
-  const costoDeVentas = subtract(
-    subtract(subtract(existencia, inventarioFinal), creditosAlCosto),
-    mermas,
-  );
+  // El costo de ventas es lo que salio del almacen: existencia menos lo que quedo. Punto. No se
+  // le descuenta nada aqui, porque tirar y regalar producto tambien es dinero que salio.
+  const costoDeVentas = subtract(existencia, inventarioFinal);
 
-  // Y entra a los gastos, no se evapora. Restarlo del costo y no sumarlo en ningun lado hacia
-  // que regalar y tirar producto SUBIERAN la utilidad. Asi la utilidad despues de gastos no
-  // cambia: el dinero sigue pesando lo mismo, nada mas se lee en su propio renglon en vez de
-  // venir escondido dentro del costo de ventas.
-  const salidasSinVenta = creditosAlCosto.consolidado + mermas.consolidado;
-  gastosDeOperacion.consolidado += salidasSinVenta;
+  // Las tres salidas sin venta, en un solo renglon: merma, consumo operativo y pruebas. Antes
+  // iban restadas del costo y sumadas a los gastos; ahora se quedan dentro del costo y se
+  // muestran aparte, con el costo neto debajo. La utilidad final es exactamente la misma -por
+  // un lado se restaba y por el otro se sumaba-, pero asi el costo de ventas cuadra contra el
+  // almacen sin tener que explicar una resta intermedia.
+  const creditosYMermas = add(creditosAlCosto, mermas);
+  const costoNetoDeVentas = subtract(costoDeVentas, creditosYMermas);
+  const salidasSinVenta = creditosYMermas.consolidado;
 
   const costoPotencial = zeroAmounts();
   const memo = new Map<string, Decimal>();
@@ -630,7 +690,10 @@ export async function computeIncomeStatement(
     addTo(costoPotencial, agg.group, unitCost.times(agg.quantitySold));
   }
 
-  const variacion = subtract(costoPotencial, costoDeVentas);
+  // Contra el costo NETO, no contra el bruto. El costo teorico dice lo que debieron costar los
+  // platillos vendidos; compararlo contra un costo que todavia trae la merma adentro llamaria
+  // "variacion" a lo que ya tiene su propio renglon dos lineas arriba, y lo cobraria dos veces.
+  const variacion = subtract(costoPotencial, costoNetoDeVentas);
 
   // La columna de "sin grupo" solo tiene caso si de verdad hay algo ahi. Se revisan todos los
   // renglones que se muestran, no unos cuantos: si un monto cae en un renglon que no se reviso,
@@ -648,6 +711,8 @@ export async function computeIncomeStatement(
     creditosAlCosto,
     mermas,
     costoDeVentas,
+    creditosYMermas,
+    costoNetoDeVentas,
     costoPotencial,
     variacion,
   ].some((montos) => Math.abs(montos.byGroup[SIN_GRUPO] ?? 0) >= 0.005);
@@ -686,9 +751,14 @@ export async function computeIncomeStatement(
     gastosDeModulo,
     comprasDeGasto,
     salidasSinVenta,
+    gastosPorGrupo: Object.fromEntries(
+      EXPENSE_GROUP_ORDER.map((key) => [key, gastosPorGrupo.get(key) ?? 0]),
+    ) as Record<ExpenseGroupKey, number>,
     ivaView,
     salesIvaRate,
     costoDeVentas,
+    creditosYMermas,
+    costoNetoDeVentas,
     costoPotencial,
     variacion,
     ventaPromedioDiaria,

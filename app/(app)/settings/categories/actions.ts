@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { parseExpenseGroup } from "@/lib/expense-groups";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
 import { Prisma, CategoryGroup } from "@/generated/prisma/client";
@@ -168,6 +169,23 @@ export async function updateCategoryExpense(categoryId: string, isExpense: boole
   await prisma.productCategory.update({
     where: { id: category.id },
     data: { isExpense },
+  });
+
+  revalidatePath("/settings/categories");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * En que renglon de gastos del Estado de Resultados caen las compras de esta categoria. Solo
+ * tiene sentido en categorias marcadas como gasto; en las demas se ignora porque sus compras
+ * van al costo de ventas, no a los gastos.
+ */
+export async function updateCategoryExpenseGroup(categoryId: string, value: string) {
+  const user = await requireOrgSession();
+
+  await prisma.productCategory.updateMany({
+    where: { id: categoryId, organizationId: user.organizationId },
+    data: { expenseGroup: parseExpenseGroup(value) },
   });
 
   revalidatePath("/settings/categories");

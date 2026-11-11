@@ -187,6 +187,9 @@ model ProductCategory {
   /// desechables, limpieza. Sus compras salen en su propio renglon del Estado de Resultados y
   /// no entran al costo de ventas, porque no son parte de lo que se vende.
   isExpense       Boolean        @default(false)
+  /// Si isExpense esta prendido, en que renglon de gastos del Estado de Resultados se suman
+  /// sus compras. Sin esto caerian en un grupo que nadie eligio.
+  expenseGroup    ExpenseGroup?
   /// Si sus productos se transforman (limpiar, porcionar). En una tablajeria son carnes,
   /// pescados y mariscos; el azucar glass y la bolsa kraft no tienen nada que hacer en esa
   /// pantalla. Mientras ninguna categoria lo tenga prendido se ofrecen todas, para que la
@@ -1106,6 +1109,16 @@ model AuditComment {
 /// congelado al momento de capturarlo (igual que una compra) y un comentario libre para la razon.
 /// Por que salio el producto del inventario. Las tres se costean y descuentan igual; lo que
 /// cambia es a donde se atribuye el dinero cuando se analiza el periodo.
+/// Los cuatro grupos con los que se presentan los gastos en el Estado de Resultados.
+/// Es opcional a proposito: un tipo de gasto sin grupo se muestra en su propio renglon
+/// ("Sin grupo asignado") en vez de caer en uno que nadie eligio.
+enum ExpenseGroup {
+  ADMINISTRACION
+  OPERACION
+  PERSONAL
+  FINANCIEROS
+}
+
 enum WasteConcept {
   /// Se echo a perder, se cayo, caduco.
   MERMA
@@ -1117,15 +1130,17 @@ enum WasteConcept {
 
 /// Tipos de gasto de operacion: renta, servicios, nomina, mantenimiento, publicidad.
 model ExpenseCategory {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id])
   name           String
   /// IVA que trae este tipo de gasto, en por ciento. 0 por omision y se prende donde aplica:
   /// la renta y la luz lo causan, la nomina no. Se copia al gasto al capturarlo.
-  ivaRate        Decimal      @default(0) @db.Decimal(5, 2)
-  sortOrder      Int          @default(0)
-  createdAt      DateTime     @default(now())
+  ivaRate        Decimal       @default(0) @db.Decimal(5, 2)
+  /// En que renglon del Estado de Resultados se suma este tipo de gasto.
+  expenseGroup   ExpenseGroup?
+  sortOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
 
   expenses Expense[]
 
