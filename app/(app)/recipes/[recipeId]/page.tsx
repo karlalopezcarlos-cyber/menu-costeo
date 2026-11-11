@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
-import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
+import { loadOrgRecipeGraph, getRecipeCost, resolveRecipeCost, type RecipeCostOrigin } from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { updateRecipeInstructions, updateRecipeStoreDescription } from "../actions";
 import AddRecipeItemForm from "./AddRecipeItemForm";
@@ -69,9 +69,12 @@ export default async function RecipeDetailPage({
   const memo = new Map<string, Decimal>();
 
   let totalCost;
+  let costOrigin: RecipeCostOrigin = "calculado";
   let costError: string | null = null;
   try {
-    totalCost = getRecipeCost(recipe.id, graph, memo);
+    const resuelto = resolveRecipeCost(recipe.id, graph, memo);
+    totalCost = resuelto.total;
+    costOrigin = resuelto.origin;
   } catch (e) {
     costError = e instanceof Error ? e.message : "Error de costeo";
   }
@@ -206,6 +209,7 @@ export default async function RecipeDetailPage({
               yieldUnit={recipe.yieldUnit as UnitValue}
               isMenuItem={recipe.isMenuItem}
               sellingPrice={recipe.sellingPrice ? recipe.sellingPrice.toString() : null}
+              manualCost={recipe.manualCost ? recipe.manualCost.toString() : null}
               categoryId={recipe.categoryId}
               categoryName={recipe.category?.name ?? null}
               categories={recipeCategories}
@@ -247,6 +251,20 @@ export default async function RecipeDetailPage({
               <p className="text-sm text-neutral-500">
                 {formatMoney(totalCost!.dividedBy(recipe.yieldQty).toNumber(), 4)} por{" "}
                 {UNIT_LABELS[recipe.yieldUnit as UnitValue]}
+              </p>
+            )}
+            {costOrigin === "capturado" && (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Este costo esta capturado a mano, no sale de los ingredientes. En cuanto la
+                receta quede completa y sus insumos tengan compras, el costo real toma su lugar
+                solo.
+              </p>
+            )}
+            {costOrigin === "incompleto" && (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                A este costo le falta informacion: hay ingredientes sin precio, o la receta esta
+                vacia. El numero sale, pero vale menos de lo que parece. Captura las compras que
+                faltan, o pon un costo capturado al editar la receta.
               </p>
             )}
             <PriceSimulator

@@ -14,6 +14,7 @@ export default function EditRecipeDetailsForm({
   yieldUnit,
   isMenuItem,
   sellingPrice,
+  manualCost,
   categoryId,
   categoryName,
   categories,
@@ -24,6 +25,7 @@ export default function EditRecipeDetailsForm({
   yieldUnit: UnitValue;
   isMenuItem: boolean;
   sellingPrice: string | null;
+  manualCost: string | null;
   categoryId: string | null;
   categoryName: string | null;
   categories: { id: string; name: string }[];
@@ -118,7 +120,29 @@ export default function EditRecipeDetailsForm({
                   ))}
                 </select>
               </div>
+              <div className="space-y-1">
+                <label htmlFor="edit-manualCost" className="text-xs font-medium text-neutral-700">
+                  Costo capturado
+                </label>
+                <input
+                  id="edit-manualCost"
+                  name="manualCost"
+                  type="number"
+                  step="any"
+                  min="0"
+                  defaultValue={manualCost ?? ""}
+                  placeholder="Sin capturar"
+                  className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
+
+            <p className="text-xs text-neutral-500">
+              El costo capturado es para cuando la receta todavia no puede costearse sola: sin
+              ingredientes, o con insumos que nunca se han comprado. Vale por el rendimiento
+              completo ({yieldQty} {UNIT_LABELS[yieldUnit]}). En cuanto la receta quede completa,
+              el costo de los ingredientes manda solo y este se queda de respaldo, sin borrarlo.
+            </p>
 
             {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 

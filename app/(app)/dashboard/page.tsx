@@ -247,25 +247,55 @@ export default async function DashboardPage({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Venta total" value={formatMoney(result.ventaTotal.consolidado)} hint="Periodo seleccionado" />
-        <StatTile
-          label="Costo neto de ventas"
-          value={formatMoney(result.costoNetoDeVentas.consolidado)}
-          hint={costoPct !== null ? `${costoPct.toFixed(2)}% de la venta total` : "Sin venta en el periodo"}
-        />
-        <StatTile
-          label="Costo teorico"
-          value={potencialPct !== null ? `${potencialPct.toFixed(2)}%` : "-"}
-          hint={`Segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
-        />
-        <StatTile
-          label="Variacion"
-          value={formatMoney(result.variacion.consolidado)}
-          tone={result.variacion.consolidado >= 0 ? "positive" : "negative"}
-          hint={result.variacion.consolidado >= 0 ? "Favorable: costo real menor al teorico" : "Desfavorable: costo real mayor al teorico"}
-        />
-      </div>
+      {result.sinAlmacen ? (
+        <>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Este reporte dice cuanto ganaste en teoria.</p>
+            <p className="mt-1 text-amber-800">
+              En el periodo no hay nada de almacen: ni inventarios, ni compras, ni traspasos. Sin
+              eso el costo real no se puede calcular, asi que el costo que ves sale de lo que
+              cuesta cada platillo por su cantidad vendida. Lo que todavia no se puede ver es la
+              diferencia entre ese costo y el que de verdad salio del almacen, que es donde se
+              esconde la merma, el robo y el descontrol de porciones. En cuanto captures compras
+              e inventarios, el reporte completo aparece solo.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StatTile label="Venta total" value={formatMoney(result.ventaTotal.consolidado)} hint="Periodo seleccionado" />
+            <StatTile
+              label="Costo de ventas estimado"
+              value={formatMoney(result.costoReconocido.consolidado)}
+              hint={potencialPct !== null ? `${potencialPct.toFixed(2)}% de la venta total` : "Sin venta en el periodo"}
+            />
+            <StatTile
+              label="Venta promedio diaria"
+              value={formatMoney(result.ventaPromedioDiaria.consolidado)}
+              hint={`${result.diasActivos} ${result.diasActivos === 1 ? "dia con venta" : "dias con venta"}`}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Venta total" value={formatMoney(result.ventaTotal.consolidado)} hint="Periodo seleccionado" />
+          <StatTile
+            label="Costo neto de ventas"
+            value={formatMoney(result.costoNetoDeVentas.consolidado)}
+            hint={costoPct !== null ? `${costoPct.toFixed(2)}% de la venta total` : "Sin venta en el periodo"}
+          />
+          <StatTile
+            label="Costo teorico"
+            value={potencialPct !== null ? `${potencialPct.toFixed(2)}%` : "-"}
+            hint={`Segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
+          />
+          <StatTile
+            label="Variacion"
+            value={formatMoney(result.variacion.consolidado)}
+            tone={result.variacion.consolidado >= 0 ? "positive" : "negative"}
+            hint={result.variacion.consolidado >= 0 ? "Favorable: costo real menor al teorico" : "Desfavorable: costo real mayor al teorico"}
+          />
+        </div>
+      )}
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div className="space-y-1">

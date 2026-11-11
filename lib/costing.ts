@@ -27,6 +27,8 @@ type RecipeNode = {
   yieldUnit: UnitValue;
   /** Receta de porcion: define el gramaje de una porcion para el modulo de Porcionamiento. */
   isPortion: boolean;
+  /** Costo capturado a mano, para el rendimiento completo. Ver resolveRecipeCost. */
+  manualCost: Decimal | null;
   items: RecipeItemWithProduct[];
 };
 
@@ -34,7 +36,22 @@ export type RecipeGraph = {
   recipes: Map<string, RecipeNode>;
   /** Costo unitario vigente de cada producto EN ESTA SUCURSAL (ver getSucursalProductCosts). */
   productCosts: Map<string, Decimal>;
+  /**
+   * De donde salio el costo de cada receta ya resuelta. Vive en el grafo y no en el memo que
+   * reciben las funciones porque ese memo es publico y guarda solo montos; aqui hace falta
+   * recordar tambien la confianza, que es lo que decide si entra el costo capturado a mano.
+   */
+  costOrigins: Map<string, RecipeCostOrigin>;
 };
+
+/**
+ * De donde salio el costo de una receta:
+ * - `calculado`: de sus ingredientes, y ninguno quedo sin precio. Es el bueno.
+ * - `capturado`: del costo que alguien escribio a mano, porque el calculo no alcanzaba.
+ * - `incompleto`: del calculo, pero le falto algo y nadie capturo un respaldo. El numero sale,
+ *   pero vale menos de lo que parece.
+ */
+export type RecipeCostOrigin = "calculado" | "capturado" | "incompleto";
 
 const MAX_DEPTH = 20;
 
@@ -101,6 +118,7 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
 
   return {
     productCosts,
+    costOrigins: new Map(),
     recipes: new Map(
       recipes.map((r) => [
         r.id,
@@ -110,6 +128,7 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
           yieldQty: new Decimal(r.yieldQty),
           yieldUnit: r.yieldUnit as UnitValue,
           isPortion: r.isPortion,
+          manualCost: r.manualCost === null ? null : new Decimal(r.manualCost),
           items: r.items.map((i) => ({
             id: i.id,
             productId: i.productId,
@@ -135,6 +154,9 @@ export async function loadOrgRecipeGraph(sucursalId: string): Promise<RecipeGrap
  * usando los precios vigentes de los productos. Memoiza dentro de una misma llamada
  * (util cuando varias recetas comparten una subreceta base) y detecta ciclos con
  * una pila de recursion.
+ *
+ * Si al calculo le falta algo y la receta trae un costo capturado a mano, devuelve ese. Ver
+ * resolveRecipeCost, que es donde vive esa regla.
  */
 export function getRecipeCost(
   recipeId: string,
@@ -143,11 +165,36 @@ export function getRecipeCost(
   stack: Set<string> = new Set(),
   depth = 0,
 ): Decimal {
+  return resolveRecipeCost(recipeId, graph, memo, stack, depth).total;
+}
+
+/**
+ * Lo mismo que getRecipeCost, pero diciendo de donde salio el numero.
+ *
+ * La regla, en una linea: el costeo real manda mientras pueda dar un numero completo; cuando no
+ * puede, entra el costo capturado a mano.
+ *
+ * El orden importa y no es simetrico. Una receta a medias -el nigiri que cuesta el arroz y el
+ * alga porque el salmon nunca se compro aqui- devuelve un numero que parece costo. Si ese
+ * numero pisara al capturado nada mas por venir de ingredientes, un restaurante veria su
+ * platillo de $40 convertido en $4.87 sin que nadie le avise. Por eso el capturado no es un
+ * valor por omision: es el que se usa justo cuando el calculo no es de fiar.
+ *
+ * Al reves tambien: en cuanto la receta queda completa, el calculado manda solo y el capturado
+ * se queda de respaldo, sin tener que borrarlo ni tocar el historico.
+ */
+export function resolveRecipeCost(
+  recipeId: string,
+  graph: RecipeGraph,
+  memo: Map<string, Decimal> = new Map(),
+  stack: Set<string> = new Set(),
+  depth = 0,
+): { total: Decimal; origin: RecipeCostOrigin } {
   if (depth > MAX_DEPTH) {
     throw new Error("Profundidad de subrecetas excesiva (posible dato corrupto).");
   }
   const cached = memo.get(recipeId);
-  if (cached) return cached;
+  if (cached) return { total: cached, origin: graph.costOrigins.get(recipeId) ?? "calculado" };
 
   const recipe = graph.recipes.get(recipeId);
   if (!recipe) throw new Error(`Receta ${recipeId} no encontrada.`);
@@ -157,26 +204,44 @@ export function getRecipeCost(
   }
   stack.add(recipeId);
 
+  // Una receta sin ingredientes no cuesta cero: no se sabe lo que cuesta. Son cosas distintas.
+  let falta = recipe.items.length === 0;
   let total = new Decimal(0);
   for (const item of recipe.items) {
-    if (item.productId && item.product) {
+    if (item.productId) {
+      if (!item.product) {
+        falta = true;
+        continue;
+      }
+      if (item.product.currentUnitCost.lte(0)) falta = true;
       const qtyInBase = convertQty(item.quantity, item.unit, item.product.baseUnit);
       total = total.plus(qtyInBase.times(item.product.currentUnitCost));
     } else if (item.subRecipeId) {
       const subRecipe = graph.recipes.get(item.subRecipeId);
       if (!subRecipe) throw new Error(`Subreceta ${item.subRecipeId} no encontrada.`);
-      const subCost = getRecipeCost(item.subRecipeId, graph, memo, stack, depth + 1);
+      const sub = resolveRecipeCost(item.subRecipeId, graph, memo, stack, depth + 1);
+      // Una subreceta resuelta con costo capturado no contagia: ya tiene su numero.
+      if (sub.origin === "incompleto") falta = true;
+      if (subRecipe.yieldQty.isZero()) falta = true;
       const qtyUsedInYieldUnit = convertQty(item.quantity, item.unit, subRecipe.yieldUnit);
       const costPerYieldUnit = subRecipe.yieldQty.isZero()
         ? new Decimal(0)
-        : subCost.dividedBy(subRecipe.yieldQty);
+        : sub.total.dividedBy(subRecipe.yieldQty);
       total = total.plus(qtyUsedInYieldUnit.times(costPerYieldUnit));
     }
   }
 
   stack.delete(recipeId);
+
+  let origin: RecipeCostOrigin = falta ? "incompleto" : "calculado";
+  if (falta && recipe.manualCost !== null) {
+    total = recipe.manualCost;
+    origin = "capturado";
+  }
+
   memo.set(recipeId, total);
-  return total;
+  graph.costOrigins.set(recipeId, origin);
+  return { total, origin };
 }
 
 /**
@@ -231,6 +296,11 @@ export function collectRecipeCostIssues(
   }
 
   stack.delete(recipeId);
+  // Donde entra el costo capturado a mano ya no hay agujero que reportar: el costo quedo
+  // resuelto, aunque sea por otra via. Es la misma regla de resolveRecipeCost, y las dos tienen
+  // que decir lo mismo; si no, la pantalla marcaria "revisar receta" en platillos que si traen
+  // costo y el promedio de ingenieria de menu los dejaria fuera sin razon.
+  if (issues.length > 0 && recipe.manualCost !== null) return [];
   return [...new Set(issues)];
 }
 

@@ -128,6 +128,9 @@ export default async function RecipesPage({
               Ver archivadas
             </Link>
           )}
+          <Link href="/recipes/costs" className="text-sm text-neutral-500 hover:underline">
+            Cargar costos
+          </Link>
           <a
             href={`/api/export/recipes${exportQuery}`}
             className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"

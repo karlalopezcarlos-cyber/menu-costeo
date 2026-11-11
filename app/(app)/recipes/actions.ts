@@ -9,6 +9,7 @@ import { requireSucursalContext } from "@/lib/tenant";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
 import { loadOrgRecipeGraph, wouldCreateCycle } from "@/lib/costing";
 import { logRecipeActivity, describeQuantity } from "@/lib/recipe-activity";
+import { formatMoney } from "@/lib/format";
 
 function parseUnit(value: FormDataEntryValue | null): UnitValue {
   if (typeof value === "string" && (UNITS as readonly string[]).includes(value)) {
@@ -394,6 +395,13 @@ export async function updateRecipeDetails(
     const yieldQty = new Decimal(String(formData.get("yieldQty") ?? "0"));
     const yieldUnit = parseUnit(formData.get("yieldUnit"));
     const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
+    const manualCostRaw = String(formData.get("manualCost") ?? "").trim();
+    let manualCost: Decimal | null = null;
+    if (manualCostRaw !== "") {
+      manualCost = new Decimal(manualCostRaw.replace(/[$,\s]/g, ""));
+      if (!manualCost.isFinite()) throw new Error("El costo capturado no es un numero.");
+      if (manualCost.lt(0)) throw new Error("El costo capturado no puede ser negativo.");
+    }
 
     if (!name) throw new Error("El nombre es obligatorio.");
     if (yieldQty.lte(0)) throw new Error("El rendimiento debe ser mayor a cero.");
@@ -435,10 +443,26 @@ export async function updateRecipeDetails(
         `la categoria de ${recipe.category?.name ?? "sin categoria"} a ${categoryName ?? "sin categoria"}`,
       );
     }
+    const manualAntes = recipe.manualCost === null ? null : new Decimal(recipe.manualCost);
+    const manualCambio =
+      manualAntes === null || manualCost === null
+        ? manualAntes !== manualCost
+        : !manualAntes.equals(manualCost);
+    if (manualCambio) {
+      changes.push(
+        `el costo capturado de ${manualAntes === null ? "sin capturar" : formatMoney(manualAntes.toNumber())} a ${manualCost === null ? "sin capturar" : formatMoney(manualCost.toNumber())}`,
+      );
+    }
 
     await prisma.recipe.update({
       where: { id: recipeId },
-      data: { name, yieldQty: yieldQty.toString(), yieldUnit, categoryId },
+      data: {
+        name,
+        yieldQty: yieldQty.toString(),
+        yieldUnit,
+        categoryId,
+        manualCost: manualCost === null ? null : manualCost.toString(),
+      },
     });
 
     // Pasar el rendimiento a otro tipo de unidad (de piezas a litros) deja colgadas a las

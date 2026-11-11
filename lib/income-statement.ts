@@ -72,6 +72,20 @@ export type IncomeStatementResult = {
   salesIvaRate: number;
   costoDeVentas: GroupAmounts;
   costoPotencial: GroupAmounts;
+  /**
+   * El periodo no tiene nada de almacen: ni inventarios, ni compras, ni traspasos.
+   *
+   * Pasa con el restaurante que todavia no captura compras y solo sube sus ventas. Ahi el costo
+   * de ventas real no existe -es inventario inicial + compras - inventario final, y los tres son
+   * cero-, asi que el unico costo que hay es el teorico. El reporte se recorta a lo que si se
+   * puede sostener con datos y deja de pintar diez renglones en ceros.
+   */
+  sinAlmacen: boolean;
+  /**
+   * El costo con el que se calcula la utilidad: el real cuando hay almacen, el teorico cuando no.
+   * Existe para que la pantalla, el PDF y el Excel no tengan que decidirlo cada uno por su lado.
+   */
+  costoReconocido: GroupAmounts;
   variacion: GroupAmounts;
   ventaPromedioDiaria: GroupAmounts;
   /** Total pagado a proveedores (SupplierPayment) en el periodo. No se desglosa por grupo porque
@@ -189,6 +203,25 @@ function buildRow(
 export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeStatementRowView[] {
   const columns = result.groups.map((g) => g.id);
   const con = (opts: Parameters<typeof buildRow>[3] = {}) => ({ ...opts, columns });
+
+  // Sin almacen no hay de donde sacar inventarios, compras, costo real ni variacion. Pintarlos
+  // en ceros no informa: hace creer que el dato existe y vale cero. Se muestra lo que si se
+  // sostiene, y el costo se nombra "estimado" para que nadie lo lea como el costo real.
+  if (result.sinAlmacen) {
+    return [
+      buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
+      ...(result.salidasAOtraSucursal.consolidado !== 0
+        ? [buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con())]
+        : []),
+      buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
+      buildRow("Costo de ventas estimado", result.costoReconocido, "costPct", con({
+        bold: true,
+        highlight: true,
+        ventaTotal: result.ventaTotal,
+      })),
+    ];
+  }
+
   return [
     buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
     buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con()),
@@ -229,7 +262,7 @@ export function buildIncomeStatementFooterRows(
 ): IncomeStatementFooterRow[] {
   const ventaTotal = result.ventaTotal.consolidado;
   const pct = (n: number) => (ventaTotal !== 0 ? (n / ventaTotal) * 100 : null);
-  const utilidadAntesDeGastos = ventaTotal - result.costoDeVentas.consolidado;
+  const utilidadAntesDeGastos = ventaTotal - result.costoReconocido.consolidado;
   const totalGastos = result.gastosDeOperacion.consolidado;
   const utilidad = utilidadAntesDeGastos - totalGastos;
 
@@ -272,9 +305,16 @@ export function buildIncomeStatementFooterRows(
   // Va al final, despues de la utilidad y no entre la utilidad y los gastos: es una deuda
   // acumulada, no un costo del periodo. Metida en medio de la resta se leeria como si tambien
   // se restara.
+  // Sin compras capturadas no hay deuda con proveedores que reportar, y un cero aqui se leeria
+  // como "no se le debe a nadie" en vez de "no se captura".
+  if (!result.sinAlmacen || result.saldoProveedores !== 0 || result.montoPagado !== 0) {
+    rows.push(
+      { label: "Saldo a proveedores al dia", amount: result.saldoProveedores, pct: null },
+      { label: "Monto pagado", amount: result.montoPagado, pct: null },
+    );
+  }
+
   rows.push(
-    { label: "Saldo a proveedores al dia", amount: result.saldoProveedores, pct: null },
-    { label: "Monto pagado", amount: result.montoPagado, pct: null },
     {
       label: "Venta promedio diaria",
       amount: result.ventaPromedioDiaria.consolidado,
@@ -303,6 +343,8 @@ export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
     "Costo de ventas - Creditos al costo: lo que costo exclusivamente lo que si se vendio. Es el numero que se compara contra el Costo teorico de ventas, porque el teorico solo habla de los platillos vendidos.",
   "Costo teorico de ventas":
     "Lo que, segun las recetas, debieron costar los platillos vendidos en el periodo. El % es respecto a la Venta total.",
+  "Costo de ventas estimado":
+    "Lo que, segun el costo de cada platillo, debieron costar los platillos vendidos en el periodo. Se usa como costo de ventas porque en este periodo no hay nada de almacen -ni inventarios, ni compras, ni traspasos- y el costo real no se puede calcular sin eso. Dice cuanto se gano en teoria, no cuanto se gano: la diferencia entre los dos es justo lo que se descubre al empezar a capturar compras e inventarios. El % es respecto a la Venta total.",
   Variacion:
     "Costo teorico de ventas - Costo neto de ventas: positivo significa que lo vendido costo menos que lo que decian las recetas (favorable). Se compara contra el costo NETO para no contar la merma dos veces: la merma ya tiene su propio renglon.",
   "Utilidad antes de gastos":
@@ -695,6 +737,16 @@ export async function computeIncomeStatement(
   // "variacion" a lo que ya tiene su propio renglon dos lineas arriba, y lo cobraria dos veces.
   const variacion = subtract(costoPotencial, costoNetoDeVentas);
 
+  // Sin un solo movimiento de almacen en el periodo, el costo de ventas no es cero: no se sabe.
+  // Son cosas distintas, y tratarlas igual haria que la utilidad fuera la venta completa. Se
+  // reconoce entonces el costo teorico, que es el unico que si tiene de donde salir.
+  const sinAlmacen =
+    inventarioInicial.consolidado === 0 &&
+    inventarioFinal.consolidado === 0 &&
+    compras.consolidado === 0 &&
+    entradasDesdeOtraSucursal.consolidado === 0;
+  const costoReconocido = sinAlmacen ? costoPotencial : costoDeVentas;
+
   // La columna de "sin grupo" solo tiene caso si de verdad hay algo ahi. Se revisan todos los
   // renglones que se muestran, no unos cuantos: si un monto cae en un renglon que no se reviso,
   // la columna se esconderia y ese dinero no saldria en ninguna parte. Y se mide contra medio
@@ -760,6 +812,8 @@ export async function computeIncomeStatement(
     creditosYMermas,
     costoNetoDeVentas,
     costoPotencial,
+    sinAlmacen,
+    costoReconocido,
     variacion,
     ventaPromedioDiaria,
     montoPagado,

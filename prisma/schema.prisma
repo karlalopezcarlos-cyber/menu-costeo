@@ -636,6 +636,12 @@ model Recipe {
   /// portionQty capturado, y este campo solo sobrevive para no perder las recetas ya creadas.
   isPortion        Boolean         @default(false)
   sellingPrice     Decimal?        @db.Decimal(12, 2)
+  /// Costo capturado a mano para el rendimiento completo de la receta, en la misma convencion
+  /// que devuelve getRecipeCost. Es para el restaurante que todavia no captura recetas ni
+  /// compras y aun asi necesita un Estado de Resultados: pone aqui lo que le cuesta el platillo
+  /// y el reporte trabaja con eso. No sustituye al costeo real; solo entra cuando el costeo no
+  /// puede dar un numero confiable (ver resolveRecipeCost en lib/costing.ts).
+  manualCost       Decimal?        @db.Decimal(14, 4)
   instructions     String?
   /// Descripcion para clientes en la tienda en linea (que es el platillo), distinta de
   /// `instructions` (que es el procedimiento interno de cocina).
