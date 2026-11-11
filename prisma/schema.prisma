@@ -37,6 +37,15 @@ enum Panel {
   KARDEX
 }
 
+/// Permisos finos que no son un panel completo. Un panel decide si la pantalla se ve; esto
+/// decide lo que se puede HACER dentro de ella. Vacio por omision: un permiso que no se otorgo
+/// explicitamente no se tiene.
+enum UserPermission {
+  /// Bajar el Estado de Resultados como archivo (Excel o PDF). Verlo en pantalla depende del
+  /// panel DASHBOARD; esto es poder sacarlo del sistema.
+  EXPORT_INCOME_STATEMENT
+}
+
 /// Agrupador usado en el Estado de Resultados para desglosar ventas/costos en 3 columnas.
 /// Categorias sin grupo asignado (null) se consolidan bajo Miscelaneos en ese reporte.
 enum CategoryGroup {
@@ -302,23 +311,25 @@ model Sucursal {
 }
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
+  id             String           @id @default(cuid())
+  email          String           @unique
   hashedPassword String
   /// Nombre para mostrar. Se arma con nombre + apellidos y es lo que leen las bitacoras:
   /// antes era un campo libre y opcional, y terminaba con apodos o claves de acceso.
   name           String?
   firstName      String?
   lastName       String?
-  role           Role          @default(STAFF)
+  role           Role             @default(STAFF)
   /// Paneles habilitados para este usuario cuando role = STAFF. Los OWNER ven todo sin importar
   /// este campo.
-  allowedPanels  Panel[]       @default([])
+  allowedPanels  Panel[]          @default([])
+  /// Permisos finos para este usuario cuando role = STAFF. Los OWNER los tienen todos.
+  permissions    UserPermission[] @default([])
   organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  organization   Organization?    @relation(fields: [organizationId], references: [id])
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   purchasesCreated          Purchase[]                 @relation("PurchaseCreatedBy")
   importBatches             ImportBatch[]              @relation("ImportBatchUploadedBy")

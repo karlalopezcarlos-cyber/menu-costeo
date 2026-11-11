@@ -33,6 +33,7 @@ export default async function UsersPage() {
     role: u.role === "OWNER" ? "OWNER" : "STAFF",
     isActive: u.isActive,
     allowedPanels: u.allowedPanels,
+    permissions: u.permissions,
     sucursalIds: u.sucursales.map((s) => s.sucursal.id),
     sucursalNames: u.sucursales.map((s) => s.sucursal.name),
   }));

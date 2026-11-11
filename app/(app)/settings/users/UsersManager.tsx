@@ -4,7 +4,7 @@ import { useState } from "react";
 import UserForm, { type EditableUser } from "./UserForm";
 import { toggleUserActive } from "./actions";
 import { PANEL_DEFS } from "@/lib/permissions";
-import type { Panel } from "@/generated/prisma/client";
+import type { Panel, UserPermission } from "@/generated/prisma/client";
 
 export type UserRow = {
   id: string;
@@ -15,6 +15,7 @@ export type UserRow = {
   role: "OWNER" | "STAFF";
   isActive: boolean;
   allowedPanels: Panel[];
+  permissions: UserPermission[];
   sucursalIds: string[];
   sucursalNames: string[];
 };
@@ -86,6 +87,7 @@ export default function UsersManager({
                             firstName: u.firstName,
                             lastName: u.lastName,
                             allowedPanels: u.allowedPanels,
+                            permissions: u.permissions,
                             sucursalIds: u.sucursalIds,
                           })
                         }

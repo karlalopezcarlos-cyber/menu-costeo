@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
+import { hasPermission } from "@/lib/permissions";
 import {
   computeIncomeStatement,
   buildIncomeStatementRows,
@@ -190,6 +191,10 @@ export default async function DashboardPage({
   // El neto, no el bruto: es el que se compara contra el costo teorico del mosaico de al lado,
   // y la Variacion del tercero es exactamente la resta de esos dos. Con el bruto, los tres
   // numeros de esta fila no cerrarian entre si.
+  // Esconder los botones no protege nada por si solo -la ruta es la que decide-, pero ofrecer
+  // una descarga que va a devolver 403 es peor que no ofrecerla.
+  const puedeDescargar = hasPermission(user.role, user.permissions, "EXPORT_INCOME_STATEMENT");
+
   const costoPct = ventaTotal !== 0 ? (result.costoNetoDeVentas.consolidado / ventaTotal) * 100 : null;
   const potencialPct = ventaTotal !== 0 ? (result.costoPotencial.consolidado / ventaTotal) * 100 : null;
 
@@ -224,20 +229,22 @@ export default async function DashboardPage({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <a
-            href={`/api/export/income-statement${exportQuery}`}
-            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-          >
-            Descargar Excel
-          </a>
-          <a
-            href={`/api/export/income-statement/pdf${exportQuery}`}
-            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-          >
-            Descargar PDF
-          </a>
-        </div>
+        {puedeDescargar && (
+          <div className="flex items-center gap-3">
+            <a
+              href={`/api/export/income-statement${exportQuery}`}
+              className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              Descargar Excel
+            </a>
+            <a
+              href={`/api/export/income-statement/pdf${exportQuery}`}
+              className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              Descargar PDF
+            </a>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

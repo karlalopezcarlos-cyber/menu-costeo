@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import type { Panel, Role } from "@/generated/prisma/client";
+import type { Panel, Role, UserPermission } from "@/generated/prisma/client";
 
 declare module "next-auth" {
   interface Session {
@@ -13,6 +13,8 @@ declare module "next-auth" {
       role: Role;
       organizationId: string | null;
       allowedPanels: Panel[];
+      /// Permisos finos (lo que puede HACER dentro de una pantalla que ya ve).
+      permissions: UserPermission[];
       /// Sucursales a las que este STAFF tiene acceso (puede cambiar entre ellas). Ignorado para
       /// OWNER/SUPERADMIN, que siempre ven todas las de su organizacion sin importar esta lista.
       sucursalIds: string[];
@@ -26,6 +28,7 @@ declare module "@auth/core/jwt" {
     role: Role;
     organizationId: string | null;
     allowedPanels: Panel[];
+    permissions: UserPermission[];
     sucursalIds: string[];
   }
 }
@@ -66,6 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           organizationId: user.organizationId,
           allowedPanels: user.allowedPanels,
+          permissions: user.permissions,
           sucursalIds: user.sucursales.map((s) => s.sucursalId),
         };
       },
@@ -78,6 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (user as { role: Role }).role;
         token.organizationId = (user as { organizationId: string | null }).organizationId;
         token.allowedPanels = (user as { allowedPanels: Panel[] }).allowedPanels;
+        token.permissions = (user as { permissions: UserPermission[] }).permissions;
         token.sucursalIds = (user as { sucursalIds: string[] }).sucursalIds;
       }
       return token;
@@ -87,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = token.role;
       session.user.organizationId = token.organizationId;
       session.user.allowedPanels = token.allowedPanels ?? [];
+      session.user.permissions = token.permissions ?? [];
       session.user.sucursalIds = token.sucursalIds ?? [];
       return session;
     },

@@ -1,4 +1,4 @@
-import type { Panel } from "@/generated/prisma/client";
+import type { Panel, UserPermission } from "@/generated/prisma/client";
 
 export const PANEL_DEFS: { key: Panel; section: string; href: string; label: string }[] = [
   { key: "DASHBOARD", section: "dashboard", href: "/dashboard", label: "Panel" },
@@ -35,4 +35,27 @@ export function hasPanelAccess(role: string, allowedPanels: Panel[], panel: Pane
   if (role !== "STAFF") return true;
   if (panel === "DASHBOARD") return true;
   return allowedPanels.includes(panel);
+}
+
+/** Lo que se puede otorgar a un STAFF, con el texto que lee quien administra usuarios. */
+export const PERMISSION_DEFS: { key: UserPermission; label: string; hint: string }[] = [
+  {
+    key: "EXPORT_INCOME_STATEMENT",
+    label: "Descargar el Estado de Resultados",
+    hint: "Bajarlo como Excel o PDF. Verlo en pantalla depende del panel de Inicio; esto es poder sacar el archivo del sistema.",
+  },
+];
+
+/**
+ * Los OWNER y SUPERADMIN los tienen todos, igual que con los paneles. Para un STAFF, un permiso
+ * que no esta en su lista no lo tiene: la lista vacia no significa "todavia no se configura",
+ * significa que no.
+ */
+export function hasPermission(
+  role: string,
+  permissions: UserPermission[] | undefined,
+  permission: UserPermission,
+): boolean {
+  if (role !== "STAFF") return true;
+  return (permissions ?? []).includes(permission);
 }

@@ -5,8 +5,8 @@ import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { requireOrgSession } from "@/lib/tenant";
-import { PANEL_DEFS } from "@/lib/permissions";
-import type { Panel } from "@/generated/prisma/client";
+import { PANEL_DEFS, PERMISSION_DEFS } from "@/lib/permissions";
+import type { Panel, UserPermission } from "@/generated/prisma/client";
 
 const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_LOGO_SIZE = 4 * 1024 * 1024;
@@ -15,6 +15,14 @@ async function requireOwner() {
   const user = await requireOrgSession();
   if (user.role !== "OWNER") throw new Error("Solo el dueno de la cuenta puede administrar usuarios.");
   return user;
+}
+
+function parsePermissions(formData: FormData): UserPermission[] {
+  const valid = new Set(PERMISSION_DEFS.map((p) => p.key));
+  return formData
+    .getAll("permissions")
+    .map((v) => String(v))
+    .filter((v): v is UserPermission => valid.has(v as UserPermission));
 }
 
 function parseAllowedPanels(formData: FormData): Panel[] {
@@ -131,6 +139,7 @@ export async function createUser(
     const persona = parseNombrePersona(formData);
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
+    const permissions = parsePermissions(formData);
     const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
 
     if (!email) throw new Error("El correo es obligatorio.");
@@ -154,6 +163,7 @@ export async function createUser(
         role: "STAFF",
         organizationId: user.organizationId,
         allowedPanels,
+        permissions,
         sucursales: { create: sucursalIds.map((sucursalId) => ({ sucursalId })) },
       },
     });
@@ -183,6 +193,7 @@ export async function updateUser(
     const persona = parseNombrePersona(formData);
     const password = String(formData.get("password") ?? "");
     const allowedPanels = parseAllowedPanels(formData);
+    const permissions = parsePermissions(formData);
     const sucursalIds = await resolveSucursalIds(user.organizationId, formData);
 
     if (!email) throw new Error("El correo es obligatorio.");
@@ -208,6 +219,7 @@ export async function updateUser(
           firstName: persona.firstName,
           lastName: persona.lastName,
           allowedPanels,
+          permissions,
           ...(password ? { hashedPassword: await bcrypt.hash(password, 10) } : {}),
         },
       }),

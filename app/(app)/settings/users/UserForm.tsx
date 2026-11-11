@@ -2,8 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createUser, updateUser } from "./actions";
-import { PANEL_DEFS } from "@/lib/permissions";
-import type { Panel } from "@/generated/prisma/client";
+import { PANEL_DEFS, PERMISSION_DEFS } from "@/lib/permissions";
+import type { Panel, UserPermission } from "@/generated/prisma/client";
 
 export type EditableUser = {
   id: string;
@@ -12,6 +12,7 @@ export type EditableUser = {
   firstName: string | null;
   lastName: string | null;
   allowedPanels: Panel[];
+  permissions: UserPermission[];
   sucursalIds: string[];
 };
 
@@ -31,6 +32,9 @@ export default function UserForm({
   const action = editing ? updateUser.bind(null, editing.id) : createUser;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [allowedPanels, setAllowedPanels] = useState<Set<Panel>>(new Set(editing?.allowedPanels ?? []));
+  const [permissions, setPermissions] = useState<Set<UserPermission>>(
+    new Set(editing?.permissions ?? []),
+  );
   const [selectedSucursales, setSelectedSucursales] = useState<Set<string>>(
     new Set(editing?.sucursalIds ?? []),
   );
@@ -42,6 +46,15 @@ export default function UserForm({
     }
     wasPending.current = pending;
   }, [pending, state, editing, onCancelEdit]);
+
+  function togglePermission(permission: UserPermission) {
+    setPermissions((prev) => {
+      const next = new Set(prev);
+      if (next.has(permission)) next.delete(permission);
+      else next.add(permission);
+      return next;
+    });
+  }
 
   function togglePanel(panel: Panel) {
     setAllowedPanels((prev) => {
@@ -177,6 +190,32 @@ export default function UserForm({
         </div>
         <p className="text-xs text-neutral-400">
           &quot;Panel&quot; (inicio) siempre esta disponible, no hace falta marcarlo.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-neutral-700">Permisos adicionales</p>
+        <div className="space-y-2">
+          {PERMISSION_DEFS.map((permission) => (
+            <label key={permission.key} className="flex items-start gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                name="permissions"
+                value={permission.key}
+                checked={permissions.has(permission.key)}
+                onChange={() => togglePermission(permission.key)}
+                className="mt-0.5 h-4 w-4 rounded border-neutral-300"
+              />
+              <span>
+                {permission.label}
+                <span className="block text-xs text-neutral-400">{permission.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-neutral-400">
+          Sin marcar, el usuario no puede. Un panel decide si ve la pantalla; esto decide lo que
+          puede hacer dentro de ella.
         </p>
       </div>
 
