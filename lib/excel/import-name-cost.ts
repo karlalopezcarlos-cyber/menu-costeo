@@ -31,17 +31,26 @@ export type NameCostOptions = {
   /** Palabras que pueden encabezar la columna del nombre (ya en minusculas y sin acentos). */
   nameHeaders: string[];
   /**
-   * Encabezados de costo que ganan sobre cualquier otro cuando hay varias columnas de costo,
+   * Palabras que delatan la columna del valor. "costo" para un archivo de costos, "cantidad" o
+   * "fisico" para un conteo. Ya en minusculas y sin acentos.
+   */
+  valueKeywords: string[];
+  /**
+   * Encabezados de valor que ganan sobre cualquier otro cuando hay varias columnas candidatas,
    * en orden de preferencia. Ya en minusculas y sin acentos.
    */
-  preferredCostHeaders?: string[];
-  /** Como llamarle a la cosa en los mensajes de error. */
+  preferredValueHeaders?: string[];
+  /** Como llamarle a la cosa en los mensajes de error ("producto", "platillo"). */
   noun: string;
+  /** Como llamarle al numero en los mensajes ("costo", "cantidad"). */
+  valueNoun: string;
   /**
-   * El encabezado exacto que el usuario eligio, cuando el archivo trae varias columnas de costo
-   * y ninguna es de las conocidas. Gana sobre todo lo demas.
+   * El encabezado exacto que el usuario eligio, cuando el archivo trae varias columnas
+   * candidatas y ninguna es de las conocidas. Gana sobre todo lo demas.
    */
-  costHeader?: string;
+  valueHeader?: string;
+  /** Si se aceptan numeros negativos. Un costo no; una diferencia de inventario si. */
+  allowNegative?: boolean;
 };
 
 function cellText(value: ExcelJS.CellValue): string {
@@ -99,8 +108,8 @@ function ubicarColumnas(
   opts: NameCostOptions,
 ): Ubicacion | Ambiguedad | null {
   const ultimaFilaABuscar = Math.min(sheet.rowCount, 15);
-  const preferidos = (opts.preferredCostHeaders ?? []).map(normaliza);
-  const elegidoPorUsuario = opts.costHeader ? normaliza(opts.costHeader) : null;
+  const preferidos = (opts.preferredValueHeaders ?? []).map(normaliza);
+  const elegidoPorUsuario = opts.valueHeader ? normaliza(opts.valueHeader) : null;
   let ambiguedad: Ambiguedad | null = null;
 
   for (let r = 1; r <= ultimaFilaABuscar; r++) {
@@ -114,13 +123,14 @@ function ubicarColumnas(
       const clave = normaliza(texto);
       if (!clave) return;
       if (!nameCol && opts.nameHeaders.some((n) => clave.includes(n))) {
-        // "Costo del producto" no es la columna del nombre: si tambien dice costo, no cuenta.
-        if (!clave.includes("costo") && !clave.includes("precio")) {
+        // "Costo del producto" no es la columna del nombre: si tambien trae la palabra del
+        // valor, no cuenta.
+        if (!opts.valueKeywords.some((k) => clave.includes(k)) && !clave.includes("precio")) {
           nameCol = col;
           nameHeader = texto;
         }
       }
-      if (clave.includes("costo") || clave === elegidoPorUsuario) {
+      if (opts.valueKeywords.some((k) => clave.includes(k)) || clave === elegidoPorUsuario) {
         candidatosCosto.push({ col, header: texto, clave });
       }
     });
@@ -129,8 +139,8 @@ function ubicarColumnas(
 
     // Quien eligio la columna manda. Despues, los encabezados conocidos en su orden: el de
     // nuestra plantilla, luego los que usan los sistemas de punto de venta. Sin ninguno de
-    // esos, solo se acepta que haya una sola columna de costo; adivinar entre varias seria
-    // escribir dinero equivocado en silencio.
+    // esos, solo se acepta que haya una sola columna candidata; adivinar entre varias seria
+    // escribir el numero equivocado en silencio.
     const elegida =
       (elegidoPorUsuario ? candidatosCosto.find((c) => c.clave === elegidoPorUsuario) : undefined) ??
       preferidos.reduce<(typeof candidatosCosto)[number] | undefined>(
@@ -193,21 +203,21 @@ export async function parseNameCostWorkbook(
       errors: [
         {
           excelRow: 0,
-          message: `No se encontraron los encabezados. El archivo necesita una columna con el nombre del ${opts.noun} y una sola columna de Costo.`,
+          message: `No se encontraron los encabezados. El archivo necesita una columna con el nombre del ${opts.noun} y una sola columna de ${opts.valueNoun}.`,
         },
       ],
       columns: null,
     };
   }
   if (!("headerRow" in ubicacion)) {
-    // Hay varias columnas de costo y ninguna conocida. Se le dicen cuales son, en vez de
-    // escoger una por el usuario: la diferencia entre dos columnas de costo es dinero.
+    // Hay varias columnas candidatas y ninguna conocida. Se le dicen cuales son, en vez de
+    // escoger una por el usuario: la diferencia entre dos columnas asi es dinero.
     return {
       rows: [],
       errors: [
         {
           excelRow: 0,
-          message: `El archivo trae mas de una columna de costo y no se cual usar: ${ubicacion.candidatos.join(", ")}. Escribe cual quieres en el campo de abajo y vuelve a subirlo.`,
+          message: `El archivo trae mas de una columna de ${opts.valueNoun} y no se cual usar: ${ubicacion.candidatos.join(", ")}. Escribe cual quieres en el campo de abajo y vuelve a subirlo.`,
         },
       ],
       columns: null,
@@ -225,7 +235,7 @@ export async function parseNameCostWorkbook(
 
     if (!nombre && !costoTexto) continue;
     if (!nombre) {
-      errors.push({ excelRow: r, message: `Hay un costo sin nombre de ${opts.noun}.` });
+      errors.push({ excelRow: r, message: `Hay un ${opts.valueNoun} sin nombre de ${opts.noun}.` });
       continue;
     }
     // Celda de costo vacia: esta fila no se toca. Ver el comentario de arriba.
@@ -233,11 +243,11 @@ export async function parseNameCostWorkbook(
 
     const costo = parseMoney(costoTexto);
     if (costo === null) {
-      errors.push({ excelRow: r, message: `"${costoTexto}" no es un costo valido.` });
+      errors.push({ excelRow: r, message: `"${costoTexto}" no es un ${opts.valueNoun} valido.` });
       continue;
     }
-    if (costo.lt(0)) {
-      errors.push({ excelRow: r, message: `El costo de "${nombre}" es negativo.` });
+    if (costo.lt(0) && !opts.allowNegative) {
+      errors.push({ excelRow: r, message: `El ${opts.valueNoun} de "${nombre}" es negativo.` });
       continue;
     }
 
@@ -247,7 +257,7 @@ export async function parseNameCostWorkbook(
       if (!previo.cost.equals(costo)) {
         errors.push({
           excelRow: r,
-          message: `"${nombre}" aparece con dos costos distintos: ${previo.cost.toFixed(2)} en la fila ${previo.excelRow} y ${costo.toFixed(2)} aqui.`,
+          message: `"${nombre}" aparece dos veces con ${opts.valueNoun} distinto: ${previo.cost.toFixed(2)} en la fila ${previo.excelRow} y ${costo.toFixed(2)} aqui.`,
         });
       }
       continue;

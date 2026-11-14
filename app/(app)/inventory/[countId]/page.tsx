@@ -10,6 +10,7 @@ import InventoryCaptureTable, { type CaptureRow } from "./InventoryCaptureTable"
 import InventoryCountTabs from "./InventoryCountTabs";
 import InventoryChangeLogTable, { type ChangeLogRow } from "./InventoryChangeLogTable";
 import DeleteCountButton from "../DeleteCountButton";
+import ImportCountForm from "./ImportCountForm";
 
 export default async function InventoryCountPage({
   params,
@@ -202,6 +203,8 @@ export default async function InventoryCountPage({
           <DeleteCountButton countId={count.id} redirectAfter="/inventory" />
         </div>
       </div>
+
+      <ImportCountForm countId={count.id} />
 
       <InventoryCountTabs
         captureTable={<InventoryCaptureTable countId={count.id} rows={rows} />}

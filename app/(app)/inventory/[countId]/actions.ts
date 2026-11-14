@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost, getSucursalProductCosts, type RecipeGraph } from "@/lib/costing";
 import { removeYieldFactor } from "@/lib/units";
+import { parseCountWorkbook } from "@/lib/excel/import-count";
+import { normaliza as normalizaNombre } from "@/lib/excel/import-name-cost";
 
 async function getCount(countId: string, sucursalId: string) {
   const count = await prisma.inventoryCount.findFirst({ where: { id: countId, sucursalId } });
@@ -268,5 +270,114 @@ export async function autoSaveInventoryCount(
     return {
       error: error instanceof Error ? error.message.slice(0, 200) : "No se pudo autoguardar.",
     };
+  }
+}
+
+export type ImportCountState = {
+  errors?: { excelRow: number; message: string }[];
+  /** Cuando el archivo trae varias columnas candidatas: cuales son, para que el usuario elija. */
+  valueCandidates?: string[];
+  message?: string;
+  result?: {
+    cargados: number;
+    noEncontrados: { name: string; excelRow: number }[];
+    /** Cantidades de cero o menos. No entran: el conteo las lee como "borra este renglon", y
+     *  un inventario fisico negativo no es un conteo, es un descuadre del otro sistema. */
+    noPositivos: { name: string; cantidad: string; excelRow: number }[];
+    columnas: { name: string; cost: string } | null;
+  };
+};
+
+/**
+ * Carga masiva de un conteo de inventario desde el Excel que el restaurante ya tiene.
+ *
+ * Se apoya en persistInventoryCount, el mismo camino que usan la captura en pantalla y el
+ * autoguardado: asi la carga congela el costo unitario igual, deja la misma bitacora de cambios
+ * y no inventa una segunda forma de escribir un conteo.
+ *
+ * Solo toca los renglones que vienen en el archivo. Lo que ya estaba capturado y no aparece se
+ * queda como estaba, porque subir la lista de un almacen no debe borrar la de otro.
+ */
+export async function importInventoryCount(
+  countId: string,
+  _prevState: ImportCountState | undefined,
+  formData: FormData,
+): Promise<ImportCountState> {
+  const user = await requireSucursalContext();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Elige el archivo de Excel que quieres subir." };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { message: "El archivo pesa mas de 5 MB. Subelo en dos partes." };
+  }
+
+  let buffer: Buffer;
+  try {
+    buffer = Buffer.from(await file.arrayBuffer());
+  } catch {
+    return { message: "No se pudo leer el archivo. Vuelve a elegirlo e intenta de nuevo." };
+  }
+
+  const valueHeader = String(formData.get("valueHeader") ?? "").trim() || undefined;
+  const { rows, errors, columns, costCandidates } = await parseCountWorkbook(buffer, valueHeader);
+  if (errors.length > 0) return { errors, valueCandidates: costCandidates };
+  if (rows.length === 0) {
+    return { message: "El archivo no trae ninguna cantidad. Revisa que la columna del conteo tenga datos." };
+  }
+
+  try {
+    await getCount(countId, user.sucursalId);
+
+    const [productos, subrecetas] = await Promise.all([
+      prisma.product.findMany({
+        where: { organizationId: user.organizationId, archivedAt: null },
+        select: { id: true, name: true },
+      }),
+      prisma.recipe.findMany({
+        where: { sucursalId: user.sucursalId, archivedAt: null, isMenuItem: false },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const productoPorNombre = new Map(productos.map((p) => [normalizaNombre(p.name), p]));
+    const subrecetaPorNombre = new Map(subrecetas.map((r) => [normalizaNombre(r.name), r]));
+
+    const entries: InventoryCaptureEntry[] = [];
+    const noEncontrados: { name: string; excelRow: number }[] = [];
+    const noPositivos: { name: string; cantidad: string; excelRow: number }[] = [];
+
+    for (const row of rows) {
+      if (row.cost.lte(0)) {
+        noPositivos.push({ name: row.name, cantidad: row.cost.toString(), excelRow: row.excelRow });
+        continue;
+      }
+      const clave = normalizaNombre(row.name);
+      const producto = productoPorNombre.get(clave);
+      if (producto) {
+        entries.push({ type: "product", id: producto.id, quantity: row.cost.toString() });
+        continue;
+      }
+      const subreceta = subrecetaPorNombre.get(clave);
+      if (subreceta) {
+        entries.push({ type: "subrecipe", id: subreceta.id, quantity: row.cost.toString() });
+        continue;
+      }
+      noEncontrados.push({ name: row.name, excelRow: row.excelRow });
+    }
+
+    if (entries.length > 0) {
+      await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
+    }
+
+    revalidatePath(`/inventory/${countId}`);
+    revalidatePath("/inventory");
+    return {
+      result: { cargados: entries.length, noEncontrados, noPositivos, columnas: columns },
+    };
+  } catch (error) {
+    console.error("import-inventory-count error:", error);
+    const detalle = error instanceof Error ? error.message : String(error);
+    return { message: `No se pudo guardar la carga. El sistema reporto: ${detalle.slice(0, 300)}` };
   }
 }

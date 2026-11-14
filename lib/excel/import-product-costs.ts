@@ -21,8 +21,10 @@ export async function parseProductCostsWorkbook(
 ): Promise<ProductCostParseResult> {
   return parseNameCostWorkbook(buffer, {
     nameHeaders: ["producto", "insumo", "articulo", "descripcion", "nombre"],
-    preferredCostHeaders: ["costo en esta sucursal", "ultimocosto", "ultimo costo"],
+    valueKeywords: ["costo"],
+    preferredValueHeaders: ["costo en esta sucursal", "ultimocosto", "ultimo costo"],
     noun: "producto",
-    costHeader,
+    valueNoun: "costo",
+    valueHeader: costHeader,
   });
 }
