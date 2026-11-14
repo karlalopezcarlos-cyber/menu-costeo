@@ -28,7 +28,7 @@ export default function ImportRecipeCostsForm() {
           </ul>
           {columnas && (
             <p className="mt-2 text-xs text-emerald-700">
-              Se leyo la columna &quot;{columnas.recipe}&quot; como el platillo y &quot;
+              Se leyo la columna &quot;{columnas.name}&quot; como el platillo y &quot;
               {columnas.cost}&quot; como el costo.
             </p>
           )}

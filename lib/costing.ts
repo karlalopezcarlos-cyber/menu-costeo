@@ -56,12 +56,20 @@ export type RecipeCostOrigin = "calculado" | "capturado" | "incompleto";
 const MAX_DEPTH = 20;
 
 /**
- * Costo unitario vigente de un producto para una sucursal especifica: el `computedUnitCost` de su
- * compra mas reciente EN ESA SUCURSAL (no el ultimo `Product.currentUnitCost` global, que se
- * actualiza con la compra mas reciente de cualquier sucursal y por lo tanto mezclaria precios entre
- * sucursales si se usara como fuente principal). Si esa sucursal nunca ha comprado el producto (ej.
- * lo recibe solo por requisicion, o todavia no lo compra directamente), se usa como respaldo el
- * costo informativo del catalogo (`Product.currentUnitCost`) en vez de dejarlo en 0.
+ * Costo unitario vigente de un producto para una sucursal especifica, en tres escalones:
+ *
+ *   1. El `computedUnitCost` de su compra mas reciente EN ESA SUCURSAL. Es el bueno: lo que de
+ *      verdad pago esta sucursal.
+ *   2. El costo capturado a mano para esta sucursal (SucursalProductCost). Para la sucursal que
+ *      acaba de abrir y todavia no captura compras, pero ya necesita costear sus recetas con
+ *      sus propios precios.
+ *   3. El costo informativo del catalogo (`Product.currentUnitCost`), que es de toda la
+ *      organizacion.
+ *
+ * El orden importa. El catalogo no se usa como fuente principal porque se actualiza con la
+ * compra mas reciente de CUALQUIER sucursal, y usarlo mezclaria precios entre sucursales. Y el
+ * capturado va antes que el catalogo, no despues: quien se tomo el trabajo de escribir el costo
+ * de esta sucursal sabe mas de esta sucursal que un numero que dejo ahi otra.
  */
 export async function getSucursalProductCosts(
   sucursalId: string,
@@ -77,6 +85,17 @@ export async function getSucursalProductCosts(
   });
   for (const p of purchases) {
     if (!costByProduct.has(p.productId)) costByProduct.set(p.productId, new Decimal(p.computedUnitCost));
+  }
+
+  const sinCompra = productIds.filter((id) => !costByProduct.has(id));
+  if (sinCompra.length > 0) {
+    const capturados = await prisma.sucursalProductCost.findMany({
+      where: { sucursalId, productId: { in: sinCompra }, unitCost: { gt: 0 } },
+      select: { productId: true, unitCost: true },
+    });
+    for (const c of capturados) {
+      costByProduct.set(c.productId, new Decimal(c.unitCost));
+    }
   }
 
   const missingIds = productIds.filter((id) => !costByProduct.has(id));

@@ -14,7 +14,7 @@ export type ImportCostsState = {
     creados: number;
     sinCambio: number;
     noEncontrados: { name: string; excelRow: number }[];
-    columnas: { recipe: string; cost: string } | null;
+    columnas: { name: string; cost: string } | null;
   };
 };
 
@@ -75,10 +75,10 @@ export async function importRecipeCosts(
     let sinCambio = 0;
 
     for (const row of rows) {
-      const existente = porNombre.get(row.recipeName.trim().toUpperCase());
+      const existente = porNombre.get(row.name.trim().toUpperCase());
       if (!existente) {
-        if (crearFaltantes) porCrear.push({ name: row.recipeName, cost: row.cost.toString() });
-        else noEncontrados.push({ name: row.recipeName, excelRow: row.excelRow });
+        if (crearFaltantes) porCrear.push({ name: row.name, cost: row.cost.toString() });
+        else noEncontrados.push({ name: row.name, excelRow: row.excelRow });
         continue;
       }
       const previo = existente.manualCost;

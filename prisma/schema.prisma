@@ -304,6 +304,7 @@ model Sucursal {
   storeOrders               StoreOrder[]
   storeDeliveryDates        StoreDeliveryDate[]
   expenses                  Expense[]
+  productCosts              SucursalProductCost[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -432,6 +433,7 @@ model Product {
   updatedAt                DateTime         @updatedAt
 
   purchases                       Purchase[]
+  sucursalCosts                   SucursalProductCost[]
   recipeItems                     RecipeItem[]
   inventoryCountItems             InventoryCountItem[]
   wasteEntries                    WasteEntry[]
@@ -1499,4 +1501,35 @@ model PortioningOutput {
   @@index([recipeId])
   @@index([productId])
   @@map("portioning_outputs")
+}
+
+/// Costo unitario capturado a mano para un producto EN UNA SUCURSAL.
+///
+/// El catalogo de productos es de toda la organizacion y su `currentUnitCost` es uno solo, asi
+/// que escribir ahi el costo de una sucursal se lo pone a todas. Una sucursal que abre no tiene
+/// compras capturadas todavia, y sin embargo ya necesita costear sus recetas con sus propios
+/// precios.
+///
+/// Se lee despues de las compras de la sucursal y antes del costo del catalogo (ver
+/// getSucursalProductCosts): en cuanto esa sucursal capture una compra real del producto, la
+/// compra manda y esto se queda de respaldo, sin tener que borrarlo.
+///
+/// No es una compra. Una compra movería el inventario y el Estado de Resultados; esto solo dice
+/// a cuanto vale el producto aqui.
+model SucursalProductCost {
+  id         String   @id @default(cuid())
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// En la unidad base del producto, igual que computedUnitCost de una compra.
+  unitCost   Decimal  @db.Decimal(14, 6)
+  /// Quien lo dejo asi: la carga masiva o quien lo edito a mano.
+  source     String   @default("manual")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([sucursalId, productId])
+  @@index([sucursalId])
+  @@map("sucursal_product_costs")
 }
