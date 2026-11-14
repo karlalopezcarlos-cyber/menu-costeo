@@ -23,15 +23,25 @@ export type NameCostParseResult = {
   errors: RowError[];
   /** Los encabezados que se reconocieron, para poder decirle al usuario que fue lo que se leyo. */
   columns: { name: string; cost: string } | null;
+  /** Cuando hay varias columnas de costo y ninguna conocida: cuales son, para que elija. */
+  costCandidates?: string[];
 };
 
 export type NameCostOptions = {
   /** Palabras que pueden encabezar la columna del nombre (ya en minusculas y sin acentos). */
   nameHeaders: string[];
-  /** Encabezado de costo que gana sobre cualquier otro, cuando hay varias columnas de costo. */
-  preferredCostHeader?: string;
+  /**
+   * Encabezados de costo que ganan sobre cualquier otro cuando hay varias columnas de costo,
+   * en orden de preferencia. Ya en minusculas y sin acentos.
+   */
+  preferredCostHeaders?: string[];
   /** Como llamarle a la cosa en los mensajes de error. */
   noun: string;
+  /**
+   * El encabezado exacto que el usuario eligio, cuando el archivo trae varias columnas de costo
+   * y ninguna es de las conocidas. Gana sobre todo lo demas.
+   */
+  costHeader?: string;
 };
 
 function cellText(value: ExcelJS.CellValue): string {
@@ -74,18 +84,30 @@ export function normaliza(texto: string): string {
  * Se busca el encabezado en las primeras filas y se reconocen varios nombres para lo mismo,
  * porque el punto es tragarse el archivo que el restaurante ya tiene.
  */
+type Ubicacion = {
+  headerRow: number;
+  nameCol: number;
+  costCol: number;
+  columns: { name: string; cost: string };
+};
+
+/** Lo que se encontro cuando no se pudo decidir, para poder decirselo al usuario. */
+type Ambiguedad = { candidatos: string[] };
+
 function ubicarColumnas(
   sheet: ExcelJS.Worksheet,
   opts: NameCostOptions,
-): { headerRow: number; nameCol: number; costCol: number; columns: { name: string; cost: string } } | null {
+): Ubicacion | Ambiguedad | null {
   const ultimaFilaABuscar = Math.min(sheet.rowCount, 15);
-  const preferido = opts.preferredCostHeader ? normaliza(opts.preferredCostHeader) : null;
+  const preferidos = (opts.preferredCostHeaders ?? []).map(normaliza);
+  const elegidoPorUsuario = opts.costHeader ? normaliza(opts.costHeader) : null;
+  let ambiguedad: Ambiguedad | null = null;
 
   for (let r = 1; r <= ultimaFilaABuscar; r++) {
     const fila = sheet.getRow(r);
     let nameCol = 0;
     let nameHeader = "";
-    const candidatosCosto: { col: number; header: string; exacto: boolean }[] = [];
+    const candidatosCosto: { col: number; header: string; clave: string }[] = [];
 
     fila.eachCell({ includeEmpty: false }, (cell, col) => {
       const texto = cellText(cell.value);
@@ -98,19 +120,29 @@ function ubicarColumnas(
           nameHeader = texto;
         }
       }
-      if (clave.includes("costo")) {
-        candidatosCosto.push({ col, header: texto, exacto: preferido !== null && clave === preferido });
+      if (clave.includes("costo") || clave === elegidoPorUsuario) {
+        candidatosCosto.push({ col, header: texto, clave });
       }
     });
 
     if (!nameCol || candidatosCosto.length === 0) continue;
 
-    // El encabezado preferido gana siempre: es el de nuestra plantilla, y suele convivir con
-    // una columna informativa que tambien dice "costo". Sin el, solo se acepta que haya una
-    // sola columna de costo; adivinar entre varias seria escribir dinero equivocado en silencio.
-    const exacta = candidatosCosto.find((c) => c.exacto);
-    const elegida = exacta ?? (candidatosCosto.length === 1 ? candidatosCosto[0] : null);
-    if (!elegida) continue;
+    // Quien eligio la columna manda. Despues, los encabezados conocidos en su orden: el de
+    // nuestra plantilla, luego los que usan los sistemas de punto de venta. Sin ninguno de
+    // esos, solo se acepta que haya una sola columna de costo; adivinar entre varias seria
+    // escribir dinero equivocado en silencio.
+    const elegida =
+      (elegidoPorUsuario ? candidatosCosto.find((c) => c.clave === elegidoPorUsuario) : undefined) ??
+      preferidos.reduce<(typeof candidatosCosto)[number] | undefined>(
+        (hallado, pref) => hallado ?? candidatosCosto.find((c) => c.clave === pref),
+        undefined,
+      ) ??
+      (candidatosCosto.length === 1 ? candidatosCosto[0] : undefined);
+
+    if (!elegida) {
+      ambiguedad = { candidatos: candidatosCosto.map((c) => c.header) };
+      continue;
+    }
 
     return {
       headerRow: r,
@@ -120,7 +152,7 @@ function ubicarColumnas(
     };
   }
 
-  return null;
+  return ambiguedad;
 }
 
 /**
@@ -165,6 +197,21 @@ export async function parseNameCostWorkbook(
         },
       ],
       columns: null,
+    };
+  }
+  if (!("headerRow" in ubicacion)) {
+    // Hay varias columnas de costo y ninguna conocida. Se le dicen cuales son, en vez de
+    // escoger una por el usuario: la diferencia entre dos columnas de costo es dinero.
+    return {
+      rows: [],
+      errors: [
+        {
+          excelRow: 0,
+          message: `El archivo trae mas de una columna de costo y no se cual usar: ${ubicacion.candidatos.join(", ")}. Escribe cual quieres en el campo de abajo y vuelve a subirlo.`,
+        },
+      ],
+      columns: null,
+      costCandidates: ubicacion.candidatos,
     };
   }
 

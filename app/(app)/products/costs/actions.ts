@@ -7,8 +7,13 @@ import { parseProductCostsWorkbook } from "@/lib/excel/import-product-costs";
 import { normaliza, type RowError } from "@/lib/excel/import-name-cost";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 
+/** Unidades donde un costo de centavos es lo esperado, no una senal de error. */
+const UNIDADES_MENUDAS = new Set(["G", "ML"]);
+
 export type ImportProductCostsState = {
   errors?: RowError[];
+  /** Cuando el archivo trae varias columnas de costo: cuales son, para que el usuario elija. */
+  costCandidates?: string[];
   /** Un problema general (archivo ilegible, sin encabezados), no de una fila. */
   message?: string;
   result?: {
@@ -62,8 +67,9 @@ export async function importProductCosts(
     return { message: "No se pudo leer el archivo. Vuelve a elegirlo e intenta de nuevo." };
   }
 
-  const { rows, errors, columns } = await parseProductCostsWorkbook(buffer);
-  if (errors.length > 0) return { errors };
+  const costHeader = String(formData.get("costHeader") ?? "").trim() || undefined;
+  const { rows, errors, columns, costCandidates } = await parseProductCostsWorkbook(buffer, costHeader);
+  if (errors.length > 0) return { errors, costCandidates };
   if (rows.length === 0) {
     return { message: "El archivo no trae ningun costo. Revisa que la columna de costo tenga datos." };
   }
@@ -106,7 +112,10 @@ export async function importProductCosts(
         continue;
       }
       const etiqueta = UNIT_LABELS[producto.baseUnit as UnitValue] ?? producto.baseUnit;
-      if (row.cost.lt(1)) {
+      // Menos de un peso solo es raro en las unidades grandes. En gramo y mililitro es lo
+      // normal -un destilado a $0.50 el ml es una botella de $375- y avisarlo ahi seria gritar
+      // en cada renglon de la barra hasta que nadie lea los avisos.
+      if (row.cost.lt(1) && !UNIDADES_MENUDAS.has(producto.baseUnit)) {
         sospechosos.push({ name: producto.name, costo: row.cost.toFixed(4), unidad: etiqueta });
       }
       const previo = previoPorProducto.get(producto.id);

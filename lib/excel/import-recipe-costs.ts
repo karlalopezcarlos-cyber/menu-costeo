@@ -18,7 +18,7 @@ export type ParseResult = NameCostParseResult;
 export async function parseRecipeCostsWorkbook(buffer: Buffer): Promise<ParseResult> {
   return parseNameCostWorkbook(buffer, {
     nameHeaders: ["platillo", "receta", "producto", "descripcion", "nombre"],
-    preferredCostHeader: "costo capturado",
+    preferredCostHeaders: ["costo capturado", "ultimocosto", "ultimo costo"],
     noun: "platillo",
   });
 }

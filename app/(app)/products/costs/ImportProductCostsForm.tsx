@@ -173,6 +173,25 @@ export default function ImportProductCostsForm({ sucursalName }: { sucursalName:
           />
         </div>
 
+        <div className="space-y-1">
+          <label htmlFor="costHeader" className="text-sm font-medium text-neutral-700">
+            Columna de costo <span className="font-normal text-neutral-400">(opcional)</span>
+          </label>
+          <input
+            id="costHeader"
+            name="costHeader"
+            type="text"
+            defaultValue={state.costCandidates?.[0] ?? ""}
+            placeholder="Se detecta sola; escribela solo si el archivo trae varias"
+            className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
+          />
+          {state.costCandidates && state.costCandidates.length > 0 && (
+            <p className="text-xs text-neutral-500">
+              En tu archivo hay: {state.costCandidates.join(", ")}.
+            </p>
+          )}
+        </div>
+
         <button
           type="submit"
           disabled={pending}
