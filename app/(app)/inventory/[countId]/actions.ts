@@ -381,3 +381,74 @@ export async function importInventoryCount(
     return { message: `No se pudo guardar la carga. El sistema reporto: ${detalle.slice(0, 300)}` };
   }
 }
+
+export type RecalcCostsState = { message?: string; ok?: { renglones: number; valor: string } };
+
+/**
+ * Vuelve a grabar el conteo con los costos de hoy, sin tocar las cantidades.
+ *
+ * El costo unitario se congela al guardar: un inventario cerrado de octubre no debe cambiar de
+ * valor porque en diciembre suba el camaron. Pero cuando el costo entra despues de la captura
+ * -se cargo el conteo antes que los costos, o llego la factura tarde- el conteo queda valuado en
+ * cero y no hay forma de corregirlo sin volver a teclear todo.
+ *
+ * Esto reusa persistInventoryCount con las mismas cantidades que ya estan guardadas, asi que
+ * solo se reescribe el costo. La bitacora no registra nada porque solo anota cambios de
+ * cantidad, y aqui ninguna cambia.
+ */
+export async function recalcInventoryCountCosts(countId: string): Promise<RecalcCostsState> {
+  const user = await requireSucursalContext();
+
+  try {
+    await getCount(countId, user.sucursalId);
+
+    const items = await prisma.inventoryCountItem.findMany({
+      where: { inventoryCountId: countId },
+      select: { productId: true, subRecipeId: true, quantity: true, costBasis: true },
+    });
+    if (items.length === 0) {
+      return { message: "Este conteo no tiene renglones capturados todavia." };
+    }
+
+    const entries: InventoryCaptureEntry[] = [];
+    for (const item of items) {
+      if (item.productId) {
+        entries.push({
+          type: "product",
+          id: item.productId,
+          quantity: item.quantity.toString(),
+          costBasis: item.costBasis ?? "net",
+        });
+      } else if (item.subRecipeId) {
+        entries.push({ type: "subrecipe", id: item.subRecipeId, quantity: item.quantity.toString() });
+      }
+    }
+
+    await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
+
+    const recalculados = await prisma.inventoryCountItem.findMany({
+      where: { inventoryCountId: countId },
+      select: { quantity: true, unitCost: true },
+    });
+    const valor = recalculados.reduce(
+      (suma, r) => suma.plus(new Decimal(r.quantity.toString()).mul(r.unitCost.toString())),
+      new Decimal(0),
+    );
+
+    revalidatePath(`/inventory/${countId}`);
+    revalidatePath("/inventory");
+    return {
+      ok: {
+        renglones: entries.length,
+        valor: valor.toNumber().toLocaleString("es-MX", {
+          style: "currency",
+          currency: "MXN",
+        }),
+      },
+    };
+  } catch (error) {
+    console.error("recalc-inventory-count-costs error:", error);
+    const detalle = error instanceof Error ? error.message : String(error);
+    return { message: `No se pudo recalcular. El sistema reporto: ${detalle.slice(0, 300)}` };
+  }
+}

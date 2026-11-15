@@ -11,6 +11,7 @@ import InventoryCountTabs from "./InventoryCountTabs";
 import InventoryChangeLogTable, { type ChangeLogRow } from "./InventoryChangeLogTable";
 import DeleteCountButton from "../DeleteCountButton";
 import ImportCountForm from "./ImportCountForm";
+import RecalcCostsButton from "./RecalcCostsButton";
 
 export default async function InventoryCountPage({
   params,
@@ -204,7 +205,10 @@ export default async function InventoryCountPage({
         </div>
       </div>
 
-      <ImportCountForm countId={count.id} />
+      <div className="flex flex-wrap items-center gap-3">
+        <ImportCountForm countId={count.id} />
+        <RecalcCostsButton countId={count.id} />
+      </div>
 
       <InventoryCountTabs
         captureTable={<InventoryCaptureTable countId={count.id} rows={rows} />}
