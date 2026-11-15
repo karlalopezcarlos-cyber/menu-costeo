@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireSucursalContext } from "@/lib/tenant";
 import { loadOrgRecipeGraph, getRecipeCost, getSucursalProductCosts, type RecipeGraph } from "@/lib/costing";
 import { removeYieldFactor } from "@/lib/units";
@@ -385,16 +386,18 @@ export async function importInventoryCount(
 export type RecalcCostsState = { message?: string; ok?: { renglones: number; valor: string } };
 
 /**
- * Vuelve a grabar el conteo con los costos de hoy, sin tocar las cantidades.
+ * Vuelve a valuar el conteo con los costos de hoy, sin tocar las cantidades.
  *
  * El costo unitario se congela al guardar: un inventario cerrado de octubre no debe cambiar de
  * valor porque en diciembre suba el camaron. Pero cuando el costo entra despues de la captura
- * -se cargo el conteo antes que los costos, o llego la factura tarde- el conteo queda valuado en
- * cero y no hay forma de corregirlo sin volver a teclear todo.
+ * -se cargo el conteo antes que los costos, o la factura llego tarde- el conteo queda valuado en
+ * cero y la unica salida era recapturar todo a mano.
  *
- * Esto reusa persistInventoryCount con las mismas cantidades que ya estan guardadas, asi que
- * solo se reescribe el costo. La bitacora no registra nada porque solo anota cambios de
- * cantidad, y aqui ninguna cambia.
+ * El costo se calcula igual que en persistInventoryCount, pero la escritura no pasa por ahi.
+ * Reusarla costaba un upsert por renglon, y contra una base remota eso son cuatrocientas y pico
+ * de vueltas de red: un conteo de 473 renglones tardaba veinte segundos y moria por timeout.
+ * Como aqui los renglones ya existen y ninguna cantidad cambia, basta un solo UPDATE con todos
+ * los costos adentro. Una vuelta en lugar de cuatrocientas, y sigue siendo atomico.
  */
 export async function recalcInventoryCountCosts(countId: string): Promise<RecalcCostsState> {
   const user = await requireSucursalContext();
@@ -404,46 +407,61 @@ export async function recalcInventoryCountCosts(countId: string): Promise<Recalc
 
     const items = await prisma.inventoryCountItem.findMany({
       where: { inventoryCountId: countId },
-      select: { productId: true, subRecipeId: true, quantity: true, costBasis: true },
+      select: { id: true, productId: true, subRecipeId: true, quantity: true, costBasis: true },
     });
     if (items.length === 0) {
       return { message: "Este conteo no tiene renglones capturados todavia." };
     }
 
-    const entries: InventoryCaptureEntry[] = [];
+    const productIds = items.map((i) => i.productId).filter((id): id is string => id !== null);
+    const traeSubrecetas = items.some((i) => i.subRecipeId !== null);
+
+    const [productos, costosPorProducto, graph] = await Promise.all([
+      productIds.length > 0
+        ? prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, yieldPercentage: true },
+          })
+        : Promise.resolve([]),
+      getSucursalProductCosts(user.sucursalId, productIds),
+      traeSubrecetas ? loadOrgRecipeGraph(user.sucursalId) : Promise.resolve(null),
+    ]);
+    const productoPorId = new Map(productos.map((p) => [p.id, p]));
+    const memo = new Map<string, Decimal>();
+
+    const nuevos: { id: string; costo: Decimal }[] = [];
+    let valor = new Decimal(0);
     for (const item of items) {
+      let costo = new Decimal(0);
       if (item.productId) {
-        entries.push({
-          type: "product",
-          id: item.productId,
-          quantity: item.quantity.toString(),
-          costBasis: item.costBasis ?? "net",
-        });
-      } else if (item.subRecipeId) {
-        entries.push({ type: "subrecipe", id: item.subRecipeId, quantity: item.quantity.toString() });
+        const producto = productoPorId.get(item.productId);
+        const neto = costosPorProducto.get(item.productId) ?? new Decimal(0);
+        costo =
+          producto && item.costBasis === "gross"
+            ? removeYieldFactor(neto, producto.yieldPercentage)
+            : neto;
+      } else if (item.subRecipeId && graph) {
+        costo = subRecipeUnitCost(graph, memo, item.subRecipeId);
       }
+      nuevos.push({ id: item.id, costo });
+      valor = valor.plus(new Decimal(item.quantity.toString()).mul(costo));
     }
 
-    await persistInventoryCount(countId, user.organizationId, user.sucursalId, user.id, entries);
-
-    const recalculados = await prisma.inventoryCountItem.findMany({
-      where: { inventoryCountId: countId },
-      select: { quantity: true, unitCost: true },
-    });
-    const valor = recalculados.reduce(
-      (suma, r) => suma.plus(new Decimal(r.quantity.toString()).mul(r.unitCost.toString())),
-      new Decimal(0),
-    );
+    await prisma.$executeRaw`
+      UPDATE inventory_count_items AS i
+      SET "unitCost" = v.costo, "updatedAt" = NOW()
+      FROM (VALUES ${Prisma.join(
+        nuevos.map((n) => Prisma.sql`(${n.id}::text, ${n.costo.toFixed(6)}::decimal)`),
+      )}) AS v(id, costo)
+      WHERE i.id = v.id AND i."inventoryCountId" = ${countId}
+    `;
 
     revalidatePath(`/inventory/${countId}`);
     revalidatePath("/inventory");
     return {
       ok: {
-        renglones: entries.length,
-        valor: valor.toNumber().toLocaleString("es-MX", {
-          style: "currency",
-          currency: "MXN",
-        }),
+        renglones: nuevos.length,
+        valor: valor.toNumber().toLocaleString("es-MX", { style: "currency", currency: "MXN" }),
       },
     };
   } catch (error) {
