@@ -26,22 +26,22 @@ type Palette = {
 const PALETTES: Record<BrandTone, Palette> = {
   dark: {
     stroke: "#f0ede8",
-    body: "#b08f5b",
+    body: "#d4af37",
     bill: "#f0ede8",
     billEdge: null,
-    detail: "#8a6a3e",
+    detail: "#b8942a",
     text: "#f0ede8",
-    ring: "#b08f5b",
+    ring: "#d4af37",
     hair: "#46423a",
   },
   light: {
     stroke: "#1c1b19",
-    body: "#8a6a3e",
+    body: "#896b1c",
     bill: "#ffffff",
     billEdge: "#1c1b19",
-    detail: "#8a6a3e",
+    detail: "#896b1c",
     text: "#1c1b19",
-    ring: "#8a6a3e",
+    ring: "#896b1c",
     hair: "#e5e1da",
   },
 };
@@ -52,8 +52,8 @@ function MarkPaths({ c }: { c: Palette }) {
     <>
       <g transform="translate(100,46) scale(0.68) translate(-100,-46)">
         <g transform="rotate(-9 100 42)">
-          <rect x="78" y="34" width="48" height="24" rx="2.5" fill="#8a6a3e" />
-          <rect x="76" y="30" width="48" height="24" rx="2.5" fill="#cdb183" />
+          <rect x="78" y="34" width="48" height="24" rx="2.5" fill="#b8942a" />
+          <rect x="76" y="30" width="48" height="24" rx="2.5" fill="#e5c566" />
           <rect
             x="74"
             y="26"

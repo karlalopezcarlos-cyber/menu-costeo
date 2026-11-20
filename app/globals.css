@@ -19,16 +19,25 @@
   --color-neutral-900: #1c1b19;
   --color-neutral-950: #121110;
 
-  --color-brand-50: #faf6ef;
-  --color-brand-100: #f2e9d8;
-  --color-brand-200: #e3d2b0;
-  --color-brand-300: #cdb183;
-  --color-brand-400: #b08f5b;
-  --color-brand-500: #8a6a3e;
-  --color-brand-600: #73572f;
-  --color-brand-700: #5a4426;
-  --color-brand-800: #42321c;
-  --color-brand-900: #2c2113;
+  /*
+   * El oro de la marca es #d4af37, el de los artes de Fondo. Vive en brand-400 y solo se usa
+   * sobre negro: ahi da 9.3:1 de contraste y se ve como metal. Sobre blanco da 2.1:1 y es
+   * ilegible -por eso toda la identidad esta hecha en negro-.
+   *
+   * De brand-600 para abajo la escala se oscurece mas de lo que un degradado normal pediria.
+   * Es a proposito: esos son los tonos para texto y bordes sobre los fondos claros de la app,
+   * y estan calculados para pasar AA (4.5:1) tanto sobre blanco como sobre el arena del fondo.
+   */
+  --color-brand-50: #fdf9ed;
+  --color-brand-100: #f9efcf;
+  --color-brand-200: #f1dc9e;
+  --color-brand-300: #e5c566;
+  --color-brand-400: #d4af37;
+  --color-brand-500: #b8942a;
+  --color-brand-600: #896b1c;
+  --color-brand-700: #6e5717;
+  --color-brand-800: #544211;
+  --color-brand-900: #382c0c;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
@@ -48,12 +57,22 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Campos de captura: un solo estilo para toda la app, con foco en bronce. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-select,
-textarea {
-  background-color: #ffffff;
-  color: var(--foreground);
+/*
+ * Campos de captura: un solo estilo para toda la app, con foco en bronce.
+ *
+ * Va dentro de @layer base a proposito. Tailwind v4 mete sus utilidades en su propia capa, y
+ * el CSS que vive fuera de toda capa le gana a cualquier capa por mas especifica que sea -no
+ * es cuestion de especificidad, es el orden de las capas-. Suelta, esta regla pintaba de
+ * blanco los campos de la pantalla de acceso, la unica en negro, sin importar que clases se le
+ * pusieran encima.
+ */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    background-color: #ffffff;
+    color: var(--foreground);
+  }
 }
 
 input::placeholder,
