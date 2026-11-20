@@ -80,16 +80,16 @@ await sharp(Buffer.from(sello({ simple: false, lado: 180 })))
 const PORTADA = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <radialGradient id="luz1" cx="50%" cy="0%" r="62%">
-      <stop offset="0%" stop-color="${ORO}" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="${ORO}" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="luz2" cx="100%" cy="100%" r="58%">
-      <stop offset="0%" stop-color="${ORO_OSCURO}" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="${ORO_OSCURO}" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="filo" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="${ORO}" stop-opacity="0"/>
-      <stop offset="50%" stop-color="${ORO}" stop-opacity="1"/>
+      <stop offset="50%" stop-color="${ORO}" stop-opacity="0.75"/>
       <stop offset="100%" stop-color="${ORO}" stop-opacity="0"/>
     </linearGradient>
   </defs>
@@ -110,7 +110,7 @@ const PORTADA = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="63
 
   <text x="596" y="476" text-anchor="middle"
         font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21"
-        font-weight="500" letter-spacing="7.5" fill="${ORO}">CONTROL · RENTABILIDAD · ESTRATEGIA</text>
+        font-weight="500" letter-spacing="7.5" fill="#a9a296">CONTROL <tspan fill="${ORO_OSCURO}">·</tspan> RENTABILIDAD <tspan fill="${ORO_OSCURO}">·</tspan> ESTRATEGIA</text>
 
   <text x="600" y="540" text-anchor="middle"
         font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="30"

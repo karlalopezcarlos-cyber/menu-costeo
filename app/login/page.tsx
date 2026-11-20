@@ -19,25 +19,23 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-neutral-950 px-4 py-10">
-      {/* Dos luces tibias detras del sello, para que el negro no quede plano. */}
+      {/* Un aclarado neutro arriba, nada mas para que el negro no quede plano. Sin color:
+          teñir el fondo de ambar hacia que la pantalla se leyera como adorno y no como acceso. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 h-[32rem] w-[32rem] -translate-x-1/2 rounded-full bg-brand-500/12 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-52 right-[-10rem] h-[34rem] w-[34rem] rounded-full bg-brand-700/14 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-gradient-to-b from-white/[0.05] to-transparent"
       />
 
       <div className="relative w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <FondoSeal size={148} tone="dark" />
-          <p className="mt-5 text-[11px] font-medium uppercase tracking-[0.34em] text-brand-400">
-            Control · Rentabilidad · Estrategia
+          <div className="mt-5 h-px w-28 bg-gradient-to-r from-transparent via-brand-500/70 to-transparent" />
+          <p className="mt-5 text-[11px] font-medium uppercase tracking-[0.34em] text-neutral-400">
+            Control <span className="text-brand-500">·</span> Rentabilidad{" "}
+            <span className="text-brand-500">·</span> Estrategia
           </p>
-          <p className="mt-3 text-sm text-neutral-400">
-            Soluciones integrales para{" "}
-            <span className="text-neutral-200">negocios de alimentos</span>
+          <p className="mt-3 text-sm text-neutral-500">
+            Soluciones integrales para negocios de alimentos
           </p>
         </div>
 
@@ -58,7 +56,7 @@ export default function LoginPage() {
               type="email"
               required
               autoComplete="email"
-              className="w-full rounded-lg border border-white/10 bg-neutral-900/80 px-3.5 py-2.5 text-sm text-neutral-100 outline-none transition-colors placeholder:text-neutral-600 focus:border-brand-400/60 focus:ring-1 focus:ring-brand-400/40"
+              className="w-full rounded-lg border border-white/10 bg-neutral-900/80 px-3.5 py-2.5 text-sm text-neutral-100 outline-none transition-colors placeholder:text-neutral-600 focus:border-neutral-500 focus:ring-1 focus:ring-neutral-600"
             />
           </div>
 
@@ -75,7 +73,7 @@ export default function LoginPage() {
               type="password"
               required
               autoComplete="current-password"
-              className="w-full rounded-lg border border-white/10 bg-neutral-900/80 px-3.5 py-2.5 text-sm text-neutral-100 outline-none transition-colors placeholder:text-neutral-600 focus:border-brand-400/60 focus:ring-1 focus:ring-brand-400/40"
+              className="w-full rounded-lg border border-white/10 bg-neutral-900/80 px-3.5 py-2.5 text-sm text-neutral-100 outline-none transition-colors placeholder:text-neutral-600 focus:border-neutral-500 focus:ring-1 focus:ring-neutral-600"
             />
           </div>
 
@@ -88,7 +86,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={pending}
-            className="w-full rounded-lg bg-gradient-to-b from-brand-300 to-brand-500 px-3.5 py-2.5 text-sm font-semibold tracking-wide text-neutral-950 shadow-lg shadow-brand-900/40 transition-opacity hover:opacity-95 disabled:opacity-50"
+            className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-sm font-semibold tracking-wide text-neutral-950 transition-colors hover:bg-white disabled:opacity-50"
           >
             {pending ? "Entrando..." : "Entrar"}
           </button>
