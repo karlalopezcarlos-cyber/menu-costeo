@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { FondoBadge } from "@/components/brand/FondoLogo";
 
 export type NavItem = { href: string; label: string };
@@ -58,16 +59,38 @@ function NavIcon({ section }: { section: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="h-[18px] w-[18px] shrink-0"
+      className="h-[19px] w-[19px] shrink-0"
     >
       <path d={path} />
     </svg>
   );
 }
 
-export default function Sidebar({ items }: { items: NavItem[] }) {
+/**
+ * Menu lateral.
+ *
+ * Por defecto es una tira angosta de puros iconos (4.5rem). Se abre a 15rem al pasar el
+ * mouse o al mover el foco con el teclado, y encima del contenido -no lo empuja-, para que
+ * el texto de la pantalla no brinque cada vez que uno roza la orilla. El boton de la flecha
+ * la deja fija abierta; esa decision se guarda en la galleta `navPinned`.
+ *
+ * El hueco del icono mide siempre lo mismo (w-12 dentro de un px-3), asi que el dibujo cae
+ * en el mismo punto este abierta o cerrada: al abrirse solo aparece el texto, nada se mueve.
+ */
+export default function Sidebar({
+  items,
+  pinned,
+  onPinnedChange,
+}: {
+  items: NavItem[];
+  pinned: boolean;
+  onPinnedChange: (valor: boolean) => void;
+}) {
   const pathname = usePathname();
   const currentSection = pathname.split("/")[1] ?? "";
+  const [asomada, setAsomada] = useState(false);
+
+  const abierta = pinned || asomada;
 
   const used = new Set<string>();
   const groups = GROUPS.map((group) => {
@@ -84,22 +107,65 @@ export default function Sidebar({ items }: { items: NavItem[] }) {
   return (
     <>
       {/* Menu lateral (pantallas medianas en adelante) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-neutral-800 bg-neutral-900 lg:flex">
-        <div className="flex h-16 items-center border-b border-neutral-800 px-5">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <FondoBadge size={30} tone="dark" />
-            <span className="text-[15px] font-semibold uppercase tracking-[0.22em] text-neutral-100">
+      <aside
+        onMouseEnter={() => setAsomada(true)}
+        onMouseLeave={() => setAsomada(false)}
+        onFocusCapture={() => setAsomada(true)}
+        onBlurCapture={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAsomada(false);
+        }}
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-neutral-800 bg-neutral-900 transition-[width] duration-200 ease-out lg:flex ${
+          abierta ? "w-60" : "w-[4.5rem]"
+        } ${asomada && !pinned ? "shadow-2xl shadow-black/40" : ""}`}
+      >
+        <div className="flex h-16 shrink-0 items-center border-b border-neutral-800 px-3">
+          <Link href="/dashboard" className="flex min-w-0 items-center" title="Fondo">
+            <span className="flex w-12 shrink-0 items-center justify-center">
+              <FondoBadge size={30} tone="dark" />
+            </span>
+            <span
+              className={`whitespace-nowrap text-[15px] font-semibold uppercase tracking-[0.22em] text-neutral-100 transition-opacity duration-150 ${
+                abierta ? "opacity-100" : "opacity-0"
+              }`}
+            >
               Fondo
             </span>
           </Link>
+
+          <button
+            type="button"
+            onClick={() => onPinnedChange(!pinned)}
+            aria-label={pinned ? "Soltar el menu" : "Dejar el menu abierto"}
+            title={pinned ? "Soltar el menu" : "Dejar el menu abierto"}
+            className={`ml-auto mr-1 rounded-md p-1.5 text-neutral-500 transition-opacity duration-150 hover:bg-neutral-800 hover:text-neutral-200 ${
+              abierta ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="h-4 w-4"
+            >
+              {pinned ? <path d="M15 6l-6 6 6 6" /> : <path d="M9 6l6 6-6 6" />}
+            </svg>
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
           {groups.map((group) => (
-            <div key={group.title} className="mb-5 last:mb-0">
-              <p className="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                {group.title}
-              </p>
+            <div key={group.title} className="mb-4 last:mb-0">
+              {abierta ? (
+                <p className="h-[22px] px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                  {group.title}
+                </p>
+              ) : (
+                <div className="mx-4 mb-2 mt-[10px] h-px bg-neutral-800" aria-hidden />
+              )}
               <ul className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = currentSection === sectionOf(item.href);
@@ -107,20 +173,31 @@ export default function Sidebar({ items }: { items: NavItem[] }) {
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        title={item.label}
                         aria-current={isActive ? "page" : undefined}
                         className={
                           isActive
-                            ? "relative flex items-center gap-2.5 rounded-md bg-neutral-800 px-2.5 py-2 text-sm font-medium text-white"
-                            : "relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-neutral-400 transition-colors hover:bg-neutral-800/60 hover:text-neutral-100"
+                            ? "relative flex items-center rounded-md bg-neutral-800 py-2 text-sm font-medium text-white"
+                            : "relative flex items-center rounded-md py-2 text-sm text-neutral-400 transition-colors hover:bg-neutral-800/60 hover:text-neutral-100"
                         }
                       >
                         {isActive && (
                           <span className="absolute inset-y-1.5 -left-3 w-0.5 rounded-r bg-brand-400" />
                         )}
-                        <span className={isActive ? "text-brand-300" : "text-neutral-500"}>
+                        <span
+                          className={`flex w-12 shrink-0 items-center justify-center ${
+                            isActive ? "text-brand-300" : "text-neutral-500"
+                          }`}
+                        >
                           <NavIcon section={sectionOf(item.href)} />
                         </span>
-                        {item.label}
+                        <span
+                          className={`truncate pr-3 transition-opacity duration-150 ${
+                            abierta ? "opacity-100" : "opacity-0"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
                       </Link>
                     </li>
                   );
