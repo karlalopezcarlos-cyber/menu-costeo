@@ -167,3 +167,84 @@ export async function createRequisicion(
   revalidatePath("/dashboard");
   redirect(`/requisitions/${requisicionId}`);
 }
+
+/**
+ * Alcance de sucursales del usuario: todas las de la organizacion si no es STAFF, y solo las
+ * asignadas si lo es. Es el mismo criterio con el que la lista decide que requisiciones muestra.
+ */
+async function sucursalesAlcanzables(user: {
+  role: string;
+  organizationId: string;
+  sucursalIds: string[];
+}): Promise<Set<string>> {
+  if (user.role !== "STAFF") {
+    const todas = await prisma.sucursal.findMany({
+      where: { organizationId: user.organizationId },
+      select: { id: true },
+    });
+    return new Set(todas.map((s) => s.id));
+  }
+  return new Set(user.sucursalIds);
+}
+
+/**
+ * Borra una requisicion completa.
+ *
+ * No hace falta ningun asiento de correccion: la Auditoria y el Kardex leen las requisiciones
+ * en vivo de la tabla, asi que al desaparecer el renglon el movimiento de inventario se deshace
+ * solo en las dos sucursales. Los RequisicionItem se van en cascada.
+ *
+ * Solo puede borrarla quien alcanza la sucursal de ORIGEN: quien recibe no deberia poder
+ * desaparecer un envio que registro alguien mas.
+ */
+export async function deleteRequisicion(id: string): Promise<{ error?: string }> {
+  const user = await requireSucursalContext();
+
+  const requisicion = await prisma.requisicion.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, fromSucursalId: true, toSucursalId: true },
+  });
+  if (!requisicion) return { error: "Requisicion no encontrada." };
+
+  const alcance = await sucursalesAlcanzables(user);
+  if (!alcance.has(requisicion.fromSucursalId)) {
+    return { error: "Solo la sucursal que envio la requisicion puede borrarla." };
+  }
+
+  await prisma.requisicion.delete({ where: { id: requisicion.id } });
+
+  revalidatePath("/requisitions");
+  revalidatePath("/audit");
+  revalidatePath("/kardex");
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  return {};
+}
+
+/** Cambia la nota de una requisicion ya registrada. Vacia la deja en null. */
+export async function updateRequisicionNote(
+  id: string,
+  note: string,
+): Promise<{ error?: string }> {
+  const user = await requireSucursalContext();
+
+  const requisicion = await prisma.requisicion.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { id: true, fromSucursalId: true, toSucursalId: true },
+  });
+  if (!requisicion) return { error: "Requisicion no encontrada." };
+
+  const alcance = await sucursalesAlcanzables(user);
+  if (!alcance.has(requisicion.fromSucursalId) && !alcance.has(requisicion.toSucursalId)) {
+    return { error: "No tienes acceso a esta requisicion." };
+  }
+
+  await prisma.requisicion.update({
+    where: { id: requisicion.id },
+    data: { note: note.trim().slice(0, 1000) || null },
+  });
+
+  revalidatePath("/requisitions");
+  revalidatePath(`/requisitions/${requisicion.id}`);
+  return {};
+}

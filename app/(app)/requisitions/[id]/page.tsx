@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatRequisicionFolio } from "@/lib/requisitions/folio";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, ZONA_HORARIA } from "@/lib/format";
+import RequisicionNota from "./RequisicionNota";
+import BorrarRequisicion from "./BorrarRequisicion";
 
 export default async function RequisicionDetailPage({
   params,
@@ -14,22 +16,45 @@ export default async function RequisicionDetailPage({
   const { id } = await params;
   const user = await requireSucursalContext();
 
+  // El alcance tiene que ser el mismo que el de la lista: ahi quien no es STAFF ve las
+  // requisiciones de toda la organizacion, asi que si aqui se filtrara por la sucursal activa,
+  // abrir una de otra sucursal desde la lista daria 404.
   const requisicion = await prisma.requisicion.findFirst({
     where: {
       id,
       organizationId: user.organizationId,
-      OR: [{ fromSucursalId: user.sucursalId }, { toSucursalId: user.sucursalId }],
+      ...(user.role === "STAFF"
+        ? {
+            OR: [
+              { fromSucursalId: { in: user.sucursalIds } },
+              { toSucursalId: { in: user.sucursalIds } },
+            ],
+          }
+        : {}),
     },
     include: {
       fromSucursal: { select: { name: true } },
       toSucursal: { select: { name: true } },
-      createdBy: { select: { name: true, email: true } },
+      createdBy: { select: { name: true, firstName: true, lastName: true, email: true } },
       items: {
         include: { product: { select: { name: true } }, subRecipe: { select: { name: true } } },
       },
     },
   });
   if (!requisicion) notFound();
+
+  // Mismo criterio que la lista y que la accion: solo quien alcanza la sucursal de ORIGEN.
+  const puedeBorrar =
+    user.role !== "STAFF" || user.sucursalIds.includes(requisicion.fromSucursalId);
+
+  const nombreUsuario = requisicion.createdBy
+    ? [requisicion.createdBy.firstName, requisicion.createdBy.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      requisicion.createdBy.name ||
+      requisicion.createdBy.email
+    : null;
 
   const total = requisicion.items.reduce(
     (sum, item) => sum + Number(item.quantity) * Number(item.unitCost),
@@ -50,12 +75,21 @@ export default async function RequisicionDetailPage({
           <strong>{requisicion.fromSucursal.name}</strong> a{" "}
           <strong>{requisicion.toSucursal.name}</strong>
         </p>
-        {requisicion.createdBy && (
-          <p className="text-xs text-neutral-400">
-            Registrada por {requisicion.createdBy.name ?? requisicion.createdBy.email}
-          </p>
-        )}
-        {requisicion.note && <p className="mt-1 text-sm text-neutral-600">{requisicion.note}</p>}
+        {/* La fecha de arriba es el dia de la operacion (un @db.Date, sin hora). La hora real
+            sale de createdAt, que es cuando quedo registrada; son dos datos distintos y por eso
+            van en renglones separados en vez de pegados. */}
+        <p className="text-xs text-neutral-400">
+          Registrada el{" "}
+          {requisicion.createdAt.toLocaleString("es-MX", {
+            timeZone: ZONA_HORARIA,
+            dateStyle: "short",
+            timeStyle: "short",
+          })}
+          {nombreUsuario && <> por {nombreUsuario}</>}
+        </p>
+        <div className="mt-3">
+          <RequisicionNota requisicionId={requisicion.id} notaInicial={requisicion.note} />
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -96,6 +130,16 @@ export default async function RequisicionDetailPage({
         <p className="text-sm text-neutral-500">Costo total de la requisicion</p>
         <p className="text-xl font-semibold text-neutral-900">{formatMoney(total)}</p>
       </div>
+
+      {puedeBorrar && (
+        <BorrarRequisicion
+          requisicionId={requisicion.id}
+          folioLabel={formatRequisicionFolio(requisicion.folio)}
+          origen={requisicion.fromSucursal.name}
+          destino={requisicion.toSucursal.name}
+          renglones={requisicion.items.length}
+        />
+      )}
     </div>
   );
 }
