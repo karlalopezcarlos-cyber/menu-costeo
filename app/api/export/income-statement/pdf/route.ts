@@ -27,11 +27,13 @@ export async function GET(request: NextRequest) {
   // que salio es peor que no tenerlo.
   const ivaView: IvaView = request.nextUrl.searchParams.get("iva") === "con" ? "conIva" : "sinIva";
 
+  // "hoy" es el periodo en curso, sin conteo final: la misma convencion que usa la pantalla,
+  // para que el archivo diga exactamente lo que se estaba viendo.
   const result = await computeIncomeStatement(
     user.organizationId,
     user.sucursalId,
     initialCountId,
-    finalCountId,
+    finalCountId === "hoy" ? null : finalCountId,
     ivaView,
   );
   const rows = buildIncomeStatementRows(result);

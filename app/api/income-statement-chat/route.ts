@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
       user.organizationId,
       user.sucursalId,
       initialCountId,
-      finalCountId,
+      // "hoy" es el periodo en curso: la IA tiene que ver el mismo reporte que la pantalla
+      // desde la que se abrio, incluido el caso en el que todavia no hay conteo final.
+      finalCountId === "hoy" ? null : finalCountId,
       ivaView,
     );
   } catch {

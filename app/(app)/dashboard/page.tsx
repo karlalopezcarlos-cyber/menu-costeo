@@ -157,17 +157,32 @@ export default async function DashboardPage({
   const defaultFinal = counts[counts.length - 1];
   const defaultInitial = counts[counts.length - 2];
 
+  // "hoy" no es un conteo: es el periodo abierto, del conteo inicial a la fecha de hoy. Se
+  // escribe asi en la URL para que el enlace se pueda guardar y compartir como cualquier otro.
+  const enCurso = params.final === "hoy";
+
   const initialCountId = params.initial && counts.some((c) => c.id === params.initial)
     ? params.initial
-    : defaultInitial.id;
-  const finalCountId = params.final && counts.some((c) => c.id === params.final)
-    ? params.final
-    : defaultFinal.id;
+    : // Con el periodo abierto el arranque natural es el ULTIMO conteo, no el penultimo: lo que
+      // se quiere ver es lo que va desde el ultimo inventario levantado.
+      enCurso
+      ? defaultFinal.id
+      : defaultInitial.id;
+  const finalCountId =
+    !enCurso && params.final && counts.some((c) => c.id === params.final)
+      ? params.final
+      : enCurso
+        ? null
+        : defaultFinal.id;
 
   const selectedInitial = counts.find((c) => c.id === initialCountId)!;
-  const selectedFinal = counts.find((c) => c.id === finalCountId)!;
-  const orderedInitialId = selectedInitial.date <= selectedFinal.date ? initialCountId : finalCountId;
-  const orderedFinalId = selectedInitial.date <= selectedFinal.date ? finalCountId : initialCountId;
+  const selectedFinal = finalCountId ? counts.find((c) => c.id === finalCountId)! : null;
+  // Si se eligieron al reves, se enderezan. Con el periodo abierto no hay nada que enderezar:
+  // hoy siempre es despues del conteo inicial.
+  const alReves = selectedFinal !== null && selectedInitial.date > selectedFinal.date;
+  const orderedInitialId = alReves ? finalCountId! : initialCountId;
+  const orderedFinalId = alReves ? initialCountId : finalCountId;
+  const finalParam = orderedFinalId ?? "hoy";
 
   // Sin IVA por omision: es la unica vista en la que la venta y el costo estan medidos con la
   // misma regla. Hay que pedir expresamente la otra.
@@ -184,7 +199,7 @@ export default async function DashboardPage({
   const columnas = columnasDe(result);
   // Concepto + monto y % por cada columna.
   const totalColumnas = 1 + columnas.length * 2;
-  const exportQuery = `?initial=${orderedInitialId}&final=${orderedFinalId}&iva=${
+  const exportQuery = `?initial=${orderedInitialId}&final=${finalParam}&iva=${
     ivaView === "conIva" ? "con" : "sin"
   }`;
   const ventaTotal = result.ventaTotal.consolidado;
@@ -247,7 +262,45 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {result.sinAlmacen ? (
+      {result.periodoEnCurso ? (
+        <>
+          <div className="rounded-xl border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-700">
+            <p className="font-semibold text-neutral-900">
+              Periodo en curso: del {result.initialDateLabel} a hoy.
+            </p>
+            <p className="mt-1">
+              Lo que ves es lo que va acumulado desde el ultimo inventario: ventas, compras,
+              traspasos, mermas y gastos, todos al dia. Lo que no aparece es el costo real de
+              ventas ni la variacion, porque los dos salen de restar un inventario final que
+              todavia no se levanta. Mientras tanto el costo que se muestra es el teorico, el
+              que dicen las recetas de lo que se vendio.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile
+              label="Venta total"
+              value={formatMoney(result.ventaTotal.consolidado)}
+              hint="Acumulada del periodo"
+            />
+            <StatTile
+              label="Compras directas"
+              value={formatMoney(result.compras.consolidado)}
+              hint="Capturadas en el periodo"
+            />
+            <StatTile
+              label="Costo teorico"
+              value={potencialPct !== null ? `${potencialPct.toFixed(2)}%` : "-"}
+              hint={`Segun receta: ${formatMoney(result.costoPotencial.consolidado)}`}
+            />
+            <StatTile
+              label="Venta promedio diaria"
+              value={formatMoney(result.ventaPromedioDiaria.consolidado)}
+              hint={`${result.diasActivos} ${result.diasActivos === 1 ? "dia con venta" : "dias con venta"}`}
+            />
+          </div>
+        </>
+      ) : result.sinAlmacen ? (
         <>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Este reporte dice cuanto ganaste en teoria.</p>
@@ -322,7 +375,7 @@ export default async function DashboardPage({
           <select
             id="final"
             name="final"
-            defaultValue={finalCountId}
+            defaultValue={finalParam}
             className="rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
             {counts.map((c) => (
@@ -330,6 +383,8 @@ export default async function DashboardPage({
                 {formatDate(c.date)}
               </option>
             ))}
+            {/* El periodo abierto: lo que va del conteo inicial a hoy, sin esperar al cierre. */}
+            <option value="hoy">Hoy — periodo en curso</option>
           </select>
         </div>
         {/* La vista viaja escondida en el formulario para que cambiar de fecha no la pierda:
@@ -345,7 +400,7 @@ export default async function DashboardPage({
             vistazo cual de las dos vistas se esta leyendo, sin tener que abrir nada. */}
         <div className="flex overflow-hidden rounded-md border border-neutral-200">
           <Link
-            href={`/dashboard?initial=${orderedInitialId}&final=${orderedFinalId}&iva=con`}
+            href={`/dashboard?initial=${orderedInitialId}&final=${finalParam}&iva=con`}
             className={`px-3 py-2 text-sm font-medium ${
               ivaView === "conIva"
                 ? "bg-neutral-900 text-white"
@@ -355,7 +410,7 @@ export default async function DashboardPage({
             Analizar con IVA
           </Link>
           <Link
-            href={`/dashboard?initial=${orderedInitialId}&final=${orderedFinalId}&iva=sin`}
+            href={`/dashboard?initial=${orderedInitialId}&final=${finalParam}&iva=sin`}
             className={`px-3 py-2 text-sm font-medium ${
               ivaView === "sinIva"
                 ? "bg-neutral-900 text-white"
@@ -427,7 +482,7 @@ export default async function DashboardPage({
 
       <IncomeStatementChat
         initialCountId={orderedInitialId}
-        finalCountId={orderedFinalId}
+        finalCountId={finalParam}
         ivaView={ivaView}
       />
     </div>

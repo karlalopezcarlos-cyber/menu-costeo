@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { computeTaxes, sinIva } from "@/lib/taxes";
+import { ZONA_HORARIA } from "@/lib/format";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import type { ExpenseGroup } from "@/generated/prisma/client";
 import {
@@ -34,6 +35,8 @@ export type IncomeStatementResult = {
   organizationName: string;
   initialDateLabel: string;
   finalDateLabel: string;
+  /// El periodo se leyo hasta hoy, sin conteo final: no hay costo real de ventas.
+  periodoEnCurso: boolean;
   diasActivos: number;
   ventasNetasPV: GroupAmounts;
   salidasAOtraSucursal: GroupAmounts;
@@ -207,6 +210,35 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
   const columns = result.groups.map((g) => g.id);
   const con = (opts: Parameters<typeof buildRow>[3] = {}) => ({ ...opts, columns });
 
+  const utilidadInterna =
+    result.utilidadVentasInternas.consolidado !== 0
+      ? [buildRow("Utilidad en ventas internas", result.utilidadVentasInternas, "share", con())]
+      : [];
+
+  // Periodo abierto: hay conteo inicial, compras, traspasos y ventas, pero no hay conteo final.
+  // Todo eso se puede leer tal cual; lo que no se puede es el costo de ventas, que sale de
+  // restar un inventario final que todavia no existe, ni la variacion, que lo compara contra el
+  // teorico. Se omiten en vez de pintarse en cero: un cero ahi se leeria como "no costo nada".
+  if (result.periodoEnCurso) {
+    return [
+      buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
+      buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con()),
+      ...utilidadInterna,
+      buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
+      buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
+      buildRow("Otras compras", result.entradasDesdeOtraSucursal, "none", con()),
+      buildRow("Compras directas", result.compras, "costPct", con({ ventaTotal: result.ventaTotal })),
+      buildRow("Creditos al costo", result.creditosYMermas, "costPct", con({
+        ventaTotal: result.ventaTotal,
+      })),
+      buildRow("Costo teorico de ventas", result.costoPotencial, "costPct", con({
+        bold: true,
+        highlight: true,
+        ventaTotal: result.ventaTotal,
+      })),
+    ];
+  }
+
   // Sin almacen no hay de donde sacar inventarios, compras, costo real ni variacion. Pintarlos
   // en ceros no informa: hace creer que el dato existe y vale cero. Se muestra lo que si se
   // sostiene, y el costo se nombra "estimado" para que nadie lo lea como el costo real.
@@ -231,9 +263,7 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     // Informativo: el margen ya esta dentro de la utilidad bruta (la venta subio al precio y el
     // costo se quedo en el costo). El renglon solo lo hace legible. Se esconde cuando no hay
     // precios internos capturados, para no meter un cero en un reporte que no lo necesita.
-    ...(result.utilidadVentasInternas.consolidado !== 0
-      ? [buildRow("Utilidad en ventas internas", result.utilidadVentasInternas, "share", con())]
-      : []),
+    ...utilidadInterna,
     buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
     buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
     buildRow("Otras compras", result.entradasDesdeOtraSucursal, "none", con()),
@@ -465,7 +495,12 @@ export async function computeIncomeStatement(
   organizationId: string,
   sucursalId: string,
   initialCountId: string,
-  finalCountId: string,
+  /**
+   * El conteo que cierra el periodo, o null para leer el periodo EN CURSO: del conteo inicial a
+   * hoy, sin conteo final. Ahi no hay inventario final, asi que el costo real de ventas no
+   * existe -es inicial + compras - final- y el reporte se recorta a lo que si se sostiene.
+   */
+  finalCountId: string | null,
   ivaView: IvaView = "sinIva",
 ): Promise<IncomeStatementResult> {
   const [
@@ -506,18 +541,28 @@ export async function computeIncomeStatement(
         },
       },
     }),
-    prisma.inventoryCount.findFirstOrThrow({
-      where: { id: finalCountId, sucursalId },
-      include: {
-        items: {
+    finalCountId === null
+      ? Promise.resolve(null)
+      : prisma.inventoryCount.findFirstOrThrow({
+          where: { id: finalCountId, sucursalId },
           include: {
-            product: { include: { category: true } },
-            subRecipe: { include: { category: true } },
+            items: {
+              include: {
+                product: { include: { category: true } },
+                subRecipe: { include: { category: true } },
+              },
+            },
           },
-        },
-      },
-    }),
+        }),
   ]);
+
+  /** Sin conteo final el periodo esta abierto y se lee hasta hoy. */
+  const periodoEnCurso = finalCount === null;
+  // "Hoy" es hoy en la hora del negocio, no en UTC: a las 7 de la noche en Mexico el servidor
+  // ya esta en el dia siguiente, y el periodo se estiraria un dia de mas.
+  const hoy = new Date(
+    `${new Date().toLocaleDateString("en-CA", { timeZone: ZONA_HORARIA })}T00:00:00Z`,
+  );
 
   // Un grupo de costo al que solo cuelgan categorias de gasto no merece columna: sus montos ya
   // no se reparten por grupo, asi que la columna saldria en ceros de arriba a abajo. Si algun
@@ -536,7 +581,7 @@ export async function computeIncomeStatement(
   );
 
   const rangeStart = initialCount.date;
-  const rangeEnd = finalCount.date;
+  const rangeEnd = finalCount?.date ?? hoy;
   // El periodo abre el dia DESPUES del conteo inicial y cierra el dia del conteo final. Un
   // conteo se levanta al cierre del dia, asi que lo que entro y salio el dia del conteo inicial
   // ya esta dentro de ese conteo: volverlo a sumar contaba la misma mercancia dos veces —y el
@@ -704,7 +749,12 @@ export async function computeIncomeStatement(
   const esDeGasto = (item: ConteoItemValuable) =>
     item.product?.category?.isExpense === true;
   const inventarioInicial = valuarConteo(initialCount.items.filter((i) => !esDeGasto(i)));
-  const inventarioFinal = valuarConteo(finalCount.items.filter((i) => !esDeGasto(i)));
+  // Sin conteo final no hay inventario final. No es cero: es que no se sabe. Se deja en cero
+  // para que las sumas no truenen, y el reporte esconde el costo de ventas, que es el unico
+  // numero que depende de el.
+  const inventarioFinal = finalCount
+    ? valuarConteo(finalCount.items.filter((i) => !esDeGasto(i)))
+    : zeroAmounts();
 
   // Las tres salidas se valuan igual y las tres se tratan igual: salieron del inventario pero
   // no se vendieron. Se separan en dos renglones solo para poder leerlas —cuanto se regalo y
@@ -779,7 +829,11 @@ export async function computeIncomeStatement(
     inventarioFinal.consolidado === 0 &&
     compras.consolidado === 0 &&
     entradasDesdeOtraSucursal.consolidado === 0;
-  const costoReconocido = sinAlmacen ? costoPotencial : costoDeVentas;
+  // Con el periodo abierto pasa lo mismo que sin almacen: el costo real no se puede calcular,
+  // asi que el unico costo que se puede enseñar es el teorico. El pie del reporte (utilidad
+  // antes de gastos, utilidad antes de impuestos) ya trabaja con costoReconocido, asi que con
+  // esto se vuelve una estimacion coherente sin tocar nada mas.
+  const costoReconocido = sinAlmacen || periodoEnCurso ? costoPotencial : costoDeVentas;
 
   // La columna de "sin grupo" solo tiene caso si de verdad hay algo ahi. Se revisan todos los
   // renglones que se muestran, no unos cuantos: si un monto cae en un renglon que no se reviso,
@@ -822,7 +876,8 @@ export async function computeIncomeStatement(
     sucursalName: sucursal.name,
     organizationName: organization.name,
     initialDateLabel: dateLabel(initialCount.date),
-    finalDateLabel: dateLabel(finalCount.date),
+    finalDateLabel: dateLabel(rangeEnd),
+    periodoEnCurso,
     diasActivos,
     ventasNetasPV,
     salidasAOtraSucursal,
