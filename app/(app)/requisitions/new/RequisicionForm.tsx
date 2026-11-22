@@ -7,8 +7,21 @@ import { createRequisicion } from "../actions";
 import SearchableSelect from "../../_components/SearchableSelect";
 import { formatMoney } from "@/lib/format";
 
-type ProductOption = { id: string; name: string; baseUnit: UnitValue; unitCost: number };
-type SubRecipeOption = { id: string; name: string; yieldUnit: UnitValue; unitCost: number };
+/** `unitPrice` es el precio de venta interna de esta sucursal. Null = el renglon va a costo. */
+type ProductOption = {
+  id: string;
+  name: string;
+  baseUnit: UnitValue;
+  unitCost: number;
+  unitPrice: number | null;
+};
+type SubRecipeOption = {
+  id: string;
+  name: string;
+  yieldUnit: UnitValue;
+  unitCost: number;
+  unitPrice: number | null;
+};
 type SucursalOption = { id: string; name: string };
 type ItemType = "product" | "subrecipe";
 
@@ -21,7 +34,8 @@ type Row = {
   unit: UnitValue;
 };
 
-const GRID_COLS = "grid-cols-[1.5rem_6.5rem_minmax(0,2fr)_6rem_6rem_minmax(0,1.6fr)_1.5rem]";
+const GRID_COLS =
+  "grid-cols-[1.5rem_6.5rem_minmax(0,2fr)_5.5rem_5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_1.5rem]";
 
 function emptyRow(key: string, defaultUnit: UnitValue): Row {
   return { key, itemType: "product", productId: "", subRecipeId: "", quantity: "", unit: defaultUnit };
@@ -66,12 +80,31 @@ export default function RequisicionForm({
     return subRecipeById.get(row.subRecipeId)?.unitCost ?? null;
   }
 
+  /** El precio de venta interna del renglon. Null = esta sucursal no le puso precio. */
+  function rowUnitPrice(row: Row): number | null {
+    if (row.itemType === "product") return productById.get(row.productId)?.unitPrice ?? null;
+    return subRecipeById.get(row.subRecipeId)?.unitPrice ?? null;
+  }
+
+  function rowQty(row: Row): number | null {
+    const qty = Number(row.quantity);
+    return !qty || qty <= 0 ? null : qty;
+  }
+
   function rowCost(row: Row): number | null {
     const unitCost = rowUnitCost(row);
-    if (unitCost === null) return null;
-    const qty = Number(row.quantity);
-    if (!qty || qty <= 0) return null;
+    const qty = rowQty(row);
+    if (unitCost === null || qty === null) return null;
     return qty * unitCost;
+  }
+
+  /** Lo que se le cobra a la otra sucursal. Sin precio capturado, el traspaso va a costo. */
+  function rowVenta(row: Row): number | null {
+    const qty = rowQty(row);
+    if (qty === null) return null;
+    const unitPrice = rowUnitPrice(row);
+    if (unitPrice !== null) return qty * unitPrice;
+    return rowCost(row);
   }
 
   const grandTotal = useMemo(
@@ -79,6 +112,14 @@ export default function RequisicionForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, products, subRecipes],
   );
+
+  const grandVenta = useMemo(
+    () => rows.reduce((sum, row) => sum + (rowVenta(row) ?? 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, products, subRecipes],
+  );
+
+  const grandIngreso = grandVenta - grandTotal;
 
   const rowsPayload = useMemo(
     () =>
@@ -154,11 +195,15 @@ export default function RequisicionForm({
             <span>Cantidad</span>
             <span>Unidad</span>
             <span>Costo</span>
+            <span>Venta interna</span>
+            <span>Ingreso</span>
             <span></span>
           </div>
 
           {rows.map((row, index) => {
             const cost = rowCost(row);
+            const venta = rowVenta(row);
+            const conPrecio = rowUnitPrice(row) !== null;
             const hasSelection = row.itemType === "product" ? !!row.productId : !!row.subRecipeId;
             return (
               <div key={row.key} className={`grid ${GRID_COLS} items-center gap-2 rounded-md px-1 py-1`}>
@@ -220,12 +265,28 @@ export default function RequisicionForm({
                 </select>
 
                 <div className="text-sm leading-tight text-neutral-700">
-                  {hasSelection ? (
-                    cost !== null ? (
-                      <span>{formatMoney(cost)}</span>
-                    ) : (
-                      <span className="text-neutral-300">-</span>
-                    )
+                  {hasSelection && cost !== null ? (
+                    <span>{formatMoney(cost)}</span>
+                  ) : (
+                    <span className="text-neutral-300">-</span>
+                  )}
+                </div>
+
+                <div className="text-sm leading-tight text-neutral-700">
+                  {hasSelection && venta !== null ? (
+                    <span className={conPrecio ? "" : "text-neutral-400"} title={conPrecio ? undefined : "Sin precio de traspaso: va a costo"}>
+                      {formatMoney(venta)}
+                    </span>
+                  ) : (
+                    <span className="text-neutral-300">-</span>
+                  )}
+                </div>
+
+                <div className="text-sm leading-tight">
+                  {hasSelection && venta !== null && cost !== null && conPrecio ? (
+                    <span className={venta - cost < 0 ? "text-red-600" : "text-neutral-700"}>
+                      {formatMoney(venta - cost)}
+                    </span>
                   ) : (
                     <span className="text-neutral-300">-</span>
                   )}
@@ -248,9 +309,18 @@ export default function RequisicionForm({
           })}
         </div>
 
-        <div className="mt-3 flex justify-end border-t border-neutral-100 pt-3">
-          <p className="text-sm text-neutral-700">
-            Costo total de la requisicion: <strong className="text-base">{formatMoney(grandTotal)}</strong>
+        <div className="mt-3 flex flex-wrap justify-end gap-x-6 gap-y-1 border-t border-neutral-100 pt-3 text-sm text-neutral-600">
+          <p>
+            Costo: <strong className="text-neutral-800">{formatMoney(grandTotal)}</strong>
+          </p>
+          <p>
+            Venta interna: <strong className="text-neutral-800">{formatMoney(grandVenta)}</strong>
+          </p>
+          <p className={grandIngreso < 0 ? "text-red-600" : ""}>
+            Ingreso:{" "}
+            <strong className={grandIngreso < 0 ? "" : "text-base text-neutral-900"}>
+              {formatMoney(grandIngreso)}
+            </strong>
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { getSucursalProductCosts, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import type { UnitValue } from "@/lib/units";
+import { getInternalProductPrices, getInternalRecipePrices } from "@/lib/internal-prices";
 import RequisicionForm from "./RequisicionForm";
 
 export default async function NewRequisicionPage() {
@@ -16,7 +17,7 @@ export default async function NewRequisicionPage() {
     prisma.recipe.findMany({
       where: { sucursalId: user.sucursalId, archivedAt: null, isMenuItem: false },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, yieldUnit: true },
+      select: { id: true, name: true, yieldUnit: true, yieldQty: true },
     }),
     prisma.sucursal.findMany({
       where: { organizationId: user.organizationId, isActive: true, id: { not: user.sucursalId } },
@@ -26,10 +27,20 @@ export default async function NewRequisicionPage() {
     loadOrgRecipeGraph(user.sucursalId),
   ]);
 
-  const productCosts = await getSucursalProductCosts(
-    user.sucursalId,
-    products.map((p) => p.id),
-  );
+  const [productCosts, productPrices, recipePrices] = await Promise.all([
+    getSucursalProductCosts(
+      user.sucursalId,
+      products.map((p) => p.id),
+    ),
+    getInternalProductPrices(
+      user.sucursalId,
+      products.map((p) => p.id),
+    ),
+    getInternalRecipePrices(
+      user.sucursalId,
+      subRecipes.map((r) => r.id),
+    ),
+  ]);
   const costMemo = new Map();
 
   return (
@@ -51,11 +62,18 @@ export default async function NewRequisicionPage() {
             name: p.name,
             baseUnit: p.baseUnit as UnitValue,
             unitCost: productCosts.get(p.id)?.toNumber() ?? 0,
+            unitPrice: productPrices.get(p.id)?.toNumber() ?? null,
           }))}
           subRecipes={subRecipes.map((r) => {
+            // getRecipeCost devuelve lo que cuesta el RENDIMIENTO COMPLETO, no el litro: una
+            // subreceta que rinde 4.5 LT y cuesta $309.90 el lote vale $68.87 el litro. Hay que
+            // dividir, que es lo que hace la accion al congelar el costo. Sin esta division la
+            // pantalla enseñaba el costo del lote como si fuera el unitario.
             let unitCost = 0;
             try {
-              unitCost = getRecipeCost(r.id, graph, costMemo).toNumber();
+              unitCost = r.yieldQty.isZero()
+                ? 0
+                : getRecipeCost(r.id, graph, costMemo).dividedBy(r.yieldQty).toNumber();
             } catch {
               unitCost = 0;
             }
@@ -64,6 +82,7 @@ export default async function NewRequisicionPage() {
               name: r.name,
               yieldUnit: r.yieldUnit as UnitValue,
               unitCost,
+              unitPrice: recipePrices.get(r.id)?.toNumber() ?? null,
             };
           })}
           sucursales={sucursales}
