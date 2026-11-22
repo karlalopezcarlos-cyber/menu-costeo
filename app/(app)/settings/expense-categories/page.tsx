@@ -5,10 +5,12 @@ import SettingsNav from "../SettingsNav";
 import InlineNameEditor from "../InlineNameEditor";
 import IvaRateInput from "../IvaRateInput";
 import ExpenseGroupSelect from "../ExpenseGroupSelect";
+import CostBehaviorSelect from "../CostBehaviorSelect";
 import {
   createExpenseCategory,
   deleteExpenseCategory,
   renameExpenseCategory,
+  setExpenseCategoryBehavior,
   setExpenseCategoryGroup,
   setExpenseCategoryIvaRate,
 } from "./actions";
@@ -39,6 +41,14 @@ export default async function ExpenseCategoriesPage() {
           que dejes sin asignar no se pierde: se suma al total en un renglon aparte, &quot;Sin
           grupo asignado&quot;, para que se vea que falta acomodarlo.
         </p>
+        <p className="mt-2 text-sm text-neutral-500">
+          <span className="font-medium text-neutral-700">Fijo o variable</span> es lo que hace
+          posible el punto de equilibrio. La pregunta es una: si vendieras la mitad, ¿pagarias
+          lo mismo? La renta, la nomina y el internet si, son fijos. Las comisiones de tarjeta,
+          las apps de reparto y los desechables no, son variables. Todo arranca en Fijo, que
+          deja el punto de equilibrio alto: de los dos errores posibles, es el que no cuesta
+          dinero.
+        </p>
       </div>
 
       <form action={createExpenseCategory} className="flex gap-2">
@@ -64,6 +74,9 @@ export default async function ExpenseCategoriesPage() {
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Grupo en el Estado de Resultados
               </th>
+              <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                Fijo o variable
+              </th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">IVA</th>
               <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Gastos</th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
@@ -75,7 +88,7 @@ export default async function ExpenseCategoriesPage() {
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
                   Todavia no hay tipos de gasto.
                 </td>
               </tr>
@@ -94,6 +107,13 @@ export default async function ExpenseCategoriesPage() {
                     id={category.id}
                     initialValue={category.expenseGroup}
                     action={setExpenseCategoryGroup}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <CostBehaviorSelect
+                    id={category.id}
+                    initialValue={category.behavior}
+                    action={setExpenseCategoryBehavior}
                   />
                 </td>
                 <td className="px-4 py-3">

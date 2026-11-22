@@ -116,3 +116,23 @@ export async function setExpenseCategoryGroup(categoryId: string, value: string)
   revalidatePath("/settings/expense-categories");
   revalidatePath("/dashboard");
 }
+
+/**
+ * Si este tipo de gasto sube con la venta o no. Solo lo lee el punto de equilibrio: los fijos
+ * son el numerador, los variables se restan de la venta para sacar el margen. No toca ningun
+ * gasto capturado —se lee del tipo al momento de armar el reporte—, asi que reclasificar uno
+ * recalcula el historico completo, que es justo lo que se quiere al irlos acomodando.
+ */
+export async function setExpenseCategoryBehavior(categoryId: string, value: string) {
+  const user = await requireOrgSession();
+
+  const behavior = value === "VARIABLE" ? "VARIABLE" : "FIJO";
+
+  await prisma.expenseCategory.updateMany({
+    where: { id: categoryId, organizationId: user.organizationId },
+    data: { behavior },
+  });
+
+  revalidatePath("/settings/expense-categories");
+  revalidatePath("/dashboard");
+}

@@ -191,3 +191,22 @@ export async function updateCategoryExpenseGroup(categoryId: string, value: stri
   revalidatePath("/settings/categories");
   revalidatePath("/dashboard");
 }
+
+/**
+ * Si las compras de esta categoria de gasto suben con la venta. Los desechables si —cada orden
+ * se lleva su vaso y su servilleta—, el gas y la limpieza casi no. Solo se lee cuando la
+ * categoria esta marcada como gasto, y solo lo usa el punto de equilibrio.
+ */
+export async function updateCategoryBehavior(categoryId: string, value: string) {
+  const user = await requireOrgSession();
+
+  const behavior = value === "VARIABLE" ? "VARIABLE" : "FIJO";
+
+  await prisma.productCategory.updateMany({
+    where: { id: categoryId, organizationId: user.organizationId },
+    data: { behavior },
+  });
+
+  revalidatePath("/settings/categories");
+  revalidatePath("/dashboard");
+}

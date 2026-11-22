@@ -201,6 +201,9 @@ model ProductCategory {
   /// Si isExpense esta prendido, en que renglon de gastos del Estado de Resultados se suman
   /// sus compras. Sin esto caerian en un grupo que nadie eligio.
   expenseGroup    ExpenseGroup?
+  /// Si isExpense esta prendido, si esas compras suben con la venta. Los desechables si (cada
+  /// orden se lleva un vaso), el gas casi no. Solo se lee cuando isExpense esta prendido.
+  behavior        CostBehavior   @default(FIJO)
   /// Si sus productos se transforman (limpiar, porcionar). En una tablajeria son carnes,
   /// pescados y mariscos; el azucar glass y la bolsa kraft no tienen nada que hacer en esa
   /// pantalla. Mientras ninguna categoria lo tenga prendido se ofrecen todas, para que la
@@ -1165,6 +1168,14 @@ model AuditComment {
 /// Los cuatro grupos con los que se presentan los gastos en el Estado de Resultados.
 /// Es opcional a proposito: un tipo de gasto sin grupo se muestra en su propio renglon
 /// ("Sin grupo asignado") en vez de caer en uno que nadie eligio.
+/// Como se comporta un gasto cuando sube o baja la venta. Es lo unico que permite calcular el
+/// punto de equilibrio: los fijos se pagan vendas lo que vendas, los variables solo existen
+/// porque vendiste.
+enum CostBehavior {
+  FIJO
+  VARIABLE
+}
+
 enum ExpenseGroup {
   ADMINISTRACION
   OPERACION
@@ -1192,6 +1203,10 @@ model ExpenseCategory {
   ivaRate        Decimal       @default(0) @db.Decimal(5, 2)
   /// En que renglon del Estado de Resultados se suma este tipo de gasto.
   expenseGroup   ExpenseGroup?
+  /// Si este gasto sube con la venta o se paga igual vendas lo que vendas. Arranca en FIJO
+  /// porque la mayoria lo es (renta, nomina, internet) y porque suponer fijo es el error
+  /// conservador: deja el punto de equilibrio alto, no bajo.
+  behavior       CostBehavior  @default(FIJO)
   sortOrder      Int           @default(0)
   createdAt      DateTime      @default(now())
 

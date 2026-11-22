@@ -3,6 +3,7 @@ import { requireOrgSession } from "@/lib/tenant";
 import {
   deleteCategory,
   updateCategoryExpense,
+  updateCategoryBehavior,
   updateCategoryExpenseGroup,
   updateCategoryGroup,
   updateCategoryInventoriable,
@@ -14,6 +15,7 @@ import SettingsNav from "../SettingsNav";
 import CategoryGroupSelect from "../CategoryGroupSelect";
 import InlineNameEditor from "../InlineNameEditor";
 import ExpenseGroupSelect from "../ExpenseGroupSelect";
+import CostBehaviorSelect from "../CostBehaviorSelect";
 import InventoriableToggle from "../InventoriableToggle";
 
 export default async function ProductCategoriesPage() {
@@ -109,11 +111,16 @@ export default async function ProductCategoriesPage() {
                   {/* Solo cuando es gasto: en las demas categorias la compra va al costo de
                       ventas y el grupo no aplica. */}
                   {category.isExpense && (
-                    <div className="mt-1.5">
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <ExpenseGroupSelect
                         id={category.id}
                         initialValue={category.expenseGroup}
                         action={updateCategoryExpenseGroup}
+                      />
+                      <CostBehaviorSelect
+                        id={category.id}
+                        initialValue={category.behavior}
+                        action={updateCategoryBehavior}
                       />
                     </div>
                   )}

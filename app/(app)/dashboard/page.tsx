@@ -14,6 +14,7 @@ import {
 } from "@/lib/income-statement";
 import { formatMoney } from "@/lib/format";
 import IncomeStatementChat from "./IncomeStatementChat";
+import PuntoEquilibrioPanel from "./PuntoEquilibrio";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("es-MX", { timeZone: "UTC" });
@@ -349,6 +350,8 @@ export default async function DashboardPage({
           />
         </div>
       )}
+
+      <PuntoEquilibrioPanel pe={result.puntoEquilibrio} />
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
         <div className="space-y-1">

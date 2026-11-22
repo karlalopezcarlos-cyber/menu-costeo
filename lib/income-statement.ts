@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { computeTaxes, sinIva } from "@/lib/taxes";
 import { ZONA_HORARIA } from "@/lib/format";
 import { loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
-import type { ExpenseGroup } from "@/generated/prisma/client";
+import type { CostBehavior, ExpenseGroup } from "@/generated/prisma/client";
 import {
   EXPENSE_GROUP_LABELS,
   EXPENSE_GROUP_ORDER,
@@ -97,6 +97,8 @@ export type IncomeStatementResult = {
   costoReconocido: GroupAmounts;
   variacion: GroupAmounts;
   ventaPromedioDiaria: GroupAmounts;
+  /** Cuanto hay que vender para no perder ni ganar, en el periodo y por dia de operacion. */
+  puntoEquilibrio: PuntoEquilibrio;
   /** Total pagado a proveedores (SupplierPayment) en el periodo. No se desglosa por grupo porque
    * un pago es a un proveedor, no a una categoria especifica. */
   montoPagado: number;
@@ -104,6 +106,46 @@ export type IncomeStatementResult = {
    * hasta la fecha final, menos todo lo pagado hasta esa misma fecha. Es un saldo acumulado, no
    * un movimiento del periodo, y por eso no entra en la utilidad. */
   saldoProveedores: number;
+};
+
+/**
+ * El punto de equilibrio: cuanto hay que vender para no perder ni ganar.
+ *
+ * Se arma con la misma aritmetica con la que el pie del reporte saca la utilidad, a proposito:
+ * vendiendo exactamente el punto de equilibrio, la utilidad antes de impuestos que imprime el
+ * reporte da cero. Si se calculara por otro lado, los dos numeros se contradirian en pantalla.
+ *
+ * Los costos variables son el costo de lo vendido mas los gastos marcados como variables; los
+ * fijos, todo lo demas del bloque de gastos. Un gasto sin clasificar cuenta como fijo.
+ */
+export type PuntoEquilibrio = {
+  gastosFijos: number;
+  gastosVariables: number;
+  /** Costo reconocido de ventas + gastos variables: lo que solo existe porque hubo venta. */
+  costosVariables: number;
+  /** Venta total menos costos variables: lo que queda de la venta para pagar los fijos. */
+  margenContribucion: number;
+  /** El margen de contribucion como por ciento de la venta. null si no hubo venta. */
+  margenPct: number | null;
+  /** Venta necesaria en el periodo completo. null cuando no se puede calcular. */
+  periodo: number | null;
+  /** El del periodo entre los dias que de verdad se abrio. */
+  diario: number | null;
+  /** Dias con venta registrada en el periodo: el divisor del diario. */
+  diasActivos: number;
+  /** Que parte del punto de equilibrio lleva la venta real, en por ciento. */
+  avance: number | null;
+  /** Lo que falta vender para alcanzarlo. Negativo si ya se rebaso. */
+  faltante: number | null;
+  /**
+   * Por que no sale el numero, cuando no sale:
+   * - "sin-ventas": no hay venta en el periodo, asi que no hay margen que medir.
+   * - "margen-negativo": lo variable se come la venta completa. No hay volumen que alcance;
+   *   el problema es el precio o el costo, no vender mas.
+   * - "sin-gastos-fijos": no hay un solo gasto fijo capturado. El punto de equilibrio seria
+   *   cero, que es falso: lo que falta es capturar la renta y la nomina.
+   */
+  problema: "sin-ventas" | "margen-negativo" | "sin-gastos-fijos" | null;
 };
 
 export type PctMode = "share" | "costPct" | "none";
@@ -376,10 +418,52 @@ export function buildIncomeStatementFooterRows(
     },
   );
 
+  // El punto de equilibrio va al final, despues de la utilidad: es una lectura de los mismos
+  // numeros, no un renglon mas de la resta. Cuando no se puede calcular no se pinta nada, que
+  // es mejor que imprimir un cero que se leeria como "ya lo alcanzaste".
+  const pe = result.puntoEquilibrio;
+  if (pe.periodo !== null) {
+    rows.push(
+      {
+        label: "Margen de contribucion",
+        amount: pe.margenContribucion,
+        pct: pe.margenPct,
+        bold: true,
+      },
+      { label: "— Gastos fijos del periodo", amount: pe.gastosFijos, pct: null, detail: true },
+      { label: "— Gastos variables del periodo", amount: pe.gastosVariables, pct: null, detail: true },
+      {
+        label: "Punto de equilibrio del periodo",
+        amount: pe.periodo,
+        pct: null,
+        bold: true,
+        highlight: true,
+      },
+    );
+    if (pe.diario !== null) {
+      rows.push({
+        label: `Punto de equilibrio diario (${pe.diasActivos} ${pe.diasActivos === 1 ? "dia" : "dias"} de operacion)`,
+        amount: pe.diario,
+        pct: null,
+        detail: true,
+      });
+    }
+    rows.push({
+      label: pe.faltante! > 0 ? "Falta vender para alcanzarlo" : "Vendido por encima del equilibrio",
+      amount: Math.abs(pe.faltante!),
+      pct: pe.avance,
+      detail: true,
+    });
+  }
+
   return rows;
 }
 
 export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
+  "Margen de contribucion":
+    "Lo que queda de la venta despues de los costos que suben y bajan con ella: el costo de lo vendido mas los gastos marcados como variables en Configuracion > Tipos de gasto. Es el dinero con el que se pagan los gastos fijos. El % es que parte de cada peso vendido se queda en el negocio.",
+  "Punto de equilibrio del periodo":
+    "Cuanto hay que vender en el periodo para no perder ni ganar: gastos fijos entre el margen de contribucion en por ciento. Vendiendo exactamente eso, la utilidad antes de impuestos de arriba da cero. Depende de que los gastos fijos esten capturados: si falta la renta, el punto sale mas bajo de lo real.",
   "Venta servicio": "Ingresos por venta directa en esta sucursal (cantidad vendida x precio de venta).",
   "Otras ventas":
     "Productos y subrecetas enviados a otra sucursal por requisicion, al precio de venta interna de esta sucursal (con IVA o sin el, segun la vista que estes leyendo). Los renglones sin precio capturado van a costo y no trasladan impuesto.",
@@ -642,7 +726,11 @@ export async function computeIncomeStatement(
     }),
     prisma.expense.findMany({
       where: { sucursalId, date: dateFilter },
-      select: { amount: true, ivaRate: true, category: { select: { expenseGroup: true } } },
+      select: {
+        amount: true,
+        ivaRate: true,
+        category: { select: { expenseGroup: true, behavior: true } },
+      },
     }),
     prisma.supplierPayment.findMany({
       where: { sucursalId, paidDate: dateFilter },
@@ -756,6 +844,16 @@ export async function computeIncomeStatement(
   // contra nada, porque cada una vive en un modulo distinto de la app.
   let gastosDeModulo = 0;
   let comprasDeGasto = 0;
+  // El mismo dinero partido por como se comporta cuando sube la venta. Es otro corte de los
+  // mismos gastos, no gastos adicionales: fijos + variables = gastos de operacion.
+  let gastosFijos = 0;
+  let gastosVariables = 0;
+  const sumarPorComportamiento = (behavior: CostBehavior | null | undefined, monto: number) => {
+    // Sin categoria no hay comportamiento que leer. Se trata como fijo, que es el supuesto
+    // conservador: deja el punto de equilibrio alto en vez de bajo.
+    if (behavior === "VARIABLE") gastosVariables += monto;
+    else gastosFijos += monto;
+  };
   // Cada peso de gasto cae en el renglon de su grupo. SIN_GRUPO_GASTO no es un grupo: es la
   // lista de lo que nadie ha clasificado todavia, y se muestra aparte para que se note.
   const gastosPorGrupo = new Map<ExpenseGroupKey, number>();
@@ -777,6 +875,7 @@ export async function computeIncomeStatement(
       comprasDeGasto += monto;
       gastosDeOperacion.consolidado += monto;
       sumarGasto(purchase.product.category?.expenseGroup ?? null, monto);
+      sumarPorComportamiento(purchase.product.category?.behavior, monto);
       continue;
     }
     addTo(compras, purchase.product.category?.costGroupId ?? null, new Decimal(purchase.totalPrice));
@@ -791,6 +890,7 @@ export async function computeIncomeStatement(
     gastosDeModulo += monto;
     gastosDeOperacion.consolidado += monto;
     sumarGasto(gasto.category?.expenseGroup ?? null, monto);
+    sumarPorComportamiento(gasto.category?.behavior, monto);
   }
 
   // Un producto de gasto puede seguir contandose fisicamente, pero no puede entrar a la
@@ -913,6 +1013,14 @@ export async function computeIncomeStatement(
   const diasActivos = diasActivosSet.size;
   const ventaPromedioDiaria = divideScalar(ventaTotal, diasActivos);
 
+  const puntoEquilibrio = calcularPuntoEquilibrio({
+    ventaTotal: ventaTotal.consolidado,
+    costoReconocido: costoReconocido.consolidado,
+    gastosFijos,
+    gastosVariables,
+    diasActivos,
+  });
+
   const montoPagado = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const saldoProveedores =
     Number(compradoAlCierre._sum.totalPrice ?? 0) - Number(pagadoAlCierre._sum.amount ?? 0);
@@ -959,7 +1067,66 @@ export async function computeIncomeStatement(
     costoReconocido,
     variacion,
     ventaPromedioDiaria,
+    puntoEquilibrio,
     montoPagado,
     saldoProveedores,
+  };
+}
+
+/**
+ * Punto de equilibrio a partir de los totales del periodo.
+ *
+ * Vive aparte y recibe numeros sueltos para poder probarse sin base de datos, y porque el
+ * razonamiento no tiene nada que ver con como se leyeron los gastos.
+ *
+ * El supuesto de siempre: los costos variables guardan la misma proporcion con la venta a
+ * cualquier volumen. Es falso en los extremos —vender el doble no duplica exactamente el
+ * costo— pero es el supuesto con el que se calcula un punto de equilibrio en cualquier lado, y
+ * en el rango en el que de verdad se mueve un negocio se sostiene.
+ */
+export function calcularPuntoEquilibrio(datos: {
+  ventaTotal: number;
+  costoReconocido: number;
+  gastosFijos: number;
+  gastosVariables: number;
+  diasActivos: number;
+}): PuntoEquilibrio {
+  const { ventaTotal, costoReconocido, gastosFijos, gastosVariables, diasActivos } = datos;
+  const costosVariables = costoReconocido + gastosVariables;
+  const margenContribucion = ventaTotal - costosVariables;
+  const margenPct = ventaTotal > 0 ? (margenContribucion / ventaTotal) * 100 : null;
+
+  const base = {
+    gastosFijos,
+    gastosVariables,
+    costosVariables,
+    margenContribucion,
+    margenPct,
+    diasActivos,
+  };
+  const sinNumero = (problema: PuntoEquilibrio["problema"]): PuntoEquilibrio => ({
+    ...base,
+    periodo: null,
+    diario: null,
+    avance: null,
+    faltante: null,
+    problema,
+  });
+
+  if (ventaTotal <= 0) return sinNumero("sin-ventas");
+  // Con margen cero o negativo no existe un volumen que alcance: cada venta adicional pierde
+  // dinero. Devolver un numero gigantesco seria peor que no devolver ninguno, porque se leeria
+  // como una meta.
+  if (margenContribucion <= 0) return sinNumero("margen-negativo");
+  if (gastosFijos <= 0) return sinNumero("sin-gastos-fijos");
+
+  const periodo = gastosFijos / (margenContribucion / ventaTotal);
+  return {
+    ...base,
+    periodo,
+    diario: diasActivos > 0 ? periodo / diasActivos : null,
+    avance: (ventaTotal / periodo) * 100,
+    faltante: periodo - ventaTotal,
+    problema: null,
   };
 }
