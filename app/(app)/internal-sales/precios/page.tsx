@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { getSucursalProductCosts, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
+import { CLAVE_UNIDAD } from "@/lib/cfdi";
 import PreciosTraspasoTable, { type PrecioRow } from "./PreciosTraspasoTable";
 
 /**
@@ -23,7 +24,7 @@ export default async function PreciosTraspasoPage() {
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, baseUnit: true, ivaRate: true },
+      select: { id: true, name: true, baseUnit: true, ivaRate: true, claveProdServ: true },
     }),
     prisma.recipe.findMany({
       where: {
@@ -33,7 +34,7 @@ export default async function PreciosTraspasoPage() {
         isPortion: false,
       },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, yieldQty: true, yieldUnit: true },
+      select: { id: true, name: true, yieldQty: true, yieldUnit: true, claveProdServ: true },
     }),
     prisma.internalTransferPrice.findMany({
       where: { sucursalId: user.sucursalId },
@@ -73,6 +74,9 @@ export default async function PreciosTraspasoPage() {
       // Sin precio capturado todavia, la tasa que se propone es la del producto: casi siempre
       // es la correcta y asi no hay que elegirla renglon por renglon.
       ivaRate: vigente?.ivaRate ?? Number(p.ivaRate),
+      claveProdServ: p.claveProdServ,
+      // La unidad del SAT no se captura: sale sola de la unidad base.
+      claveUnidad: CLAVE_UNIDAD[p.baseUnit].clave,
     };
   });
 
@@ -96,6 +100,8 @@ export default async function PreciosTraspasoPage() {
       // Una subreceta no tiene tasa propia: esta hecha de insumos con tasas distintas. Se
       // propone 0 y quien vende decide.
       ivaRate: vigente?.ivaRate ?? 0,
+      claveProdServ: r.claveProdServ,
+      claveUnidad: CLAVE_UNIDAD[r.yieldUnit].clave,
     };
   });
 

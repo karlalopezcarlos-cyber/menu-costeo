@@ -8,6 +8,7 @@ const TABS = [
   { href: "/settings/taxes", label: "Impuestos" },
   { href: "/settings/suppliers", label: "Proveedores" },
   { href: "/settings/sucursales", label: "Sucursales" },
+  { href: "/settings/fiscal", label: "Datos fiscales" },
   { href: "/settings/store", label: "Tienda en linea" },
   { href: "/settings/users", label: "Usuarios" },
 ];

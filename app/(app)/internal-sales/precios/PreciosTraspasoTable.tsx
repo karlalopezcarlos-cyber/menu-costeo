@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/format";
 import { TASAS_IVA_COMUNES } from "@/lib/taxes";
 import { setInternalPrice } from "../actions";
+import { setClaveProdServ } from "../../settings/fiscal/actions";
 
 export type PrecioRow = {
   tipo: "product" | "recipe";
@@ -17,6 +18,10 @@ export type PrecioRow = {
   precio: number | null;
   /** Tasa de IVA en por ciento. 0 = sin IVA. */
   ivaRate: number;
+  /** Clave c_ClaveProdServ del SAT. Null = todavia no se puede facturar este renglon. */
+  claveProdServ: string | null;
+  /** Clave c_ClaveUnidad, deducida de la unidad. Solo se muestra. */
+  claveUnidad: string;
 };
 
 /** Un renglon que se guarda solo al salir del campo, como la captura de costos por sucursal. */
@@ -24,6 +29,8 @@ function Renglon({ row }: { row: PrecioRow }) {
   const router = useRouter();
   const [valor, setValor] = useState(row.precio !== null ? String(row.precio) : "");
   const [tasa, setTasa] = useState(row.ivaRate);
+  const [clave, setClave] = useState(row.claveProdServ ?? "");
+  const [errorClave, setErrorClave] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
   const [guardando, startGuardado] = useTransition();
@@ -43,6 +50,19 @@ function Renglon({ row }: { row: PrecioRow }) {
         return;
       }
       setGuardado(true);
+      router.refresh();
+    });
+  }
+
+  function guardarClave() {
+    if (clave.trim() === (row.claveProdServ ?? "")) return;
+    setErrorClave(null);
+    startGuardado(async () => {
+      const resultado = await setClaveProdServ(row.tipo, row.id, clave);
+      if (resultado?.error) {
+        setErrorClave(resultado.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -119,7 +139,29 @@ function Renglon({ row }: { row: PrecioRow }) {
       >
         {margen === null ? "—" : formatMoney(margen, 4)}
       </td>
-      <td className="px-4 py-2.5 text-xs text-red-600">{error}</td>
+      <td className="px-4 py-2.5 text-right">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={clave}
+          onChange={(e) => {
+            setClave(e.target.value);
+            setErrorClave(null);
+          }}
+          onBlur={guardarClave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          disabled={guardando}
+          placeholder="8 digitos"
+          aria-label={`Clave del SAT de ${row.nombre}`}
+          title={`ClaveUnidad del SAT: ${row.claveUnidad}`}
+          className={`w-28 rounded-md border px-2.5 py-1.5 text-right text-sm ${
+            errorClave ? "border-red-300" : "border-neutral-200"
+          }`}
+        />
+      </td>
+      <td className="px-4 py-2.5 text-xs text-red-600">{error ?? errorClave}</td>
     </tr>
   );
 }
@@ -218,13 +260,16 @@ export default function PreciosTraspasoTable({
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Ingreso por unidad
               </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                Clave SAT
+              </th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
                   {base.length === 0
                     ? pestana === "product"
                       ? "No hay productos en el catalogo."
@@ -240,6 +285,11 @@ export default function PreciosTraspasoTable({
         </table>
       </div>
 
+      <p className="text-xs text-neutral-400">
+        La <strong>Clave SAT</strong> es la ClaveProdServ que el SAT exige en cada concepto de
+        una factura; sin ella ese renglon no se puede facturar. La ClaveUnidad no se captura:
+        sale sola de la unidad (pasa el cursor sobre el campo para verla).
+      </p>
       <p className="text-xs text-neutral-400">
         El precio se captura <strong>sin IVA</strong>, igual que el de una compra: el impuesto se
         suma aparte porque es acreditable y no es costo de nadie. Se guarda solo al salir del

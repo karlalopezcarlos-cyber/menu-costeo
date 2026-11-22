@@ -251,6 +251,29 @@ model Sucursal {
   /// Sucursal "matriz"/CEDIS de la organizacion. Se crea una automaticamente para cada
   /// organizacion existente al migrar; sirve como destino por default y para el backfill.
   isCentral            Boolean      @default(false)
+
+  // --- Datos fiscales (CFDI 4.0) ------------------------------------------------------
+  // Una sucursal puede ser un contribuyente distinto: dos razones sociales que se venden
+  // entre si y se facturan. Si dos sucursales comparten RFC no hay factura posible entre
+  // ellas -el SAT no deja que emisor y receptor sean el mismo-, y el traspaso se queda como
+  // cifra de control interno.
+  //
+  // Todos opcionales: la mayoria de las organizaciones nunca va a facturar entre sucursales,
+  // y obligar estos campos romperia el alta de una sucursal nueva.
+  //
+  /// RFC, en mayusculas y sin guiones ni espacios (ej. XAXX010101000).
+  rfc                  String?
+  /// Razon social EXACTA como viene en la Constancia de Situacion Fiscal. El SAT rechaza el
+  /// CFDI si no coincide caracter por caracter, incluido el regimen de capital (SA DE CV).
+  razonSocial          String?
+  /// Clave del catalogo c_RegimenFiscal del SAT (ej. "601", "612", "626").
+  regimenFiscal        String?
+  /// Codigo postal del domicilio fiscal. Es el LugarExpedicion cuando esta sucursal emite, y
+  /// el DomicilioFiscalReceptor cuando recibe.
+  codigoPostalFiscal   String?
+  /// Clave del catalogo c_UsoCFDI con la que esta sucursal recibe facturas por omision
+  /// (ej. "G01" adquisicion de mercancias). Solo aplica cuando es la receptora.
+  usoCfdi              String?
   isActive             Boolean      @default(true)
   /// Slug unico (global, no solo por organizacion) para la URL publica de la tienda en linea de
   /// esta sucursal (ej. /store/mi-dark-kitchen). Nulo mientras no se configure.
@@ -393,6 +416,10 @@ model Product {
   /// Tasa de IEPS, en por ciento. 0 = no lo causa, que es el caso de casi todo. Se calcula
   /// sobre el subtotal y forma parte de la base del IVA, como en la ley.
   iepsRate                 Decimal          @default(0) @db.Decimal(5, 2)
+  /// Clave del catalogo c_ClaveProdServ del SAT (8 digitos), obligatoria en cada concepto de
+  /// un CFDI. Nula mientras nadie facture este producto; la ClaveUnidad no se guarda porque
+  /// sale sola de baseUnit (ver lib/cfdi.ts).
+  claveProdServ            String?
   /// % de rendimiento neto (100 = sin merma). Ej. cilantro con 20% de merma -> 80.
   /// El costo unitario de cada compra se divide entre este factor para costear con el neto aprovechable.
   yieldPercentage          Decimal          @default(100) @db.Decimal(5, 2)
@@ -648,6 +675,8 @@ model Recipe {
   /// y el reporte trabaja con eso. No sustituye al costeo real; solo entra cuando el costeo no
   /// puede dar un numero confiable (ver resolveRecipeCost en lib/costing.ts).
   manualCost       Decimal?        @db.Decimal(14, 4)
+  /// Clave del catalogo c_ClaveProdServ del SAT (8 digitos) para facturar esta subreceta.
+  claveProdServ    String?
   instructions     String?
   /// Descripcion para clientes en la tienda en linea (que es el platillo), distinta de
   /// `instructions` (que es el procedimiento interno de cocina).
