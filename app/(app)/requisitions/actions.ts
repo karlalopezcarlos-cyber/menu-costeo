@@ -7,6 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { getSucursalProductCosts, loadOrgRecipeGraph, getRecipeCost } from "@/lib/costing";
 import { resolveDestRecipeIds } from "@/lib/requisitions/subrecipe-match";
+import {
+  getInternalProductPrices,
+  getInternalRecipePrices,
+  pegarCostoEnDestino,
+} from "@/lib/internal-prices";
 import { UNITS, type UnitValue } from "@/lib/units";
 
 type RequisicionRowInput = {
@@ -64,7 +69,15 @@ export async function createRequisicion(
     const productIds = [...new Set(productRows.map((r) => r.productId!))];
     const subRecipeIds = [...new Set(subRecipeRows.map((r) => r.subRecipeId!))];
 
-    const [products, productCosts, subRecipes, graph, destRecipeIdByOrigin] = await Promise.all([
+    const [
+      products,
+      productCosts,
+      subRecipes,
+      graph,
+      destRecipeIdByOrigin,
+      productPrices,
+      recipePrices,
+    ] = await Promise.all([
       prisma.product.findMany({
         where: { id: { in: productIds }, organizationId: user.organizationId },
       }),
@@ -74,6 +87,10 @@ export async function createRequisicion(
       }),
       subRecipeIds.length > 0 ? loadOrgRecipeGraph(user.sucursalId) : Promise.resolve(null),
       resolveDestRecipeIds(subRecipeIds, toSucursalId),
+      // El precio es el de quien envia, y se congela aqui: cambiarlo despues no mueve este
+      // traspaso, igual que pasa con el costo.
+      getInternalProductPrices(user.sucursalId, productIds),
+      getInternalRecipePrices(user.sucursalId, subRecipeIds),
     ]);
     const productById = new Map(products.map((p) => [p.id, p]));
     const subRecipeById = new Map(subRecipes.map((r) => [r.id, r]));
@@ -92,11 +109,14 @@ export async function createRequisicion(
       const unit = parseUnit(row.unit);
       const unitCost = productCosts.get(product.id) ?? new Decimal(0);
 
+      const unitPrice = productPrices.get(product.id) ?? null;
+
       return {
         productId: product.id,
         quantity: quantity.toString(),
         unit,
         unitCost: unitCost.toString(),
+        unitPrice: unitPrice ? unitPrice.toString() : null,
       };
     });
 
@@ -125,12 +145,15 @@ export async function createRequisicion(
         );
       }
 
+      const unitPrice = recipePrices.get(subRecipe.id) ?? null;
+
       return {
         subRecipeId: subRecipe.id,
         destSubRecipeId,
         quantity: quantity.toString(),
         unit,
         unitCost: unitCost.toString(),
+        unitPrice: unitPrice ? unitPrice.toString() : null,
       };
     });
 
@@ -144,7 +167,7 @@ export async function createRequisicion(
         select: { nextRequisicionFolio: true },
       });
       const folio = org.nextRequisicionFolio - 1;
-      return tx.requisicion.create({
+      const creada = await tx.requisicion.create({
         data: {
           organizationId: user.organizationId,
           folio,
@@ -156,6 +179,11 @@ export async function createRequisicion(
           items: { create: items },
         },
       });
+      // Lo que entra a la sucursal destino le queda costando el precio al que se lo vendieron,
+      // no lo que le costaba a quien lo mando. Va dentro de la misma transaccion: si el traspaso
+      // no se guarda, el costo tampoco se movio.
+      await pegarCostoEnDestino(tx, toSucursalId, items);
+      return creada;
     });
     requisicionId = requisicion.id;
   } catch (error) {

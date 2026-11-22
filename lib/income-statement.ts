@@ -37,6 +37,9 @@ export type IncomeStatementResult = {
   diasActivos: number;
   ventasNetasPV: GroupAmounts;
   salidasAOtraSucursal: GroupAmounts;
+  /// Diferencia entre el precio de venta interna y el costo de lo que se mando a otra sucursal.
+  /// Es informativo: ya viene dentro de la utilidad bruta y no se suma por segunda vez.
+  utilidadVentasInternas: GroupAmounts;
   ventaTotal: GroupAmounts;
   inventarioInicial: GroupAmounts;
   entradasDesdeOtraSucursal: GroupAmounts;
@@ -225,6 +228,12 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
   return [
     buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
     buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con()),
+    // Informativo: el margen ya esta dentro de la utilidad bruta (la venta subio al precio y el
+    // costo se quedo en el costo). El renglon solo lo hace legible. Se esconde cuando no hay
+    // precios internos capturados, para no meter un cero en un reporte que no lo necesita.
+    ...(result.utilidadVentasInternas.consolidado !== 0
+      ? [buildRow("Utilidad en ventas internas", result.utilidadVentasInternas, "share", con())]
+      : []),
     buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
     buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
     buildRow("Otras compras", result.entradasDesdeOtraSucursal, "none", con()),
@@ -328,10 +337,14 @@ export function buildIncomeStatementFooterRows(
 
 export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Venta servicio": "Ingresos por venta directa en esta sucursal (cantidad vendida x precio de venta).",
-  "Otras ventas": "Valor, a costo, de productos y subrecetas enviados a otra sucursal por requisicion.",
+  "Otras ventas":
+    "Productos y subrecetas enviados a otra sucursal por requisicion, valuados al precio de venta interna de esta sucursal. Los renglones sin precio capturado van a costo.",
+  "Utilidad en ventas internas":
+    "Diferencia entre el precio al que se traspaso y lo que costaba. Es informativo: ya esta dentro de la utilidad bruta, no se suma dos veces.",
   "Venta total": "Venta servicio + Otras ventas.",
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
-  "Otras compras": "Valor, a costo, de productos y subrecetas recibidos de otra sucursal por requisicion.",
+  "Otras compras":
+    "Productos y subrecetas recibidos de otra sucursal por requisicion, valuados al precio que cobro la sucursal que los mando.",
   "Compras directas":
     "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas al bloque de gastos. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
@@ -413,7 +426,8 @@ function dateLabel(d: Date): string {
  * Estado de resultados de una sucursal entre dos conteos de inventario, desglosado en las 3
  * columnas de CategoryGroup (categorias sin grupo asignado se consolidan en Miscelaneos). Sigue
  * el mismo esquema de columnas/filas que la hoja de calculo de referencia de la usuaria:
- * Venta Total = Ventas netas PV + Salidas a otra sucursal (a costo, via Requisiciones);
+ * Venta Total = Ventas netas PV + Salidas a otra sucursal (al precio de venta interna, via
+ * Requisiciones; a costo cuando no hay precio capturado);
  * Costo de Ventas = Existencia (inicial + entradas + compras) - Inventario final — esto ya
  * incluye cualquier salida fisica del periodo (ventas, mermas, transferencias), porque el
  * conteo final las refleja; Costo Potencial es el costo teorico de receta de lo realmente
@@ -611,8 +625,28 @@ export async function computeIncomeStatement(
   // transferencias. Si el inventario incluye lo que la cocina tiene preparado, una salsa que se
   // mando a otra sucursal tiene que salir como transferencia; si no, desapareceria del
   // inventario sin aparecer en ningun lado y se leeria como costo.
-  const salidasAOtraSucursal = valuarConteo(requisicionesOut);
-  const entradasDesdeOtraSucursal = valuarConteo(requisicionesIn);
+  //
+  // Los traspasos se valuan al PRECIO de venta interna, no al costo: la sucursal que manda la
+  // salsa en $250 que le costo $200 tuvo una venta de $250, y la que la recibe la tiene
+  // costando $250. El renglon sin precio capturado se sigue valuando a costo, que es como
+  // funcionaba todo antes de que existieran los precios internos.
+  const aPrecio = (items: typeof requisicionesOut) =>
+    items.map((item) => ({ ...item, unitCost: item.unitPrice ?? item.unitCost }));
+  const salidasAOtraSucursal = valuarConteo(aPrecio(requisicionesOut));
+  const entradasDesdeOtraSucursal = valuarConteo(aPrecio(requisicionesIn));
+
+  // La utilidad de las ventas internas NO se suma a nada: ya esta dentro de la utilidad bruta,
+  // porque "Otras ventas" subio al precio mientras el costo de ventas sigue absorbiendo el
+  // costo. Se calcula aparte solo para poder enseñarla en su propio renglon; sumarla otra vez
+  // la contaria dos veces.
+  const utilidadVentasInternas = zeroAmounts();
+  for (const item of requisicionesOut) {
+    if (item.unitPrice === null) continue;
+    const grupo =
+      item.product?.category?.costGroupId ?? item.subRecipe?.category?.costGroupId ?? null;
+    const margen = new Decimal(item.unitPrice).minus(item.unitCost).times(item.quantity);
+    addTo(utilidadVentasInternas, grupo, margen);
+  }
 
   // Lo que se compra para vender va a Compras; lo que se compra para operar —agua, gas,
   // desechables— va a Gastos. Antes todo caia en Compras y por eso el costo de ventas incluia
@@ -755,6 +789,7 @@ export async function computeIncomeStatement(
   const hayMontosSinGrupo = [
     ventasNetasPV,
     salidasAOtraSucursal,
+    utilidadVentasInternas,
     ventaTotal,
     inventarioInicial,
     entradasDesdeOtraSucursal,
@@ -791,6 +826,7 @@ export async function computeIncomeStatement(
     diasActivos,
     ventasNetasPV,
     salidasAOtraSucursal,
+    utilidadVentasInternas,
     ventaTotal,
     inventarioInicial,
     entradasDesdeOtraSucursal,

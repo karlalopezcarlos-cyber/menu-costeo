@@ -17,6 +17,7 @@ export const PANEL_DEFS: { key: Panel; section: string; href: string; label: str
   { key: "EXPENSES", section: "expenses", href: "/expenses", label: "Gastos" },
   { key: "REQUISITIONS", section: "requisitions", href: "/requisitions", label: "Requisiciones" },
   { key: "PAYMENTS", section: "payments", href: "/payments", label: "Pagos" },
+  { key: "INTERNAL_SALES", section: "internal-sales", href: "/internal-sales", label: "Ventas internas" },
   { key: "SALES", section: "sales", href: "/sales", label: "Ventas" },
   { key: "MENU_ENGINEERING", section: "menu-engineering", href: "/menu-engineering", label: "Ingenieria de menu" },
   { key: "SETTINGS", section: "settings", href: "/settings/categories", label: "Configuracion" },

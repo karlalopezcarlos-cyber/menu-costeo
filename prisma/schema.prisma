@@ -35,6 +35,7 @@ enum Panel {
   STORE_ORDERS
   PORTIONING
   KARDEX
+  INTERNAL_SALES
 }
 
 /// Permisos finos que no son un panel completo. Un panel decide si la pantalla se ve; esto
@@ -154,6 +155,7 @@ model Organization {
   supplierPayments          SupplierPayment[]
   sucursales                Sucursal[]
   requisiciones             Requisicion[]
+  preciosTraspaso           InternalTransferPrice[]
   saleTickets               SaleTicket[]
   planningRuns              PlanningRun[]
   storeOrders               StoreOrder[]
@@ -297,6 +299,7 @@ model Sucursal {
   dailySaleChanges          DailySaleChange[]
   inventoryCountItemChanges InventoryCountItemChange[]
   requisicionesEnviadas     Requisicion[]              @relation("RequisicionFrom")
+  preciosTraspaso           InternalTransferPrice[]
   requisicionesRecibidas    Requisicion[]              @relation("RequisicionTo")
   userAccess                UserSucursal[]
   saleTickets               SaleTicket[]
@@ -442,6 +445,7 @@ model Product {
   presentations                   ProductPresentation[]
   inventoryCountItemChanges       InventoryCountItemChange[]
   requisicionItems                RequisicionItem[]
+  preciosTraspaso                 InternalTransferPrice[]
   planningRunItems                PlanningRunItem[]
   portioningEntries               PortioningEntry[]
   portioningOutputProduct         PortioningEntry[]              @relation("PortioningOutputProduct")
@@ -664,6 +668,7 @@ model Recipe {
   auditComments             AuditComment[]
   inventoryCountItemChanges InventoryCountItemChange[]
   requisicionItemsAsOrigin  RequisicionItem[]          @relation("RequisicionItemSubRecipe")
+  preciosTraspaso           InternalTransferPrice[]
   requisicionItemsAsDest    RequisicionItem[]          @relation("RequisicionItemDestSubRecipe")
   wasteEntries              WasteEntry[]
   saleTicketItems           SaleTicketItem[]
@@ -1375,6 +1380,12 @@ model RequisicionItem {
   /// Costo unitario congelado al momento de enviar (de la sucursal de origen), mismo patron que
   /// Purchase/WasteEntry/ProductionEntry: nunca se recalcula despues.
   unitCost        Decimal     @db.Decimal(14, 6)
+  /// Precio de venta interno congelado al enviar (ver InternalTransferPrice). Es a lo que la
+  /// sucursal de origen le "vende" el renglon a la de destino, y la diferencia contra unitCost
+  /// es su utilidad por venta interna. Null cuando la sucursal de origen no tiene precio
+  /// capturado para ese producto o subreceta: el traspaso va a costo, como antes de que esto
+  /// existiera.
+  unitPrice       Decimal?    @db.Decimal(14, 6)
 
   @@index([requisicionId])
   @@index([productId])
@@ -1516,6 +1527,40 @@ model PortioningOutput {
 ///
 /// No es una compra. Una compra movería el inventario y el Estado de Resultados; esto solo dice
 /// a cuanto vale el producto aqui.
+/// Precio al que una sucursal le vende un producto o una subreceta a otra sucursal.
+///
+/// El precio es de quien ENVIA, no del catalogo: el CEDIS puede traspasar la salsa verde a $250
+/// y otra sucursal a $260, y cada una tiene su propia utilidad. Por eso la llave es
+/// (sucursal, producto) o (sucursal, subreceta) y no el producto solo.
+///
+/// Es un precio vigente, no un historico: al enviar una requisicion el precio se copia a
+/// RequisicionItem.unitPrice y ahi se congela, igual que el costo. Cambiarlo aqui despues no
+/// mueve ningun traspaso ya hecho.
+model InternalTransferPrice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// La sucursal que vende (el origen del traspaso).
+  sucursalId     String
+  sucursal       Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  /// Producto del catalogo compartido (mutuamente excluyente con recipeId).
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// Subreceta de ESTA sucursal (mutuamente excluyente con productId).
+  recipeId       String?
+  recipe         Recipe?      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  /// En la unidad base del producto o en la unidad de rendimiento de la subreceta, la misma
+  /// convencion con la que se congela unitCost en RequisicionItem.
+  price          Decimal      @db.Decimal(14, 6)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([sucursalId, productId])
+  @@unique([sucursalId, recipeId])
+  @@index([organizationId])
+  @@map("internal_transfer_prices")
+}
+
 model SucursalProductCost {
   id         String   @id @default(cuid())
   sucursalId String
