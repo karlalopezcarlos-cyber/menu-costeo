@@ -27,6 +27,46 @@ function qty(n: number): string {
   return n.toLocaleString("es-MX", { maximumFractionDigits: 4 });
 }
 
+type Campo =
+  | "fecha"
+  | "hora"
+  | "producto"
+  | "movimiento"
+  | "folio"
+  | "detalle"
+  | "entrada"
+  | "salida"
+  | "saldo"
+  | "usuario";
+
+function valorDe(
+  { row, balance }: { row: KardexRow; balance: number },
+  campo: Campo,
+): string | number {
+  switch (campo) {
+    case "fecha":
+      return row.dateValue;
+    case "hora":
+      return row.createdAtValue;
+    case "producto":
+      return row.productName;
+    case "movimiento":
+      return row.typeLabel;
+    case "folio":
+      return row.reference;
+    case "detalle":
+      return row.detail;
+    case "entrada":
+      return Math.max(row.qtyDelta, 0);
+    case "salida":
+      return Math.max(-row.qtyDelta, 0);
+    case "saldo":
+      return balance;
+    case "usuario":
+      return row.userName ?? "";
+  }
+}
+
 export default function KardexTable({
   rows,
   totals,
@@ -62,6 +102,8 @@ export default function KardexTable({
   const [typeFilter, setTypeFilter] = useState(filters.type);
   const [dateFrom, setDateFrom] = useState(isDefaultMonth ? defaultFrom : filters.dateFrom);
   const [dateTo, setDateTo] = useState(isDefaultMonth ? defaultTo : filters.dateTo);
+  // El orden es nada mas de pantalla: no viaja a la URL ni vuelve a consultar.
+  const [orden, setOrden] = useState<{ campo: Campo; asc: boolean }>({ campo: "fecha", asc: true });
 
   function buildParams(next: Partial<KardexFilters>): URLSearchParams {
     const merged: KardexFilters = {
@@ -118,6 +160,69 @@ export default function KardexTable({
     }
     return acumulado;
   }, [rows, opening]);
+
+  // El saldo corrido se calcula SIEMPRE en orden cronologico y queda pegado a su movimiento: es
+  // "con cuanto quedo despues de este", y eso no cambia porque la tabla se vea de otra forma.
+  // Por eso se ordena hasta aqui, despues de acumular.
+  const visibles = useMemo(() => {
+    const copia = [...rowsConSaldo];
+    copia.sort((a, b) => {
+      const va = valorDe(a, orden.campo);
+      const vb = valorDe(b, orden.campo);
+      let cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb), "es");
+      // Dos movimientos del mismo dia se desempatan por hora de captura, que es el orden real.
+      if (cmp === 0) cmp = a.row.createdAtValue - b.row.createdAtValue;
+      return orden.asc ? cmp : -cmp;
+    });
+    return copia;
+  }, [rowsConSaldo, orden]);
+
+  // El renglon del saldo inicial solo tiene sentido pegado al extremo cronologico. Con otro
+  // orden se esconde: el dato ya esta en el recuadro de arriba.
+  const cronologico = orden.campo === "fecha" || orden.campo === "hora";
+  const inicialArriba = conSaldo && cronologico && orden.asc;
+  const inicialAbajo = conSaldo && cronologico && !orden.asc;
+
+  function ordenarPor(campo: Campo) {
+    setOrden((previo) =>
+      previo.campo === campo
+        ? { campo, asc: !previo.asc }
+        : { campo, asc: campo === "producto" || campo === "folio" || campo === "detalle" || campo === "movimiento" || campo === "usuario" },
+    );
+  }
+
+  /** Titulo que ordena al hacerle click y que se queda pegado arriba al bajar la tabla. */
+  function Th({
+    campo,
+    children,
+    derecha,
+  }: {
+    campo: Campo;
+    children: React.ReactNode;
+    derecha?: boolean;
+  }) {
+    const activa = orden.campo === campo;
+    return (
+      <th className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-50 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
+        <button
+          type="button"
+          onClick={() => ordenarPor(campo)}
+          aria-sort={activa ? (orden.asc ? "ascending" : "descending") : "none"}
+          className={`flex w-full items-center gap-1 uppercase transition-colors hover:text-neutral-800 ${
+            derecha ? "justify-end" : ""
+          } ${activa ? "text-neutral-800" : ""}`}
+        >
+          {children}
+          <span className={activa ? "text-brand-600" : "text-transparent"}>
+            {activa && !orden.asc ? "\u25bc" : "\u25b2"}
+          </span>
+        </button>
+      </th>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -302,48 +407,34 @@ export default function KardexTable({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      {/* El scroll vive en este contenedor y no en la ventana: es lo que deja que los titulos se
+          queden pegados arriba mientras la lista corre debajo. */}
+      <div className="max-h-[70vh] overflow-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
+          <thead className="text-left text-neutral-500">
             <tr>
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Fecha</th>
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Hora</th>
-              {!conSaldo && (
-                <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
-                  Producto
-                </th>
-              )}
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Movimiento
-              </th>
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Folio</th>
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Detalle</th>
-              <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+              <Th campo="fecha">Fecha</Th>
+              <Th campo="hora">Hora</Th>
+              {!conSaldo && <Th campo="producto">Producto</Th>}
+              <Th campo="movimiento">Movimiento</Th>
+              <Th campo="folio">Folio</Th>
+              <Th campo="detalle">Detalle</Th>
+              <Th campo="entrada" derecha>
                 Entrada
-              </th>
-              <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+              </Th>
+              <Th campo="salida" derecha>
                 Salida
-              </th>
+              </Th>
               {conSaldo && (
-                <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                <Th campo="saldo" derecha>
                   Saldo
-                </th>
+                </Th>
               )}
-              <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">Usuario</th>
+              <Th campo="usuario">Usuario</Th>
             </tr>
           </thead>
           <tbody>
-            {conSaldo && (
-              <tr className="border-t border-neutral-100 bg-neutral-50 font-medium">
-                <td className="px-3 py-2 text-neutral-500" colSpan={5}>
-                  Saldo inicial de {productName} · {opening!.basisLabel}
-                </td>
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2 text-right tabular-nums">{qty(opening!.qty)}</td>
-                <td className="px-3 py-2" />
-              </tr>
-            )}
+            {inicialArriba && <RenglonInicial />}
             {rows.length === 0 && (
               <tr>
                 <td colSpan={10} className="px-4 py-10 text-center text-sm text-neutral-400">
@@ -351,7 +442,7 @@ export default function KardexTable({
                 </td>
               </tr>
             )}
-            {rowsConSaldo.map(({ row, balance }) => {
+            {visibles.map(({ row, balance }) => {
               return (
                 <tr key={row.id} className="border-t border-neutral-100 transition-colors hover:bg-neutral-50">
                   <td className="px-3 py-2 text-neutral-500">{row.dateLabel}</td>
@@ -392,9 +483,24 @@ export default function KardexTable({
                 </tr>
               );
             })}
+            {inicialAbajo && <RenglonInicial />}
           </tbody>
         </table>
       </div>
     </div>
   );
+
+  function RenglonInicial() {
+    return (
+      <tr className="border-t border-neutral-100 bg-neutral-50 font-medium">
+        <td className="px-3 py-2 text-neutral-500" colSpan={5}>
+          Saldo inicial de {productName} · {opening!.basisLabel}
+        </td>
+        <td className="px-3 py-2" />
+        <td className="px-3 py-2" />
+        <td className="px-3 py-2 text-right tabular-nums">{qty(opening!.qty)}</td>
+        <td className="px-3 py-2" />
+      </tr>
+    );
+  }
 }

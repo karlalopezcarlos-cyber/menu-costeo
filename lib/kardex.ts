@@ -1,12 +1,25 @@
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
-import { loadOrgRecipeGraph, getRecipeUsagePerUnit, type RecipeGraph, type RecipeUsage } from "@/lib/costing";
+import {
+  loadOrgRecipeGraph,
+  getRecipeUsagePerUnit,
+  getSucursalProductCosts,
+  type RecipeGraph,
+  type RecipeUsage,
+} from "@/lib/costing";
 import { convertQty, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { ZONA_HORARIA } from "@/lib/format";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import { formatPortioningFolio } from "@/lib/portioning/query";
 import { formatRequisicionFolio } from "@/lib/requisitions/folio";
-import { KARDEX_TYPE_LABELS, type KardexRow, type KardexType, type KardexTotals } from "@/lib/kardex-types";
+import {
+  KARDEX_TYPE_LABELS,
+  type CorteRow,
+  type InventarioAlCorte,
+  type KardexRow,
+  type KardexType,
+  type KardexTotals,
+} from "@/lib/kardex-types";
 
 export * from "@/lib/kardex-types";
 
@@ -484,5 +497,96 @@ export async function computeKardexOpening(
     basisLabel: desde
       ? `Conteo del ${desde.toLocaleDateString("es-MX", { timeZone: "UTC" })} mas sus movimientos`
       : "Sin conteo previo: arrastre de todos los movimientos",
+  };
+}
+
+/**
+ * Inventario teorico de TODOS los productos a una fecha.
+ *
+ * Es el mismo razonamiento que computeKardexOpening pero para el catalogo entero: se parte del
+ * ultimo conteo fisico hasta esa fecha y se le suman los movimientos posteriores. No sustituye
+ * a un conteo —es lo que el sistema cree que hay, no lo que hay—, y esa es justo su utilidad:
+ * comparado contra un conteo real, la diferencia es la merma que nadie registro.
+ *
+ * Los movimientos del mismo dia del conteo ya estan dentro de lo contado, asi que se arranca
+ * del dia siguiente. Es el mismo corte que usa el resto de la app.
+ */
+export async function computeInventarioAlCorte(
+  organizationId: string,
+  sucursalId: string,
+  fecha: string,
+): Promise<InventarioAlCorte> {
+  const corte = new Date(`${fecha}T00:00:00.000Z`);
+
+  const [conteo, productos] = await Promise.all([
+    prisma.inventoryCount.findFirst({
+      where: { sucursalId, date: { lte: corte } },
+      orderBy: { date: "desc" },
+      include: { items: { where: { productId: { not: null } } } },
+    }),
+    prisma.product.findMany({
+      where: { organizationId, archivedAt: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, baseUnit: true },
+    }),
+  ]);
+
+  const base = new Map<string, number>();
+  if (conteo) {
+    for (const item of conteo.items) {
+      if (item.productId) base.set(item.productId, Number(item.quantity));
+    }
+  }
+
+  const desde = conteo
+    ? new Date(conteo.date.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : "2000-01-01";
+
+  // Si el conteo es posterior a la fecha de corte no puede pasar (se filtro con lte), pero el
+  // dia siguiente si puede rebasarla: un conteo levantado justo el dia del corte no deja
+  // movimientos que sumar.
+  const movimientos =
+    desde > fecha
+      ? []
+      : await loadKardexRows(organizationId, sucursalId, { dateFrom: desde, dateTo: fecha });
+
+  const delta = new Map<string, number>();
+  for (const row of movimientos) {
+    delta.set(row.productId, (delta.get(row.productId) ?? 0) + row.qtyDelta);
+  }
+
+  const costos = await getSucursalProductCosts(
+    sucursalId,
+    productos.map((p) => p.id),
+  );
+
+  const rows: CorteRow[] = [];
+  for (const producto of productos) {
+    const b = base.get(producto.id) ?? 0;
+    const m = delta.get(producto.id) ?? 0;
+    // Un producto que nunca se conto y nunca se movio no es un renglon en ceros: es un
+    // producto que no participa en este almacen. Enseñarlo solo alarga la tabla.
+    if (b === 0 && m === 0) continue;
+    const saldo = b + m;
+    const unitCost = costos.get(producto.id)?.toNumber() ?? 0;
+    rows.push({
+      productId: producto.id,
+      productName: producto.name,
+      unitLabel: UNIT_LABELS[producto.baseUnit as UnitValue],
+      base: b,
+      movimientos: m,
+      saldo,
+      unitCost,
+      valor: saldo * unitCost,
+    });
+  }
+
+  return {
+    rows,
+    basisLabel: conteo
+      ? `Conteo del ${conteo.date.toLocaleDateString("es-MX", { timeZone: "UTC" })}`
+      : "Sin conteo previo: arrastrado desde el primer movimiento",
+    sinConteo: !conteo,
+    totalValor: rows.reduce((suma, r) => suma + r.valor, 0),
   };
 }

@@ -68,3 +68,27 @@ export type KardexTotals = {
   salidas: number;
   porTipo: { type: KardexType; label: string; qty: number }[];
 };
+
+/** Un renglon del inventario al corte: cuanto deberia haber hoy de un producto, y cuanto vale. */
+export type CorteRow = {
+  productId: string;
+  productName: string;
+  unitLabel: string;
+  /** Lo que decia el ultimo conteo fisico. 0 si el producto no venia en ese conteo. */
+  base: number;
+  /** Lo que entro y salio desde ese conteo hasta la fecha de corte. */
+  movimientos: number;
+  /** base + movimientos: lo que deberia haber. */
+  saldo: number;
+  unitCost: number;
+  valor: number;
+};
+
+export type InventarioAlCorte = {
+  rows: CorteRow[];
+  /** De donde arranca el calculo, en texto, para que nadie lea el saldo sin saber de que cuelga. */
+  basisLabel: string;
+  /** Si no hay ningun conteo previo: el saldo se arrastro desde el primer movimiento. */
+  sinConteo: boolean;
+  totalValor: number;
+};
