@@ -61,6 +61,18 @@ export default async function RequisicionDetailPage({
     0,
   );
 
+  // Lo que se le cobra a la otra sucursal. Un renglon sin precio capturado se traspasa a costo
+  // y no traslada impuesto, asi que entra con su costo y con cero de IVA.
+  const venta = requisicion.items.reduce((sum, item) => {
+    const base = Number(item.unitPrice ?? item.unitCost);
+    return sum + Number(item.quantity) * base;
+  }, 0);
+  const iva = requisicion.items.reduce((sum, item) => {
+    if (item.unitPrice === null) return sum;
+    return sum + Number(item.quantity) * Number(item.unitPrice) * (Number(item.ivaRate) / 100);
+  }, 0);
+  const hayVentaInterna = requisicion.items.some((item) => item.unitPrice !== null);
+
   return (
     <div className="max-w-3xl space-y-6">
       <div>
@@ -126,9 +138,45 @@ export default async function RequisicionDetailPage({
         </table>
       </div>
 
-      <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white shadow-sm p-4">
-        <p className="text-sm text-neutral-500">Costo total de la requisicion</p>
-        <p className="text-xl font-semibold text-neutral-900">{formatMoney(total)}</p>
+      <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between text-sm text-neutral-500">
+          <p>Costo para {requisicion.fromSucursal.name}</p>
+          <p className="tabular-nums">{formatMoney(total)}</p>
+        </div>
+
+        {hayVentaInterna ? (
+          <>
+            <div className="flex items-center justify-between text-sm text-neutral-500">
+              <p>Venta interna (sin IVA)</p>
+              <p className="tabular-nums">{formatMoney(venta)}</p>
+            </div>
+            <div className="flex items-center justify-between text-sm text-neutral-500">
+              <p>IVA trasladado</p>
+              <p className="tabular-nums">{formatMoney(iva)}</p>
+            </div>
+            <div className="flex items-center justify-between border-t border-neutral-100 pt-2">
+              <p className="text-sm text-neutral-600">Total cobrado a {requisicion.toSucursal.name}</p>
+              <p className="text-xl font-semibold tabular-nums text-neutral-900">
+                {formatMoney(venta + iva)}
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <p className="text-neutral-500">Ingreso por venta interna</p>
+              <p
+                className={`font-medium tabular-nums ${
+                  venta - total < 0 ? "text-red-600" : "text-neutral-800"
+                }`}
+              >
+                {formatMoney(venta - total)}
+              </p>
+            </div>
+          </>
+        ) : (
+          <p className="border-t border-neutral-100 pt-2 text-xs text-neutral-400">
+            Este traspaso fue a costo: no hay precio de venta interna capturado para estos
+            renglones, asi que no genera ingreso ni traslada IVA.
+          </p>
+        )}
       </div>
 
       {puedeBorrar && (

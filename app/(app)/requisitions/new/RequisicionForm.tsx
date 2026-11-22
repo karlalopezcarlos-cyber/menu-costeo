@@ -14,6 +14,8 @@ type ProductOption = {
   baseUnit: UnitValue;
   unitCost: number;
   unitPrice: number | null;
+  /** Tasa de IVA de la venta interna, en por ciento. 0 = sin IVA. */
+  ivaRate: number;
 };
 type SubRecipeOption = {
   id: string;
@@ -21,6 +23,7 @@ type SubRecipeOption = {
   yieldUnit: UnitValue;
   unitCost: number;
   unitPrice: number | null;
+  ivaRate: number;
 };
 type SucursalOption = { id: string; name: string };
 type ItemType = "product" | "subrecipe";
@@ -35,7 +38,7 @@ type Row = {
 };
 
 const GRID_COLS =
-  "grid-cols-[1.5rem_6.5rem_minmax(0,2fr)_5.5rem_5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_1.5rem]";
+  "grid-cols-[1.25rem_6rem_minmax(0,1.8fr)_5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_1.25rem]";
 
 function emptyRow(key: string, defaultUnit: UnitValue): Row {
   return { key, itemType: "product", productId: "", subRecipeId: "", quantity: "", unit: defaultUnit };
@@ -98,13 +101,28 @@ export default function RequisicionForm({
     return qty * unitCost;
   }
 
-  /** Lo que se le cobra a la otra sucursal. Sin precio capturado, el traspaso va a costo. */
+  function rowIvaRate(row: Row): number {
+    if (row.itemType === "product") return productById.get(row.productId)?.ivaRate ?? 0;
+    return subRecipeById.get(row.subRecipeId)?.ivaRate ?? 0;
+  }
+
+  /**
+   * Lo que se le cobra a la otra sucursal, SIN IVA. Sin precio capturado el traspaso va a
+   * costo, y un traspaso a costo no traslada impuesto.
+   */
   function rowVenta(row: Row): number | null {
     const qty = rowQty(row);
     if (qty === null) return null;
     const unitPrice = rowUnitPrice(row);
     if (unitPrice !== null) return qty * unitPrice;
     return rowCost(row);
+  }
+
+  /** El IVA trasladado del renglon. Solo lo causa lo que tiene precio capturado. */
+  function rowIva(row: Row): number {
+    const venta = rowVenta(row);
+    if (venta === null || rowUnitPrice(row) === null) return 0;
+    return (venta * rowIvaRate(row)) / 100;
   }
 
   const grandTotal = useMemo(
@@ -115,6 +133,12 @@ export default function RequisicionForm({
 
   const grandVenta = useMemo(
     () => rows.reduce((sum, row) => sum + (rowVenta(row) ?? 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, products, subRecipes],
+  );
+
+  const grandIva = useMemo(
+    () => rows.reduce((sum, row) => sum + rowIva(row), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, products, subRecipes],
   );
@@ -195,14 +219,17 @@ export default function RequisicionForm({
             <span>Cantidad</span>
             <span>Unidad</span>
             <span>Costo</span>
-            <span>Venta interna</span>
-            <span>Ingreso</span>
+            <span>Venta s/IVA</span>
+            <span>IVA</span>
+            <span>Total</span>
             <span></span>
           </div>
 
           {rows.map((row, index) => {
             const cost = rowCost(row);
             const venta = rowVenta(row);
+            const iva = rowIva(row);
+            const tasa = rowIvaRate(row);
             const conPrecio = rowUnitPrice(row) !== null;
             const hasSelection = row.itemType === "product" ? !!row.productId : !!row.subRecipeId;
             return (
@@ -282,11 +309,17 @@ export default function RequisicionForm({
                   )}
                 </div>
 
-                <div className="text-sm leading-tight">
-                  {hasSelection && venta !== null && cost !== null && conPrecio ? (
-                    <span className={venta - cost < 0 ? "text-red-600" : "text-neutral-700"}>
-                      {formatMoney(venta - cost)}
-                    </span>
+                <div className="text-sm leading-tight text-neutral-500">
+                  {hasSelection && venta !== null && conPrecio && tasa > 0 ? (
+                    <span title={`IVA ${tasa}%`}>{formatMoney(iva)}</span>
+                  ) : (
+                    <span className="text-neutral-300">-</span>
+                  )}
+                </div>
+
+                <div className="text-sm leading-tight text-neutral-700">
+                  {hasSelection && venta !== null ? (
+                    <span>{formatMoney(venta + iva)}</span>
                   ) : (
                     <span className="text-neutral-300">-</span>
                   )}
@@ -314,7 +347,13 @@ export default function RequisicionForm({
             Costo: <strong className="text-neutral-800">{formatMoney(grandTotal)}</strong>
           </p>
           <p>
-            Venta interna: <strong className="text-neutral-800">{formatMoney(grandVenta)}</strong>
+            Venta s/IVA: <strong className="text-neutral-800">{formatMoney(grandVenta)}</strong>
+          </p>
+          <p>
+            IVA: <strong className="text-neutral-800">{formatMoney(grandIva)}</strong>
+          </p>
+          <p>
+            Total: <strong className="text-neutral-800">{formatMoney(grandVenta + grandIva)}</strong>
           </p>
           <p className={grandIngreso < 0 ? "text-red-600" : ""}>
             Ingreso:{" "}

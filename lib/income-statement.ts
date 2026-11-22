@@ -43,6 +43,9 @@ export type IncomeStatementResult = {
   /// Diferencia entre el precio de venta interna y el costo de lo que se mando a otra sucursal.
   /// Es informativo: ya viene dentro de la utilidad bruta y no se suma por segunda vez.
   utilidadVentasInternas: GroupAmounts;
+  /// IVA trasladado por las ventas internas del periodo. Desglose: no se suma a nada, en la
+  /// vista con IVA ya viene dentro de "Otras ventas".
+  ivaVentasInternas: GroupAmounts;
   ventaTotal: GroupAmounts;
   inventarioInicial: GroupAmounts;
   entradasDesdeOtraSucursal: GroupAmounts;
@@ -215,6 +218,15 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
       ? [buildRow("Utilidad en ventas internas", result.utilidadVentasInternas, "share", con())]
       : [];
 
+  // El IVA trasladado va pegado debajo de "Otras ventas" porque es su desglose. Nunca se suma:
+  // en la vista con IVA ya esta adentro de ese mismo renglon, y en la vista sin IVA no
+  // pertenece a ninguna cuenta de resultados. Se enseña en las dos para que se vea cuanto
+  // impuesto se esta trasladando entre sucursales.
+  const ivaInterno =
+    result.ivaVentasInternas.consolidado !== 0
+      ? [buildRow("IVA de ventas internas", result.ivaVentasInternas, "none", con())]
+      : [];
+
   // Periodo abierto: hay conteo inicial, compras, traspasos y ventas, pero no hay conteo final.
   // Todo eso se puede leer tal cual; lo que no se puede es el costo de ventas, que sale de
   // restar un inventario final que todavia no existe, ni la variacion, que lo compara contra el
@@ -223,6 +235,7 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     return [
       buildRow("Venta servicio", result.ventasNetasPV, "share", con()),
       buildRow("Otras ventas", result.salidasAOtraSucursal, "share", con()),
+      ...ivaInterno,
       ...utilidadInterna,
       buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
       buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
@@ -263,6 +276,7 @@ export function buildIncomeStatementRows(result: IncomeStatementResult): IncomeS
     // Informativo: el margen ya esta dentro de la utilidad bruta (la venta subio al precio y el
     // costo se quedo en el costo). El renglon solo lo hace legible. Se esconde cuando no hay
     // precios internos capturados, para no meter un cero en un reporte que no lo necesita.
+    ...ivaInterno,
     ...utilidadInterna,
     buildRow("Venta total", result.ventaTotal, "share", con({ bold: true })),
     buildRow("Inventario inicial", result.inventarioInicial, "none", con()),
@@ -368,13 +382,15 @@ export function buildIncomeStatementFooterRows(
 export const INCOME_STATEMENT_ROW_DESCRIPTIONS: Record<string, string> = {
   "Venta servicio": "Ingresos por venta directa en esta sucursal (cantidad vendida x precio de venta).",
   "Otras ventas":
-    "Productos y subrecetas enviados a otra sucursal por requisicion, valuados al precio de venta interna de esta sucursal. Los renglones sin precio capturado van a costo.",
+    "Productos y subrecetas enviados a otra sucursal por requisicion, al precio de venta interna de esta sucursal (con IVA o sin el, segun la vista que estes leyendo). Los renglones sin precio capturado van a costo y no trasladan impuesto.",
   "Utilidad en ventas internas":
     "Diferencia entre el precio al que se traspaso y lo que costaba. Es informativo: ya esta dentro de la utilidad bruta, no se suma dos veces.",
   "Venta total": "Venta servicio + Otras ventas.",
   "Inventario inicial": "Valor de los productos contados en el conteo de inventario inicial del periodo.",
   "Otras compras":
-    "Productos y subrecetas recibidos de otra sucursal por requisicion, valuados al precio que cobro la sucursal que los mando.",
+    "Productos y subrecetas recibidos de otra sucursal por requisicion, al precio que cobro quien los mando, siempre sin IVA: el impuesto es acreditable y no es costo, igual que en las compras directas.",
+  "IVA de ventas internas":
+    "Impuesto trasladado a las otras sucursales. Desglose: en la vista con IVA ya esta dentro de Otras ventas, y en la vista sin IVA no entra a ninguna suma.",
   "Compras directas":
     "Compras de producto del periodo (el % es respecto a la Venta total), que aqui va del dia siguiente al conteo inicial hasta el dia del conteo final: no es el mes de calendario. Lo comprado el dia del conteo inicial ya esta dentro de ese conteo y cuenta en el periodo anterior. NO incluye las compras de categorias marcadas como gasto en Configuracion > Categorias (agua, gas, desechables, limpieza): esas se van completas al bloque de gastos. Por eso este renglon suele ser menor que el total del modulo de Compras para las mismas fechas, y la diferencia entre los dos es exactamente lo que se compro en categorias de gasto.",
   "Inventario final": "Valor de los productos contados en el conteo de inventario final del periodo.",
@@ -675,10 +691,44 @@ export async function computeIncomeStatement(
   // salsa en $250 que le costo $200 tuvo una venta de $250, y la que la recibe la tiene
   // costando $250. El renglon sin precio capturado se sigue valuando a costo, que es como
   // funcionaba todo antes de que existieran los precios internos.
-  const aPrecio = (items: typeof requisicionesOut) =>
-    items.map((item) => ({ ...item, unitCost: item.unitPrice ?? item.unitCost }));
-  const salidasAOtraSucursal = valuarConteo(aPrecio(requisicionesOut));
-  const entradasDesdeOtraSucursal = valuarConteo(aPrecio(requisicionesIn));
+  //
+  // El IVA se trata con la misma regla que el resto del reporte, y por eso los dos lados NO se
+  // comportan igual:
+  //
+  //   - La SALIDA es una venta de quien manda, asi que sigue la vista: neta en "sin IVA" y con
+  //     impuesto en "con IVA", igual que la venta de carta.
+  //   - La ENTRADA es una compra de quien recibe, y una compra siempre entra neta -el IVA es
+  //     acreditable, no es costo-, igual que "Compras directas", que nunca cambia con la vista.
+  const conIvaDeTraspaso = (item: { unitPrice: Decimal | null; ivaRate: Decimal }) =>
+    item.unitPrice === null
+      ? null
+      : new Decimal(item.unitPrice).times(new Decimal(100).plus(item.ivaRate)).dividedBy(100);
+
+  const salidasAOtraSucursal = valuarConteo(
+    requisicionesOut.map((item) => ({
+      ...item,
+      unitCost:
+        (ivaView === "conIva" ? conIvaDeTraspaso(item) : item.unitPrice) ?? item.unitCost,
+    })),
+  );
+  const entradasDesdeOtraSucursal = valuarConteo(
+    requisicionesIn.map((item) => ({ ...item, unitCost: item.unitPrice ?? item.unitCost })),
+  );
+
+  // El IVA trasladado por las ventas internas, para poder enseñarlo desglosado. No entra en
+  // ninguna suma del reporte: en la vista con IVA ya va dentro de "Otras ventas", y en la vista
+  // sin IVA no debe estar en ningun lado.
+  const ivaVentasInternas = zeroAmounts();
+  for (const item of requisicionesOut) {
+    if (item.unitPrice === null) continue;
+    const grupo =
+      item.product?.category?.costGroupId ?? item.subRecipe?.category?.costGroupId ?? null;
+    addTo(
+      ivaVentasInternas,
+      grupo,
+      new Decimal(item.quantity).times(item.unitPrice).times(item.ivaRate).dividedBy(100),
+    );
+  }
 
   // La utilidad de las ventas internas NO se suma a nada: ya esta dentro de la utilidad bruta,
   // porque "Otras ventas" subio al precio mientras el costo de ventas sigue absorbiendo el
@@ -844,6 +894,7 @@ export async function computeIncomeStatement(
     ventasNetasPV,
     salidasAOtraSucursal,
     utilidadVentasInternas,
+    ivaVentasInternas,
     ventaTotal,
     inventarioInicial,
     entradasDesdeOtraSucursal,
@@ -882,6 +933,7 @@ export async function computeIncomeStatement(
     ventasNetasPV,
     salidasAOtraSucursal,
     utilidadVentasInternas,
+    ivaVentasInternas,
     ventaTotal,
     inventarioInicial,
     entradasDesdeOtraSucursal,

@@ -1386,6 +1386,9 @@ model RequisicionItem {
   /// capturado para ese producto o subreceta: el traspaso va a costo, como antes de que esto
   /// existiera.
   unitPrice       Decimal?    @db.Decimal(14, 6)
+  /// Tasa de IVA congelada al enviar, en por ciento. Solo tiene sentido junto a unitPrice: el
+  /// traspaso a costo no traslada impuesto.
+  ivaRate         Decimal     @default(0) @db.Decimal(5, 2)
 
   @@index([requisicionId])
   @@index([productId])
@@ -1549,9 +1552,15 @@ model InternalTransferPrice {
   /// Subreceta de ESTA sucursal (mutuamente excluyente con productId).
   recipeId       String?
   recipe         Recipe?      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  /// En la unidad base del producto o en la unidad de rendimiento de la subreceta, la misma
-  /// convencion con la que se congela unitCost en RequisicionItem.
+  /// SIN IVA, en la unidad base del producto o en la unidad de rendimiento de la subreceta.
+  /// Misma convencion que el precio de una compra: se captura neto y el impuesto se suma
+  /// aparte, porque el IVA es acreditable y no es costo de nadie.
   price          Decimal      @db.Decimal(14, 6)
+  /// Tasa de IVA de esta venta interna, en por ciento (16, no 0.16). 0 = sin IVA, que es el
+  /// caso de casi todo el almacen de un restaurante. Vive aqui y no se toma del producto
+  /// porque una subreceta no tiene tasa propia -esta hecha de insumos con tasas distintas- y
+  /// porque quien vende es quien decide si el traspaso lleva impuesto.
+  ivaRate        Decimal      @default(0) @db.Decimal(5, 2)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

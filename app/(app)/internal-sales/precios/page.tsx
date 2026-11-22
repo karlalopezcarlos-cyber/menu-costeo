@@ -23,7 +23,7 @@ export default async function PreciosTraspasoPage() {
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, baseUnit: true },
+      select: { id: true, name: true, baseUnit: true, ivaRate: true },
     }),
     prisma.recipe.findMany({
       where: {
@@ -37,15 +37,17 @@ export default async function PreciosTraspasoPage() {
     }),
     prisma.internalTransferPrice.findMany({
       where: { sucursalId: user.sucursalId },
-      select: { productId: true, recipeId: true, price: true },
+      select: { productId: true, recipeId: true, price: true, ivaRate: true },
     }),
   ]);
 
-  const precioPorProducto = new Map<string, number>();
-  const precioPorReceta = new Map<string, number>();
+  type Vigente = { precio: number; ivaRate: number };
+  const precioPorProducto = new Map<string, Vigente>();
+  const precioPorReceta = new Map<string, Vigente>();
   for (const p of precios) {
-    if (p.productId) precioPorProducto.set(p.productId, Number(p.price));
-    else if (p.recipeId) precioPorReceta.set(p.recipeId, Number(p.price));
+    const v = { precio: Number(p.price), ivaRate: Number(p.ivaRate) };
+    if (p.productId) precioPorProducto.set(p.productId, v);
+    else if (p.recipeId) precioPorReceta.set(p.recipeId, v);
   }
 
   const costos = await getSucursalProductCosts(
@@ -60,13 +62,17 @@ export default async function PreciosTraspasoPage() {
 
   const filasProductos: PrecioRow[] = productos.map((p) => {
     const costo = costos.get(p.id);
+    const vigente = precioPorProducto.get(p.id);
     return {
       tipo: "product",
       id: p.id,
       nombre: p.name,
       unidad: UNIT_LABELS[p.baseUnit as UnitValue],
       costo: costo ? costo.toNumber() : null,
-      precio: precioPorProducto.get(p.id) ?? null,
+      precio: vigente?.precio ?? null,
+      // Sin precio capturado todavia, la tasa que se propone es la del producto: casi siempre
+      // es la correcta y asi no hay que elegirla renglon por renglon.
+      ivaRate: vigente?.ivaRate ?? Number(p.ivaRate),
     };
   });
 
@@ -79,13 +85,17 @@ export default async function PreciosTraspasoPage() {
         costo = null;
       }
     }
+    const vigente = precioPorReceta.get(r.id);
     return {
       tipo: "recipe",
       id: r.id,
       nombre: r.name,
       unidad: UNIT_LABELS[r.yieldUnit as UnitValue],
       costo,
-      precio: precioPorReceta.get(r.id) ?? null,
+      precio: vigente?.precio ?? null,
+      // Una subreceta no tiene tasa propia: esta hecha de insumos con tasas distintas. Se
+      // propone 0 y quien vende decide.
+      ivaRate: vigente?.ivaRate ?? 0,
     };
   });
 

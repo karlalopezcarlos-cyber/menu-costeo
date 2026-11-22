@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/format";
+import { TASAS_IVA_COMUNES } from "@/lib/taxes";
 import { setInternalPrice } from "../actions";
 
 export type PrecioRow = {
@@ -12,26 +13,31 @@ export type PrecioRow = {
   unidad: string;
   /** Lo que le cuesta a esta sucursal. Null cuando no se puede costear todavia. */
   costo: number | null;
-  /** Precio de traspaso vigente. Null = se traspasa a costo. */
+  /** Precio de traspaso vigente, SIN IVA. Null = se traspasa a costo. */
   precio: number | null;
+  /** Tasa de IVA en por ciento. 0 = sin IVA. */
+  ivaRate: number;
 };
 
 /** Un renglon que se guarda solo al salir del campo, como la captura de costos por sucursal. */
 function Renglon({ row }: { row: PrecioRow }) {
   const router = useRouter();
   const [valor, setValor] = useState(row.precio !== null ? String(row.precio) : "");
+  const [tasa, setTasa] = useState(row.ivaRate);
   const [error, setError] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
   const [guardando, startGuardado] = useTransition();
 
   const original = row.precio !== null ? String(row.precio) : "";
 
-  function guardar() {
-    if (valor.trim() === original) return;
+  function guardar(nuevaTasa: number = tasa) {
+    // La tasa sola no se guarda si no hay precio: sin precio no hay venta interna que gravar.
+    if (valor.trim() === original && nuevaTasa === row.ivaRate) return;
+    if (valor.trim() === "" && original === "") return;
     setError(null);
     setGuardado(false);
     startGuardado(async () => {
-      const resultado = await setInternalPrice(row.tipo, row.id, valor);
+      const resultado = await setInternalPrice(row.tipo, row.id, valor, nuevaTasa);
       if (resultado?.error) {
         setError(resultado.error);
         return;
@@ -44,6 +50,7 @@ function Renglon({ row }: { row: PrecioRow }) {
   const precioNum = Number(valor.replace(/,/g, ""));
   const hayPrecio = valor.trim() !== "" && !Number.isNaN(precioNum) && precioNum > 0;
   const margen = hayPrecio && row.costo !== null ? precioNum - row.costo : null;
+  const conIva = hayPrecio ? precioNum * (1 + tasa / 100) : null;
 
   return (
     <tr className="border-t border-neutral-100">
@@ -67,7 +74,7 @@ function Renglon({ row }: { row: PrecioRow }) {
             setValor(e.target.value);
             setGuardado(false);
           }}
-          onBlur={guardar}
+          onBlur={() => guardar()}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
@@ -82,6 +89,28 @@ function Renglon({ row }: { row: PrecioRow }) {
                 : "border-neutral-200"
           }`}
         />
+      </td>
+      <td className="px-4 py-2.5 text-right">
+        <select
+          value={tasa}
+          onChange={(e) => {
+            const nueva = Number(e.target.value);
+            setTasa(nueva);
+            guardar(nueva);
+          }}
+          disabled={guardando || !hayPrecio}
+          aria-label={`IVA de ${row.nombre}`}
+          className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm disabled:text-neutral-300"
+        >
+          {TASAS_IVA_COMUNES.map((t) => (
+            <option key={t} value={t}>
+              {t === 0 ? "Sin IVA" : `${t}%`}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-2.5 text-right text-neutral-600">
+        {conIva === null ? <span className="text-neutral-300">—</span> : formatMoney(conIva, 4)}
       </td>
       <td
         className={`px-4 py-2.5 text-right ${
@@ -178,7 +207,13 @@ export default function PreciosTraspasoTable({
                 Costo aqui
               </th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
-                Precio de traspaso
+                Precio s/IVA
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                IVA
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
+                Total c/IVA
               </th>
               <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Ingreso por unidad
@@ -189,7 +224,7 @@ export default function PreciosTraspasoTable({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={8} className="px-4 py-6 text-center text-neutral-400">
                   {base.length === 0
                     ? pestana === "product"
                       ? "No hay productos en el catalogo."
@@ -206,9 +241,11 @@ export default function PreciosTraspasoTable({
       </div>
 
       <p className="text-xs text-neutral-400">
-        El precio se guarda solo al salir del campo. Dejarlo vacio borra el precio y ese renglon
-        vuelve a traspasarse a costo. Cambiar un precio no mueve las requisiciones ya hechas: cada
-        traspaso se queda con el precio que tenia el dia que se envio.
+        El precio se captura <strong>sin IVA</strong>, igual que el de una compra: el impuesto se
+        suma aparte porque es acreditable y no es costo de nadie. Se guarda solo al salir del
+        campo; dejarlo vacio borra el precio y ese renglon vuelve a traspasarse a costo. Cambiar
+        un precio o una tasa no mueve las requisiciones ya hechas: cada traspaso se queda con lo
+        que tenia el dia que se envio.
       </p>
     </div>
   );

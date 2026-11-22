@@ -10,19 +10,22 @@ import type { Prisma } from "@/generated/prisma/client";
  * se copia al renglon y se congela ahi; esta tabla solo guarda el precio vigente.
  */
 
+/** Un precio de venta interna: neto y su tasa de IVA, en por ciento. */
+export type PrecioInterno = { price: Decimal; ivaRate: number };
+
 /** Precios vigentes de productos para la sucursal que vende. Clave: productId. */
 export async function getInternalProductPrices(
   sucursalId: string,
   productIds: string[],
-): Promise<Map<string, Decimal>> {
-  const out = new Map<string, Decimal>();
+): Promise<Map<string, PrecioInterno>> {
+  const out = new Map<string, PrecioInterno>();
   if (productIds.length === 0) return out;
   const filas = await prisma.internalTransferPrice.findMany({
     where: { sucursalId, productId: { in: productIds }, price: { gt: 0 } },
-    select: { productId: true, price: true },
+    select: { productId: true, price: true, ivaRate: true },
   });
   for (const f of filas) {
-    if (f.productId) out.set(f.productId, new Decimal(f.price));
+    if (f.productId) out.set(f.productId, { price: new Decimal(f.price), ivaRate: Number(f.ivaRate) });
   }
   return out;
 }
@@ -31,15 +34,15 @@ export async function getInternalProductPrices(
 export async function getInternalRecipePrices(
   sucursalId: string,
   recipeIds: string[],
-): Promise<Map<string, Decimal>> {
-  const out = new Map<string, Decimal>();
+): Promise<Map<string, PrecioInterno>> {
+  const out = new Map<string, PrecioInterno>();
   if (recipeIds.length === 0) return out;
   const filas = await prisma.internalTransferPrice.findMany({
     where: { sucursalId, recipeId: { in: recipeIds }, price: { gt: 0 } },
-    select: { recipeId: true, price: true },
+    select: { recipeId: true, price: true, ivaRate: true },
   });
   for (const f of filas) {
-    if (f.recipeId) out.set(f.recipeId, new Decimal(f.price));
+    if (f.recipeId) out.set(f.recipeId, { price: new Decimal(f.price), ivaRate: Number(f.ivaRate) });
   }
   return out;
 }
@@ -77,6 +80,9 @@ export function precioDeTraspaso(item: {
  *
  * `manualCost` guarda el costo del RENDIMIENTO COMPLETO, no el unitario: por eso se multiplica
  * por yieldQty.
+ *
+ * Lo que se pega es el precio NETO, sin IVA. El impuesto que la sucursal destino pago es
+ * acreditable y no es costo suyo, igual que el IVA de cualquier compra.
  */
 export async function pegarCostoEnDestino(
   tx: Prisma.TransactionClient,

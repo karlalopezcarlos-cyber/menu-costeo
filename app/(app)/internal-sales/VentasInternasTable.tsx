@@ -18,9 +18,16 @@ export type VentaInternaRow = {
   cantidad: number;
   unidad: string;
   costoUnitario: number;
+  /** Precio unitario SIN IVA. */
   precioUnitario: number;
+  /** Tasa de IVA congelada en el traspaso, en por ciento. */
+  tasaIva: number;
   costoTotal: number;
+  /** Venta del renglon sin IVA. */
   ventaTotal: number;
+  iva: number;
+  totalConIva: number;
+  /** Contra el precio neto: el IVA no es ingreso. */
   ingreso: number;
 };
 
@@ -35,6 +42,8 @@ type Campo =
   | "cantidad"
   | "costo"
   | "venta"
+  | "iva"
+  | "total"
   | "ingreso";
 
 function valorDe(row: VentaInternaRow, campo: Campo): string | number {
@@ -55,6 +64,10 @@ function valorDe(row: VentaInternaRow, campo: Campo): string | number {
       return row.costoTotal;
     case "venta":
       return row.ventaTotal;
+    case "iva":
+      return row.iva;
+    case "total":
+      return row.totalConIva;
     case "ingreso":
       return row.ingreso;
   }
@@ -91,7 +104,12 @@ export default function VentasInternasTable({
     setOrden((previo) =>
       previo.campo === campo
         ? { campo, asc: !previo.asc }
-        : { campo, asc: !["fecha", "cantidad", "costo", "venta", "ingreso"].includes(campo) },
+        : {
+            campo,
+            asc: !["fecha", "cantidad", "costo", "venta", "iva", "total", "ingreso"].includes(
+              campo,
+            ),
+          },
     );
   }
 
@@ -122,6 +140,7 @@ export default function VentasInternasTable({
   const totalVenta = visibles.reduce((s, r) => s + r.ventaTotal, 0);
   const totalCosto = visibles.reduce((s, r) => s + r.costoTotal, 0);
   const totalIngreso = visibles.reduce((s, r) => s + r.ingreso, 0);
+  const totalIva = visibles.reduce((s, r) => s + r.iva, 0);
   const margenPct = totalVenta === 0 ? 0 : (totalIngreso / totalVenta) * 100;
 
   function Th({
@@ -155,11 +174,20 @@ export default function VentasInternasTable({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">Traspasado</p>
           <p className="mt-1 text-xl font-semibold text-neutral-900">{formatMoney(totalVenta)}</p>
-          <p className="mt-0.5 text-xs text-neutral-400">a precio de venta interna</p>
+          <p className="mt-0.5 text-xs text-neutral-400">
+            sin IVA · {formatMoney(totalVenta + totalIva)} con IVA
+          </p>
+        </div>
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+            IVA trasladado
+          </p>
+          <p className="mt-1 text-xl font-semibold text-neutral-900">{formatMoney(totalIva)}</p>
+          <p className="mt-0.5 text-xs text-neutral-400">no es ingreso, es del SAT</p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">Costo</p>
@@ -271,7 +299,13 @@ export default function VentasInternasTable({
                 Costo
               </Th>
               <Th campo="venta" derecha>
-                Venta interna
+                Venta s/IVA
+              </Th>
+              <Th campo="iva" derecha>
+                IVA
+              </Th>
+              <Th campo="total" derecha>
+                Total c/IVA
               </Th>
               <Th campo="ingreso" derecha>
                 Ingreso
@@ -282,7 +316,7 @@ export default function VentasInternasTable({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={11} className="px-4 py-6 text-center text-neutral-400">
                   Ningun renglon coincide con los filtros.
                 </td>
               </tr>
@@ -313,6 +347,13 @@ export default function VentasInternasTable({
                 <td className="px-4 py-3 text-right text-neutral-500">{formatMoney(row.costoTotal)}</td>
                 <td className="px-4 py-3 text-right">{formatMoney(row.ventaTotal)}</td>
                 <td
+                  className="px-4 py-3 text-right text-neutral-500"
+                  title={row.tasaIva === 0 ? "Sin IVA" : `IVA ${row.tasaIva}%`}
+                >
+                  {row.tasaIva === 0 ? <span className="text-neutral-300">—</span> : formatMoney(row.iva)}
+                </td>
+                <td className="px-4 py-3 text-right text-neutral-600">{formatMoney(row.totalConIva)}</td>
+                <td
                   className={`px-4 py-3 text-right font-medium ${
                     row.ingreso < 0 ? "text-red-600" : "text-neutral-900"
                   }`}
@@ -331,6 +372,10 @@ export default function VentasInternasTable({
                 </td>
                 <td className="px-4 py-3 text-right text-neutral-600">{formatMoney(totalCosto)}</td>
                 <td className="px-4 py-3 text-right">{formatMoney(totalVenta)}</td>
+                <td className="px-4 py-3 text-right text-neutral-600">{formatMoney(totalIva)}</td>
+                <td className="px-4 py-3 text-right text-neutral-600">
+                  {formatMoney(totalVenta + totalIva)}
+                </td>
                 <td className="px-4 py-3 text-right">{formatMoney(totalIngreso)}</td>
                 <td />
               </tr>

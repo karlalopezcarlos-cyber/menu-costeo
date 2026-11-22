@@ -109,14 +109,16 @@ export async function createRequisicion(
       const unit = parseUnit(row.unit);
       const unitCost = productCosts.get(product.id) ?? new Decimal(0);
 
-      const unitPrice = productPrices.get(product.id) ?? null;
+      const precio = productPrices.get(product.id) ?? null;
 
       return {
         productId: product.id,
         quantity: quantity.toString(),
         unit,
         unitCost: unitCost.toString(),
-        unitPrice: unitPrice ? unitPrice.toString() : null,
+        unitPrice: precio ? precio.price.toString() : null,
+        // La tasa se congela junto al precio: un traspaso a costo no traslada impuesto.
+        ivaRate: precio ? precio.ivaRate.toString() : "0",
       };
     });
 
@@ -145,7 +147,7 @@ export async function createRequisicion(
         );
       }
 
-      const unitPrice = recipePrices.get(subRecipe.id) ?? null;
+      const precio = recipePrices.get(subRecipe.id) ?? null;
 
       return {
         subRecipeId: subRecipe.id,
@@ -153,7 +155,8 @@ export async function createRequisicion(
         quantity: quantity.toString(),
         unit,
         unitCost: unitCost.toString(),
-        unitPrice: unitPrice ? unitPrice.toString() : null,
+        unitPrice: precio ? precio.price.toString() : null,
+        ivaRate: precio ? precio.ivaRate.toString() : "0",
       };
     });
 

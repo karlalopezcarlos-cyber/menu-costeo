@@ -62,7 +62,8 @@ export default async function NewRequisicionPage() {
             name: p.name,
             baseUnit: p.baseUnit as UnitValue,
             unitCost: productCosts.get(p.id)?.toNumber() ?? 0,
-            unitPrice: productPrices.get(p.id)?.toNumber() ?? null,
+            unitPrice: productPrices.get(p.id)?.price.toNumber() ?? null,
+            ivaRate: productPrices.get(p.id)?.ivaRate ?? 0,
           }))}
           subRecipes={subRecipes.map((r) => {
             // getRecipeCost devuelve lo que cuesta el RENDIMIENTO COMPLETO, no el litro: una
@@ -82,7 +83,8 @@ export default async function NewRequisicionPage() {
               name: r.name,
               yieldUnit: r.yieldUnit as UnitValue,
               unitCost,
-              unitPrice: recipePrices.get(r.id)?.toNumber() ?? null,
+              unitPrice: recipePrices.get(r.id)?.price.toNumber() ?? null,
+              ivaRate: recipePrices.get(r.id)?.ivaRate ?? 0,
             };
           })}
           sucursales={sucursales}

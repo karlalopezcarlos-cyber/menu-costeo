@@ -42,6 +42,8 @@ export default async function InternalSalesPage() {
     const cantidad = Number(item.quantity);
     const costo = Number(item.unitCost);
     const precio = Number(item.unitPrice);
+    const tasaIva = Number(item.ivaRate);
+    const ventaTotal = cantidad * precio;
     const u = item.requisicion.createdBy;
     const usuario = u
       ? [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.name || u.email
@@ -62,8 +64,13 @@ export default async function InternalSalesPage() {
       unidad: UNIT_LABELS[item.unit as UnitValue],
       costoUnitario: costo,
       precioUnitario: precio,
+      tasaIva,
       costoTotal: cantidad * costo,
-      ventaTotal: cantidad * precio,
+      ventaTotal,
+      // El impuesto se calcula, nunca se guarda: lo que esta congelado es la tasa.
+      iva: (ventaTotal * tasaIva) / 100,
+      totalConIva: ventaTotal * (1 + tasaIva / 100),
+      // El ingreso es contra el precio NETO. El IVA no es ingreso de nadie, es del SAT.
       ingreso: cantidad * (precio - costo),
     };
   });

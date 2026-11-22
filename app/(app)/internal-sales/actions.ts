@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
+import { TASAS_IVA_COMUNES } from "@/lib/taxes";
 
 /**
  * Fija (o borra) el precio al que esta sucursal le traspasa un producto o una subreceta a otra.
@@ -16,8 +17,17 @@ export async function setInternalPrice(
   tipo: "product" | "recipe",
   id: string,
   precioRaw: string,
+  /** Tasa de IVA en por ciento. Se ignora si el precio queda vacio. */
+  ivaRateRaw: number = 0,
 ): Promise<{ error?: string }> {
   const user = await requireSucursalContext();
+
+  // Solo las tasas que la app ofrece. Una tasa inventada desde fuera cambiaria lo que se le
+  // factura a otra sucursal, asi que no se acepta aunque venga bien formada.
+  if (!TASAS_IVA_COMUNES.includes(ivaRateRaw)) {
+    return { error: "Tasa de IVA no valida." };
+  }
+  const ivaRate = ivaRateRaw.toString();
 
   const texto = precioRaw.trim();
   let precio: Decimal | null = null;
@@ -50,8 +60,9 @@ export async function setInternalPrice(
           sucursalId: user.sucursalId,
           productId: id,
           price: precio.toString(),
+          ivaRate,
         },
-        update: { price: precio.toString() },
+        update: { price: precio.toString(), ivaRate },
       });
     }
   } else {
@@ -75,8 +86,9 @@ export async function setInternalPrice(
           sucursalId: user.sucursalId,
           recipeId: id,
           price: precio.toString(),
+          ivaRate,
         },
-        update: { price: precio.toString() },
+        update: { price: precio.toString(), ivaRate },
       });
     }
   }
