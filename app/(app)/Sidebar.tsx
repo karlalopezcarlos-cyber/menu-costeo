@@ -13,7 +13,7 @@ export type NavItem = { href: string; label: string };
  * asi que agregar un panel nuevo nunca lo deja fuera del menu.
  */
 const GROUPS: { title: string; sections: string[] }[] = [
-  { title: "Operacion", sections: ["dashboard", "products", "recipes", "production", "portioning", "inventory", "waste"] },
+  { title: "Operacion", sections: ["dashboard", "products", "recipes", "costeador", "production", "portioning", "inventory", "waste"] },
   { title: "Ventas", sections: ["sales", "internal-sales", "orders", "store-orders"] },
   { title: "Compras", sections: ["purchases", "expenses", "requisitions", "payments"] },
   { title: "Analisis", sections: ["planning", "menu-engineering", "audit", "kardex"] },
@@ -29,6 +29,7 @@ const ICONS: Record<string, string> = {
   dashboard: "M3 12h6v8H3zM10.5 4h3v16h-3zM15 9h6v11h-6z",
   products: "M4 7l8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10",
   recipes: "M5 3h11l3 3v15H5zM9 8h7M9 12h7M9 16h4",
+  costeador: "M9 3h6v4H9zM7 7h10l1 14H6zM10 12h4M12 10v4",
   production: "M3 20h18M5 20V9l5 3V9l5 3V6l4 2v12",
   portioning: "M6 4v16M10 4v7a3 3 0 006 0V4M13 14v6",
   inventory: "M3 8h18v12H3zM3 8l2-4h14l2 4M12 8v12",

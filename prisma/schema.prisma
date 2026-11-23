@@ -36,6 +36,7 @@ enum Panel {
   PORTIONING
   KARDEX
   INTERNAL_SALES
+  COSTEADOR
 }
 
 /// Permisos finos que no son un panel completo. Un panel decide si la pantalla se ve; esto
@@ -161,6 +162,7 @@ model Organization {
   storeOrders               StoreOrder[]
   expenses                  Expense[]
   expenseCategories         ExpenseCategory[]
+  costeadores               Costeador[]
 
   @@map("organizations")
 }
@@ -235,7 +237,8 @@ model RecipeCategory {
   costGroup      CostGroup?     @relation(fields: [costGroupId], references: [id])
   createdAt      DateTime       @default(now())
 
-  recipes Recipe[]
+  recipes     Recipe[]
+  costeadores Costeador[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -247,13 +250,13 @@ model RecipeCategory {
 /// Organization. El CEDIS es una sucursal mas, marcada con isCentral=true (no una entidad aparte),
 /// para que las Requisiciones puedan ir de cualquier sucursal a cualquier otra sin caso especial.
 model Sucursal {
-  id                   String       @id @default(cuid())
-  organizationId       String
-  organization         Organization @relation(fields: [organizationId], references: [id])
-  name                 String
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
   /// Sucursal "matriz"/CEDIS de la organizacion. Se crea una automaticamente para cada
   /// organizacion existente al migrar; sirve como destino por default y para el backfill.
-  isCentral            Boolean      @default(false)
+  isCentral      Boolean      @default(false)
 
   // --- Datos fiscales (CFDI 4.0) ------------------------------------------------------
   // Una sucursal puede ser un contribuyente distinto: dos razones sociales que se venden
@@ -277,37 +280,37 @@ model Sucursal {
   /// Clave del catalogo c_UsoCFDI con la que esta sucursal recibe facturas por omision
   /// (ej. "G01" adquisicion de mercancias). Solo aplica cuando es la receptora.
   usoCfdi              String?
-  isActive             Boolean      @default(true)
+  isActive             Boolean  @default(true)
   /// Slug unico (global, no solo por organizacion) para la URL publica de la tienda en linea de
   /// esta sucursal (ej. /store/mi-dark-kitchen). Nulo mientras no se configure.
-  storeSlug            String?      @unique
+  storeSlug            String?  @unique
   /// Si la tienda en linea esta habilitada para recibir pedidos publicos ahorita mismo.
-  storeEnabled         Boolean      @default(false)
+  storeEnabled         Boolean  @default(false)
   /// Direccion de origen para calcular km de envio a domicilio (geocodificada a lat/lng al
   /// guardarse en Configuracion).
   businessAddress      String?
-  businessLat          Decimal?     @db.Decimal(10, 6)
-  businessLng          Decimal?     @db.Decimal(10, 6)
+  businessLat          Decimal? @db.Decimal(10, 6)
+  businessLng          Decimal? @db.Decimal(10, 6)
   /// Cuota fija de envio, independiente de la distancia.
-  deliveryBaseFee      Decimal      @default(0) @db.Decimal(10, 2)
+  deliveryBaseFee      Decimal  @default(0) @db.Decimal(10, 2)
   /// Precio por km recorrido (ruta real, no linea recta) que se suma a deliveryBaseFee.
-  deliveryPricePerKm   Decimal      @default(0) @db.Decimal(10, 2)
+  deliveryPricePerKm   Decimal  @default(0) @db.Decimal(10, 2)
   /// Pedido minimo (subtotal de platillos, sin contar el envio) para poder pedir a domicilio.
-  deliveryMinOrder     Decimal      @default(0) @db.Decimal(12, 2)
+  deliveryMinOrder     Decimal  @default(0) @db.Decimal(12, 2)
   /// Distancia maxima (km, ruta real) a la que se acepta enviar a domicilio. 0 = sin limite.
-  deliveryMaxKm        Decimal      @default(0) @db.Decimal(6, 2)
+  deliveryMaxKm        Decimal  @default(0) @db.Decimal(6, 2)
   /// Horarios de entrega (opcional): si deliverySlotsCount > 0, el cliente debe elegir uno de los
   /// horarios generados a partir de deliveryStartTime + deliverySlotMinutes x deliverySlotsCount
   /// (ej. inicio "14:00", cada 30 min, 4 horarios -> 14:00, 14:30, 15:00, 15:30). Cada horario
   /// admite hasta deliverySlotCapacity pedidos antes de bloquearse para nuevos clientes.
   deliveryStartTime    String?
-  deliverySlotMinutes  Int          @default(30)
-  deliverySlotsCount   Int          @default(0)
-  deliverySlotCapacity Int          @default(1)
+  deliverySlotMinutes  Int      @default(30)
+  deliverySlotsCount   Int      @default(0)
+  deliverySlotCapacity Int      @default(1)
   /// Dias minimos de anticipacion que debe tener una fecha de StoreDeliveryDate para que el
   /// cliente la pueda elegir (ej. 7 = solo se puede pedir con una semana de anticipacion).
-  deliveryLeadDays     Int          @default(0)
-  createdAt            DateTime     @default(now())
+  deliveryLeadDays     Int      @default(0)
+  createdAt            DateTime @default(now())
 
   purchases                 Purchase[]
   purchaseOrders            PurchaseOrder[]
@@ -334,6 +337,7 @@ model Sucursal {
   storeDeliveryDates        StoreDeliveryDate[]
   expenses                  Expense[]
   productCosts              SucursalProductCost[]
+  costeadores               Costeador[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -381,6 +385,7 @@ model User {
   /// todas las sucursales de su organizacion sin importar que haya filas aqui.
   sucursales                UserSucursal[]
   expensesCreated           Expense[]                  @relation("ExpenseCreatedBy")
+  costeadores               Costeador[]                @relation("CosteadorCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -483,6 +488,7 @@ model Product {
   transformationTemplatesAsSource TransformationTemplate[]       @relation("TransformationTemplateSource")
   transformationTemplateOutputs   TransformationTemplateOutput[] @relation("TransformationTemplateOutput")
   expenses                        Expense[]
+  costeadorItems                  CosteadorItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -709,6 +715,8 @@ model Recipe {
   portioningOutputs         PortioningOutput[]
   portionExtrasFor          Product[]                  @relation("ProductPortionExtras")
   dailySaleChanges          DailySaleChange[]
+  costeadorItems            CosteadorItem[]            @relation("CosteadorItemSubRecipe")
+  costeadorOrigen           Costeador[]                @relation("CosteadorTransferida")
 
   @@unique([sucursalId, name])
   @@index([organizationId])
@@ -1630,4 +1638,71 @@ model SucursalProductCost {
   @@unique([sucursalId, productId])
   @@index([sucursalId])
   @@map("sucursal_product_costs")
+}
+
+/// Un costeo de prueba: una receta que todavia no existe.
+///
+/// Vive en su propia tabla y no como una bandera en Recipe a proposito. Recipe la leen el
+/// costeo, las ventas, la ingenieria de menu, el inventario, las requisiciones y la tienda; una
+/// bandera tendria que respetarse en cada una de esas consultas y bastaria con olvidar una para
+/// que un platillo que nadie autorizo aparezca en el catalogo. Una tabla aparte no se puede
+/// colar: no hay consulta que la alcance por accidente.
+///
+/// Lo que no se duplica aqui es el costeo. Los ingredientes apuntan a los productos y a las
+/// subrecetas de verdad, asi que el costo de la propuesta se mueve con los precios reales de la
+/// sucursal. Un coctel costeado en marzo vale lo que valen hoy sus insumos.
+model Costeador {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  sucursalId     String
+  sucursal       Sucursal        @relation(fields: [sucursalId], references: [id])
+  name           String
+  categoryId     String?
+  category       RecipeCategory? @relation(fields: [categoryId], references: [id])
+  yieldQty       Decimal         @db.Decimal(14, 4)
+  yieldUnit      Unit
+  /// Si al autorizarse va a ser un platillo que se vende (y no una subreceta).
+  isMenuItem     Boolean         @default(true)
+  /// El precio al que se piensa vender. Es la mitad del ejercicio: sin el no hay margen que ver.
+  sellingPrice   Decimal?        @db.Decimal(12, 2)
+  /// Para que nace la propuesta y como se preparo. Lo que se presenta junto al numero.
+  notes          String?
+  /// La receta que se creo al autorizarlo. El borrador no se borra al transferirse: queda como
+  /// el costeo con el que se tomo la decision, que es justo lo que despues nadie encuentra.
+  recipeId       String?
+  recipe         Recipe?         @relation("CosteadorTransferida", fields: [recipeId], references: [id], onDelete: SetNull)
+  transferredAt  DateTime?
+
+  createdByUserId String?
+  createdBy       User?     @relation("CosteadorCreatedBy", fields: [createdByUserId], references: [id])
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items CosteadorItem[]
+
+  @@index([organizationId])
+  @@index([sucursalId])
+  @@map("costeador")
+}
+
+/// Un ingrediente de una propuesta. Misma forma que RecipeItem para que transferir sea copiar.
+model CosteadorItem {
+  id          String    @id @default(cuid())
+  costeadorId String
+  costeador   Costeador @relation(fields: [costeadorId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id])
+  subRecipeId String?
+  subRecipe   Recipe?   @relation("CosteadorItemSubRecipe", fields: [subRecipeId], references: [id])
+  quantity    Decimal   @db.Decimal(14, 4)
+  unit        Unit
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([costeadorId])
+  @@index([productId])
+  @@index([subRecipeId])
+  @@map("costeador_items")
 }
