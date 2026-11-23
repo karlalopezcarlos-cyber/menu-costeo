@@ -56,10 +56,17 @@ export default function SearchableSelect({
         }}
         placeholder={placeholder}
         autoComplete="off"
+        // El campo vive en una columna angosta, asi que un nombre largo se corta aunque la
+        // lista ya no lo corte. El title lo deja leer completo con pasar el raton encima.
+        title={selected?.label}
         className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
       />
       {open && (
-        <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-md border border-neutral-200 bg-white shadow-lg">
+        /* La lista NO hereda el ancho del campo: crece hasta donde la obligue el nombre mas
+           largo, con un tope para no taparle media pantalla a nadie. Antes era w-full y en las
+           columnas angostas -mermas, requisiciones- los productos salian como "ACEITE DE
+           CANOL...", que es justo donde se distinguen entre si. */
+        <div className="absolute z-30 mt-1 max-h-60 w-max min-w-full max-w-[min(34rem,calc(100vw-2rem))] overflow-auto rounded-md border border-neutral-200 bg-white shadow-lg">
           {filtered.length === 0 ? (
             <p className="px-3 py-2 text-sm text-neutral-400">Sin resultados</p>
           ) : (
@@ -72,7 +79,8 @@ export default function SearchableSelect({
                   setQuery("");
                   setOpen(false);
                 }}
-                className={`block w-full overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-neutral-50 ${
+                title={o.label}
+                className={`block w-full whitespace-normal break-words px-3 py-2 text-left text-sm leading-snug hover:bg-neutral-50 ${
                   o.id === value ? "bg-neutral-100 font-medium" : ""
                 }`}
               >

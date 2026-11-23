@@ -45,7 +45,9 @@ type Row = {
   costBasis: CostBasis;
 };
 
-const GRID_COLS = "grid-cols-[1.5rem_6.5rem_minmax(0,2fr)_6rem_6rem_minmax(0,1.8fr)_minmax(0,1.9fr)_1.5rem]";
+// La columna del producto se lleva el espacio que sobra: es la unica que trae nombres largos.
+// El costo de la merma es un monto corto y no necesitaba casi dos fracciones.
+const GRID_COLS = "grid-cols-[1.5rem_6.5rem_minmax(0,3.2fr)_5.5rem_6rem_minmax(0,1.6fr)_8rem_1.5rem]";
 
 function emptyRow(key: string): Row {
   return {
