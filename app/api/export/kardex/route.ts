@@ -17,28 +17,33 @@ export async function GET(request: Request) {
 
   const rows = filterKardexRows(
     await loadKardexRows(user.organizationId, user.sucursalId, {
-      productId: filters.productId || undefined,
+      articuloId: filters.articuloId || undefined,
       dateFrom,
       dateTo,
     }),
     filters,
   );
 
-  // El saldo corrido solo tiene sentido con un producto a la vez.
+  // El saldo corrido solo tiene sentido con un articulo a la vez.
   let openingQty: number | null = null;
   let openingLabel: string | null = null;
   let productName: string | null = null;
-  if (filters.productId) {
-    const [opening, product] = await Promise.all([
-      computeKardexOpening(user.organizationId, user.sucursalId, filters.productId, dateFrom),
+  if (filters.articuloId) {
+    // El id puede ser de un producto o de una subreceta; se busca en los dos lados.
+    const [opening, product, subreceta] = await Promise.all([
+      computeKardexOpening(user.organizationId, user.sucursalId, filters.articuloId, dateFrom),
       prisma.product.findFirst({
-        where: { id: filters.productId, organizationId: user.organizationId },
+        where: { id: filters.articuloId, organizationId: user.organizationId },
+        select: { name: true },
+      }),
+      prisma.recipe.findFirst({
+        where: { id: filters.articuloId, sucursalId: user.sucursalId },
         select: { name: true },
       }),
     ]);
     openingQty = opening.qty;
     openingLabel = opening.basisLabel;
-    productName = product?.name ?? null;
+    productName = product?.name ?? subreceta?.name ?? null;
   }
 
   const buffer = await buildKardexWorkbook(rows, { openingQty, openingLabel, productName });

@@ -49,7 +49,7 @@ function valorDe(
     case "hora":
       return row.createdAtValue;
     case "producto":
-      return row.productName;
+      return row.articuloNombre;
     case "movimiento":
       return row.typeLabel;
     case "folio":
@@ -72,6 +72,7 @@ export default function KardexTable({
   totals,
   filters,
   products,
+  subrecetas,
   users,
   opening,
   productName,
@@ -84,6 +85,7 @@ export default function KardexTable({
   totals: KardexTotals;
   filters: KardexFilters;
   products: { id: string; name: string }[];
+  subrecetas: { id: string; name: string }[];
   users: string[];
   opening: { qty: number; basisLabel: string } | null;
   productName: string | null;
@@ -97,7 +99,7 @@ export default function KardexTable({
 
   const [searchInput, setSearchInput] = useState(filters.search);
   const [folioInput, setFolioInput] = useState(filters.folio);
-  const [productId, setProductId] = useState(filters.productId);
+  const [articuloId, setArticuloId] = useState(filters.articuloId);
   const [userFilter, setUserFilter] = useState(filters.user);
   const [typeFilter, setTypeFilter] = useState(filters.type);
   const [dateFrom, setDateFrom] = useState(isDefaultMonth ? defaultFrom : filters.dateFrom);
@@ -107,7 +109,7 @@ export default function KardexTable({
 
   function buildParams(next: Partial<KardexFilters>): URLSearchParams {
     const merged: KardexFilters = {
-      productId: next.productId ?? productId,
+      articuloId: next.articuloId ?? articuloId,
       search: next.search ?? searchInput,
       folio: next.folio ?? folioInput,
       user: next.user ?? userFilter,
@@ -116,7 +118,7 @@ export default function KardexTable({
       dateTo: next.dateTo ?? dateTo,
     };
     const params = new URLSearchParams();
-    if (merged.productId) params.set("product", merged.productId);
+    if (merged.articuloId) params.set("articulo", merged.articuloId);
     if (merged.search.trim()) params.set("q", merged.search.trim());
     if (merged.folio.trim()) params.set("folio", merged.folio.trim());
     if (merged.user) params.set("user", merged.user);
@@ -236,23 +238,34 @@ export default function KardexTable({
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <label htmlFor="kardexProduct" className="text-xs font-medium text-neutral-500">
-            Producto
+            Articulo
           </label>
           <select
             id="kardexProduct"
-            value={productId}
+            value={articuloId}
             onChange={(e) => {
-              setProductId(e.target.value);
-              navigate({ productId: e.target.value });
+              setArticuloId(e.target.value);
+              navigate({ articuloId: e.target.value });
             }}
             className="w-64 rounded-md border border-neutral-200 px-3 py-2 text-sm"
           >
-            <option value="">Todos los productos</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
+            <option value="">Todo</option>
+            <optgroup label="Productos">
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </optgroup>
+            {subrecetas.length > 0 && (
+              <optgroup label="Subrecetas">
+                {subrecetas.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
         <input
@@ -449,7 +462,12 @@ export default function KardexTable({
                   <td className="px-3 py-2 text-neutral-400">{row.timeLabel}</td>
                   {!conSaldo && (
                     <td className="px-3 py-2 font-medium text-neutral-900">
-                      {row.productName}
+                      {row.articuloNombre}
+                      {row.articuloTipo === "subreceta" && (
+                        <span className="ml-1.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                          subreceta
+                        </span>
+                      )}
                       <span className="ml-1 text-xs text-neutral-400">{row.unitLabel}</span>
                     </td>
                   )}

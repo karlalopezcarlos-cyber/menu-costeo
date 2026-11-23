@@ -4,7 +4,8 @@ import type { KardexFilters } from "@/lib/kardex-types";
 export function readKardexFilters(get: (key: string) => string | null | undefined): KardexFilters {
   const value = (key: string) => (get(key) ?? "").toString();
   return {
-    productId: value("product"),
+    // "product" se sigue leyendo porque los enlaces viejos lo traen.
+    articuloId: value("articulo") || value("product"),
     search: value("q"),
     folio: value("folio"),
     user: value("user"),
@@ -16,7 +17,7 @@ export function readKardexFilters(get: (key: string) => string | null | undefine
 
 export function hasAnyKardexFilter(filters: KardexFilters): boolean {
   return Boolean(
-    filters.productId ||
+    filters.articuloId ||
       filters.search.trim() ||
       filters.folio.trim() ||
       filters.user ||

@@ -10,6 +10,7 @@ export type KardexType =
   | "requisicion_entrada"
   | "transformacion_entrada"
   | "transformacion_salida"
+  | "produccion_entrada"
   | "produccion_salida"
   | "venta"
   | "merma"
@@ -22,6 +23,7 @@ export const KARDEX_TYPE_LABELS: Record<KardexType, string> = {
   requisicion_entrada: "Requisicion (entrada)",
   transformacion_entrada: "Transformacion (entrada)",
   transformacion_salida: "Transformacion (consumo)",
+  produccion_entrada: "Produccion (entrada)",
   produccion_salida: "Produccion (consumo)",
   venta: "Venta",
   merma: "Merma",
@@ -29,6 +31,15 @@ export const KARDEX_TYPE_LABELS: Record<KardexType, string> = {
   pruebas: "Pruebas",
   requisicion_salida: "Requisicion (salida)",
 };
+
+/**
+ * Lo que se mueve: un producto del catalogo o una subreceta.
+ *
+ * Las subrecetas tienen inventario propio -se producen, se traspasan, se cuentan y se merman-
+ * asi que tienen que estar aqui. Antes el kardex era solo de productos y una salsa que se
+ * mandaba a otra sucursal no dejaba rastro en ningun lado.
+ */
+export type ArticuloTipo = "producto" | "subreceta";
 
 export type KardexRow = {
   id: string;
@@ -38,8 +49,10 @@ export type KardexRow = {
   /** Cuando se capturo, en la hora del negocio. Vacio en los movimientos sin sello de tiempo. */
   timeLabel: string;
   createdAtValue: number;
-  productId: string;
-  productName: string;
+  /** Id del producto o de la subreceta, segun articuloTipo. */
+  articuloId: string;
+  articuloTipo: ArticuloTipo;
+  articuloNombre: string;
   unitLabel: string;
   type: KardexType;
   typeLabel: string;
@@ -53,7 +66,8 @@ export type KardexRow = {
 };
 
 export type KardexFilters = {
-  productId: string;
+  /** Un producto o una subreceta; el tipo se resuelve al consultar. */
+  articuloId: string;
   search: string;
   folio: string;
   /** Nombre del usuario tal como se muestra; el filtro es exacto. */
@@ -71,8 +85,9 @@ export type KardexTotals = {
 
 /** Un renglon del inventario al corte: cuanto deberia haber hoy de un producto, y cuanto vale. */
 export type CorteRow = {
-  productId: string;
-  productName: string;
+  articuloId: string;
+  articuloTipo: ArticuloTipo;
+  articuloNombre: string;
   unitLabel: string;
   /** Lo que decia el ultimo conteo fisico. 0 si el producto no venia en ese conteo. */
   base: number;

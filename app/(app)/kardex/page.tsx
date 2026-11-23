@@ -82,14 +82,21 @@ export default async function KardexPage({
     );
   }
 
-  const [allRows, products, usuarios] = await Promise.all([
+  const [allRows, products, subrecetas, usuarios] = await Promise.all([
     loadKardexRows(user.organizationId, user.sucursalId, {
-      productId: filters.productId || undefined,
+      articuloId: filters.articuloId || undefined,
       dateFrom,
       dateTo,
     }),
     prisma.product.findMany({
       where: { organizationId: user.organizationId, archivedAt: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    // Las subrecetas llevan inventario propio, asi que tambien se pueden seguir una por una.
+    // Los PLU no: un platillo de menu no se almacena, se arma al servirlo.
+    prisma.recipe.findMany({
+      where: { sucursalId: user.sucursalId, archivedAt: null, isMenuItem: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -105,11 +112,13 @@ export default async function KardexPage({
   const rows = filtered.slice(0, ROW_LIMIT);
 
   // El saldo inicial y el corrido solo tienen sentido con un producto a la vez.
-  const opening = filters.productId
-    ? await computeKardexOpening(user.organizationId, user.sucursalId, filters.productId, dateFrom)
+  const opening = filters.articuloId
+    ? await computeKardexOpening(user.organizationId, user.sucursalId, filters.articuloId, dateFrom)
     : null;
-  const productName = filters.productId
-    ? (products.find((p) => p.id === filters.productId)?.name ?? null)
+  const productName = filters.articuloId
+    ? (products.find((p) => p.id === filters.articuloId)?.name ??
+      subrecetas.find((r) => r.id === filters.articuloId)?.name ??
+      null)
     : null;
 
   const userNames = [
@@ -130,6 +139,7 @@ export default async function KardexPage({
         totals={totals}
         filters={filters}
         products={products}
+        subrecetas={subrecetas}
         users={userNames}
         opening={opening}
         productName={productName}

@@ -4,12 +4,14 @@ import { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/format";
 import type { CorteRow } from "@/lib/kardex-types";
 
-type Campo = "producto" | "base" | "movimientos" | "saldo" | "costo" | "valor";
+type Campo = "articulo" | "tipo" | "base" | "movimientos" | "saldo" | "costo" | "valor";
 
 function valorDe(row: CorteRow, campo: Campo): string | number {
   switch (campo) {
-    case "producto":
-      return row.productName;
+    case "articulo":
+      return row.articuloNombre;
+    case "tipo":
+      return row.articuloTipo;
     case "base":
       return row.base;
     case "movimientos":
@@ -44,14 +46,14 @@ export default function InventarioAlCorteTable({
 
   function ordenarPor(campo: Campo) {
     setOrden((previo) =>
-      previo.campo === campo ? { campo, asc: !previo.asc } : { campo, asc: campo === "producto" },
+      previo.campo === campo ? { campo, asc: !previo.asc } : { campo, asc: campo === "articulo" || campo === "tipo" },
     );
   }
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     const filtradas = rows.filter((row) => {
-      if (q && !row.productName.toLowerCase().includes(q)) return false;
+      if (q && !row.articuloNombre.toLowerCase().includes(q)) return false;
       if (soloConSaldo && row.saldo === 0) return false;
       return true;
     });
@@ -113,7 +115,7 @@ export default function InventarioAlCorteTable({
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-            Productos
+            Articulos
           </p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-neutral-900">
             {visibles.length}
@@ -151,7 +153,7 @@ export default function InventarioAlCorteTable({
         </p>
         {enNegativo > 0 && (
           <p className="mt-1">
-            Hay {enNegativo} {enNegativo === 1 ? "producto" : "productos"} en negativo: se
+            Hay {enNegativo} {enNegativo === 1 ? "articulo" : "articulos"} en negativo: se
             descargo mas de lo que entro, casi siempre porque falta capturar una compra o porque
             la receta descuenta de mas.
           </p>
@@ -163,7 +165,7 @@ export default function InventarioAlCorteTable({
           type="text"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar producto..."
+          placeholder="Buscar articulo..."
           className="w-[16rem] rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <label className="flex items-center gap-2 text-sm text-neutral-600">
@@ -176,7 +178,7 @@ export default function InventarioAlCorteTable({
           Esconder los que quedan en cero
         </label>
         <p className="ml-auto text-sm text-neutral-500">
-          {visibles.length} de {rows.length} productos
+          {visibles.length} de {rows.length} articulos
         </p>
       </div>
 
@@ -186,7 +188,8 @@ export default function InventarioAlCorteTable({
         <table className="w-full text-sm">
           <thead className="text-left text-neutral-500">
             <tr>
-              <Th campo="producto">Producto</Th>
+              <Th campo="articulo">Articulo</Th>
+              <Th campo="tipo">Tipo</Th>
               <th className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-50 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                 Unidad
               </th>
@@ -210,19 +213,28 @@ export default function InventarioAlCorteTable({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-neutral-400">
                   {rows.length === 0
                     ? "No hay movimientos ni conteos hasta esa fecha."
-                    : "Ningun producto coincide con la busqueda."}
+                    : "Ningun articulo coincide con la busqueda."}
                 </td>
               </tr>
             )}
             {visibles.map((row) => (
               <tr
-                key={row.productId}
+                key={`${row.articuloTipo}:${row.articuloId}`}
                 className="border-t border-neutral-100 transition-colors hover:bg-neutral-50"
               >
-                <td className="px-3 py-2.5">{row.productName}</td>
+                <td className="px-3 py-2.5">{row.articuloNombre}</td>
+                <td className="px-3 py-2.5">
+                  {row.articuloTipo === "subreceta" ? (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                      Subreceta
+                    </span>
+                  ) : (
+                    <span className="text-xs text-neutral-400">Producto</span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5 text-neutral-400">{row.unitLabel}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-neutral-500">
                   {cantidad(row.base)}
@@ -258,7 +270,7 @@ export default function InventarioAlCorteTable({
           {visibles.length > 0 && (
             <tfoot className="sticky bottom-0 border-t border-neutral-200 bg-neutral-50 font-medium">
               <tr>
-                <td colSpan={6} className="px-3 py-3 text-right text-neutral-500">
+                <td colSpan={7} className="px-3 py-3 text-right text-neutral-500">
                   Total
                 </td>
                 <td className="px-3 py-3 text-right tabular-nums">{formatMoney(totalValor)}</td>

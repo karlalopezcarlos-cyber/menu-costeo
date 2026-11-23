@@ -22,7 +22,8 @@ export async function buildInventarioCorteWorkbook(
   sheet.getRow(2).font = { italic: true, color: { argb: "FF6B6B6B" } };
 
   const encabezados = sheet.addRow([
-    "Producto",
+    "Articulo",
+    "Tipo",
     "Unidad",
     "Ultimo conteo",
     "Movimientos",
@@ -39,6 +40,7 @@ export async function buildInventarioCorteWorkbook(
 
   sheet.columns = [
     { key: "product", width: 36 },
+    { key: "kind", width: 11 },
     { key: "unit", width: 9 },
     { key: "base", width: 14 },
     { key: "movimientos", width: 14 },
@@ -49,9 +51,22 @@ export async function buildInventarioCorteWorkbook(
     { key: "diferencia", width: 14 },
   ];
 
+  // Las letras se sacan de las claves, no se escriben a mano: agregar una columna en medio
+  // corre todas las de la derecha, y una formula con la letra vieja apunta en silencio a otra
+  // columna. Ya paso al meter "Tipo".
+  const letra = (key: string) => {
+    const i = sheet.columns.findIndex((c) => c.key === key);
+    if (i < 0) throw new Error(`Columna ${key} no definida`);
+    return String.fromCharCode(65 + i);
+  };
+  const colSaldo = letra("saldo");
+  const colValor = letra("valor");
+  const colFisico = letra("fisico");
+
   for (const row of rows) {
     const añadida = sheet.addRow({
-      product: row.productName,
+      product: row.articuloNombre,
+      kind: row.articuloTipo === "subreceta" ? "Subreceta" : "Producto",
       unit: row.unitLabel,
       base: row.base,
       movimientos: row.movimientos,
@@ -62,7 +77,7 @@ export async function buildInventarioCorteWorkbook(
     // La diferencia se calcula en la hoja: asi quien sale a contar escribe el fisico y la
     // columna se llena sola, sin volver a la app.
     añadida.getCell("diferencia").value = {
-      formula: `IF(H${añadida.number}="","",H${añadida.number}-E${añadida.number})`,
+      formula: `IF(${colFisico}${añadida.number}="","",${colFisico}${añadida.number}-${colSaldo}${añadida.number})`,
     };
   }
 
@@ -71,13 +86,15 @@ export async function buildInventarioCorteWorkbook(
   const total = sheet.addRow({ product: "Total" });
   total.font = { bold: true };
   if (ultima >= primera) {
-    total.getCell("valor").value = { formula: `SUM(G${primera}:G${ultima})` };
+    total.getCell("valor").value = {
+      formula: `SUM(${colValor}${primera}:${colValor}${ultima})`,
+    };
   }
 
   sheet.views = [{ state: "frozen", ySplit: filaEncabezado }];
   sheet.autoFilter = {
     from: { row: filaEncabezado, column: 1 },
-    to: { row: ultima, column: 9 },
+    to: { row: ultima, column: sheet.columns.length },
   };
 
   const buffer = await workbook.xlsx.writeBuffer();

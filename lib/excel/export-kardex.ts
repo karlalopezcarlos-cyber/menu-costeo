@@ -18,7 +18,8 @@ export async function buildKardexWorkbook(
   sheet.columns = [
     { header: "Fecha", key: "date", width: 12 },
     { header: "Hora de captura", key: "time", width: 16 },
-    { header: "Producto", key: "product", width: 34 },
+    { header: "Articulo", key: "product", width: 34 },
+    { header: "Tipo", key: "kind", width: 11 },
     { header: "Unidad", key: "unit", width: 9 },
     { header: "Movimiento", key: "type", width: 24 },
     { header: "Folio", key: "reference", width: 16 },
@@ -51,7 +52,8 @@ export async function buildKardexWorkbook(
     sheet.addRow({
       date: row.dateLabel,
       time: row.timeLabel,
-      product: row.productName,
+      product: row.articuloNombre,
+      kind: row.articuloTipo === "subreceta" ? "Subreceta" : "Producto",
       unit: row.unitLabel,
       type: row.typeLabel,
       reference: row.reference,
