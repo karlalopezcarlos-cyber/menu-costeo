@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import SearchableSelect from "../_components/SearchableSelect";
 import {
   KARDEX_TYPE_LABELS,
   type KardexFilters,
@@ -106,6 +107,17 @@ export default function KardexTable({
   const [dateTo, setDateTo] = useState(isDefaultMonth ? defaultTo : filters.dateTo);
   // El orden es nada mas de pantalla: no viaja a la URL ni vuelve a consultar.
   const [orden, setOrden] = useState<{ campo: Campo; asc: boolean }>({ campo: "fecha", asc: true });
+
+  // El buscador no tiene grupos, asi que la subreceta se distingue en el propio texto. Ademas
+  // lo vuelve buscable: escribir "subreceta" las trae todas.
+  const opcionesDeArticulo = useMemo(
+    () => [
+      { id: "", label: "Todos los articulos" },
+      ...products.map((p) => ({ id: p.id, label: p.name })),
+      ...subrecetas.map((r) => ({ id: r.id, label: `${r.name} · subreceta` })),
+    ],
+    [products, subrecetas],
+  );
 
   function buildParams(next: Partial<KardexFilters>): URLSearchParams {
     const merged: KardexFilters = {
@@ -236,43 +248,27 @@ export default function KardexTable({
       )}
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <label htmlFor="kardexProduct" className="text-xs font-medium text-neutral-500">
-            Articulo
-          </label>
-          <select
-            id="kardexProduct"
+        <div className="w-64 space-y-1">
+          <label className="text-xs font-medium text-neutral-500">Articulo</label>
+          {/* Un select nativo con mil productos se abre como una lista enorme encima de la
+              pagina y sin forma de buscar: hay que bajarla a mano hasta encontrar el nombre.
+              Este es el mismo buscador que usan Compras, Mermas y Recetas. */}
+          <SearchableSelect
+            name="kardexArticulo"
+            options={opcionesDeArticulo}
             value={articuloId}
-            onChange={(e) => {
-              setArticuloId(e.target.value);
-              navigate({ articuloId: e.target.value });
+            onChange={(id) => {
+              setArticuloId(id);
+              navigate({ articuloId: id });
             }}
-            className="w-64 rounded-md border border-neutral-200 px-3 py-2 text-sm"
-          >
-            <option value="">Todo</option>
-            <optgroup label="Productos">
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </optgroup>
-            {subrecetas.length > 0 && (
-              <optgroup label="Subrecetas">
-                {subrecetas.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+            placeholder="Todos los articulos"
+          />
         </div>
         <input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Buscar producto, detalle o usuario..."
+          placeholder="Buscar articulo, detalle o usuario..."
           className="w-full max-w-xs rounded-md border border-neutral-200 px-3 py-2 text-sm"
         />
         <input
