@@ -21,6 +21,8 @@ type SortKey =
   | "initial"
   | "purchases"
   | "produced"
+  | "requisicionesIn"
+  | "requisicionesOut"
   | "waste"
   | "productionConsumed"
   | "sales"
@@ -39,9 +41,11 @@ const NUMERIC_KEYS = new Set<SortKey>([
   "initial",
   "purchases",
   "produced",
+  "requisicionesIn",
   "transformedIn",
   "waste",
   "productionConsumed",
+  "requisicionesOut",
   "transformedOut",
   "sales",
   "theoretical",
@@ -61,24 +65,26 @@ const NUMERIC_KEYS = new Set<SortKey>([
  * casi siempre traen un guion.
  */
 const COLUMNS: { key: SortKey; label: string; width: number; hint?: string }[] = [
-  { key: "category", label: "Categoria", width: 6 },
+  { key: "category", label: "Categoria", width: 5 },
   { key: "name", label: "Nombre", width: 10 },
-  { key: "unit", label: "Unidad", width: 4 },
+  { key: "unit", label: "Unidad", width: 3 },
   { key: "initial", label: "Inicial", width: 4, hint: "Lo que habia en el conteo inicial" },
   { key: "purchases", label: "+ Compras", width: 5, hint: "Lo que entro por compras en el periodo" },
-  { key: "produced", label: "+ Produccion", width: 5, hint: "Lo que se produjo de esta subreceta" },
-  { key: "transformedIn", label: "+ Transform.", width: 5, hint: "Lo que entro por salir de una transformacion" },
-  { key: "waste", label: "- Mermas", width: 5, hint: "Mermas, salidas a servicio y pruebas" },
-  { key: "productionConsumed", label: "- Produccion", width: 5, hint: "Lo que se consumio al producir otras subrecetas" },
-  { key: "transformedOut", label: "- Transform.", width: 5, hint: "Lo que se consumio al entrar a una transformacion" },
+  { key: "produced", label: "+ Produccion", width: 4, hint: "Lo que se produjo de esta subreceta" },
+  { key: "requisicionesIn", label: "+ Requis.", width: 4, hint: "Lo que llego por requisicion de otra sucursal" },
+  { key: "transformedIn", label: "+ Transform.", width: 4, hint: "Lo que entro por salir de una transformacion" },
+  { key: "waste", label: "- Mermas", width: 4, hint: "Mermas, salidas a servicio y pruebas" },
+  { key: "productionConsumed", label: "- Produccion", width: 4, hint: "Lo que se consumio al producir otras subrecetas" },
+  { key: "requisicionesOut", label: "- Requis.", width: 4, hint: "Lo que se mando por requisicion a otra sucursal" },
+  { key: "transformedOut", label: "- Transform.", width: 4, hint: "Lo que se consumio al entrar a una transformacion" },
   { key: "sales", label: "- Ventas", width: 4, hint: "Lo que consumieron los platillos vendidos" },
-  { key: "theoretical", label: "= Teorico", width: 5, hint: "Lo que deberia haber: inicial + entradas - salidas" },
+  { key: "theoretical", label: "= Teorico", width: 6, hint: "Lo que deberia haber: inicial + entradas - salidas" },
   { key: "actual", label: "Real", width: 4, hint: "Lo que se conto en el inventario final" },
-  { key: "variance", label: "Variacion", width: 5, hint: "Lo real menos lo teorico" },
+  { key: "variance", label: "Variacion", width: 4, hint: "Lo real menos lo teorico" },
   { key: "previousVarianceQty", label: "Var. ant.", width: 4, hint: "Variacion del periodo anterior, contra el conteo previo a este" },
-  { key: "varianceAmount", label: "Var. $", width: 6, hint: "La variacion valuada a su costo unitario" },
-  { key: "variancePct", label: "Var. %", width: 5, hint: "La variacion contra lo teorico, en porcentaje" },
-  { key: "comment", label: "Comentario", width: 13 },
+  { key: "varianceAmount", label: "Var. $", width: 5, hint: "La variacion valuada a su costo unitario" },
+  { key: "variancePct", label: "Var. %", width: 4, hint: "La variacion contra lo teorico, en porcentaje" },
+  { key: "comment", label: "Comentario", width: 14 },
 ];
 
 function fmt(n: number): string {
@@ -153,6 +159,10 @@ export default function AuditTable({
         return row.purchasesQty;
       case "produced":
         return row.producedQty;
+      case "requisicionesIn":
+        return row.requisicionesInQty;
+      case "requisicionesOut":
+        return row.requisicionesOutQty;
       case "transformedIn":
         return row.transformedInQty;
       case "transformedOut":
@@ -421,6 +431,11 @@ export default function AuditTable({
                     : "-"}
                 </td>
                 <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-emerald-700">
+                  {row.requisicionesInQty !== 0
+                    ? `+${fmt(row.requisicionesInQty)}`
+                    : "-"}
+                </td>
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-emerald-700">
                   {row.transformedInQty !== 0
                     ? `+${fmt(row.transformedInQty)}`
                     : "-"}
@@ -431,6 +446,11 @@ export default function AuditTable({
                 <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
                   {row.productionConsumedQty !== 0
                     ? `-${fmt(row.productionConsumedQty)}`
+                    : "-"}
+                </td>
+                <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">
+                  {row.requisicionesOutQty !== 0
+                    ? `-${fmt(row.requisicionesOutQty)}`
                     : "-"}
                 </td>
                 <td className="px-2 py-2 wrap-anywhere text-right tabular-nums text-red-600">

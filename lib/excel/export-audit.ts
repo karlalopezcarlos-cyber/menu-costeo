@@ -32,9 +32,11 @@ export async function buildAuditWorkbook(
     { header: "Inicial", key: "initial", width: 12 },
     { header: "+ Compras", key: "purchases", width: 12 },
     { header: "+ Produccion", key: "produced", width: 13 },
+    { header: "+ Requisiciones", key: "requisicionesIn", width: 15 },
     { header: "+ Transformacion", key: "transformedIn", width: 15 },
     { header: "- Mermas", key: "waste", width: 11 },
     { header: "- Produccion", key: "productionConsumed", width: 13 },
+    { header: "- Requisiciones", key: "requisicionesOut", width: 15 },
     { header: "- Transformacion", key: "transformedOut", width: 15 },
     { header: "- Ventas", key: "sales", width: 11 },
     { header: "= Teorico", key: "theoretical", width: 12 },
@@ -51,7 +53,9 @@ export async function buildAuditWorkbook(
 
   for (const row of rows) {
     // Las salidas se guardan en negativo para que la fila se pueda sumar de corrido:
-    // inicial + compras + produccion - mermas - produccion consumida - ventas = teorico.
+    // inicial + compras + produccion + requisiciones recibidas + transformacion que entra
+    // - mermas - produccion consumida - requisiciones enviadas - transformacion que sale
+    // - ventas = teorico.
     sheet.addRow({
       costGroup: row.costGroupName ?? "",
       category: row.categoryName ?? "",
@@ -62,9 +66,11 @@ export async function buildAuditWorkbook(
       initial: row.initialQty,
       purchases: row.purchasesQty || null,
       produced: row.producedQty || null,
+      requisicionesIn: row.requisicionesInQty || null,
       transformedIn: row.transformedInQty || null,
       waste: row.wasteQty ? -row.wasteQty : null,
       productionConsumed: row.productionConsumedQty ? -row.productionConsumedQty : null,
+      requisicionesOut: row.requisicionesOutQty ? -row.requisicionesOutQty : null,
       transformedOut: row.transformedOutQty ? -row.transformedOutQty : null,
       sales: row.salesQty ? -row.salesQty : null,
       theoretical: row.theoreticalFinalQty,
@@ -83,6 +89,8 @@ export async function buildAuditWorkbook(
     "initial",
     "purchases",
     "produced",
+    "requisicionesIn",
+    "requisicionesOut",
     "transformedIn",
     "waste",
     "transformedOut",
