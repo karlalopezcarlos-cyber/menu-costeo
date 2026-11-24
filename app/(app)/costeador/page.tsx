@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/format";
 import { UNIT_LABELS, type UnitValue } from "@/lib/units";
 import { COSTEADOR_INCLUDE, costearPropuesta, nombreDe } from "@/lib/costeador";
 import NuevaPropuestaForm from "./NuevaPropuestaForm";
+import BorrarPropuesta from "./BorrarPropuesta";
 
 export default async function CosteadorPage() {
   const user = await requireSucursalContext();
@@ -85,6 +86,7 @@ export default async function CosteadorPage() {
                 <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]">
                   Estado
                 </th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -148,6 +150,13 @@ export default async function CosteadorPage() {
                         Propuesta
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <BorrarPropuesta
+                      costeadorId={propuesta.id}
+                      nombre={propuesta.name}
+                      yaEsReceta={propuesta.recipe !== null}
+                    />
                   </td>
                 </tr>
               ))}
