@@ -61,9 +61,11 @@ export default function PurchasesTable({
   filteredTaxes,
   filteredCount,
   filters,
-  isDefaultToday,
-  today,
+  isDefaultMonth,
+  defaultFrom,
+  defaultTo,
   truncated,
+  rowLimit,
 }: {
   rows: PurchaseRow[];
   supplierOptions: string[];
@@ -74,9 +76,12 @@ export default function PurchasesTable({
   /** Cuantas compras hay en lo filtrado, tambien de la base. */
   filteredCount: number;
   filters: PurchaseListFilterValues;
-  isDefaultToday: boolean;
-  today: string;
+  /** Nadie ha tocado los filtros: lo que se ve es el periodo por omision, el mes en curso. */
+  isDefaultMonth: boolean;
+  defaultFrom: string;
+  defaultTo: string;
   truncated: boolean;
+  rowLimit: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -92,8 +97,8 @@ export default function PurchasesTable({
   // busquedas de compras viejas queden fuera de un limite arbitrario conforme crece el historial.
   const [searchInput, setSearchInput] = useState(filters.search);
   const [folioInput, setFolioInput] = useState(filters.folio);
-  const [dateFrom, setDateFrom] = useState(isDefaultToday ? today : filters.dateFrom);
-  const [dateTo, setDateTo] = useState(isDefaultToday ? today : filters.dateTo);
+  const [dateFrom, setDateFrom] = useState(isDefaultMonth ? defaultFrom : filters.dateFrom);
+  const [dateTo, setDateTo] = useState(isDefaultMonth ? defaultTo : filters.dateTo);
   const [pendingOnly, setPendingOnly] = useState(filters.pendingOnly);
   const [supplierFilter, setSupplierFilter] = useState(filters.supplier);
   const [categoryFilter, setCategoryFilter] = useState(filters.category);
@@ -260,8 +265,8 @@ export default function PurchasesTable({
     <div className="space-y-3">
       {truncated && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
-          Se muestran los primeros 500 resultados. Agrega mas filtros (fecha, folio, producto) para acotar la
-          busqueda.
+          Se muestran los primeros {rowLimit} resultados. Agrega mas filtros (fecha, folio,
+          producto) para acotar la busqueda.
         </p>
       )}
       <div className="flex flex-wrap items-end gap-3">
@@ -533,8 +538,8 @@ export default function PurchasesTable({
             {sortedRows.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
-                  {isDefaultToday
-                    ? "No se registraron compras hoy."
+                  {isDefaultMonth
+                    ? "No hay compras registradas en lo que va del mes."
                     : "Ninguna compra coincide con los filtros."}
                 </td>
               </tr>

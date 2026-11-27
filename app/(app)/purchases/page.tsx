@@ -13,8 +13,9 @@ import {
 } from "@/lib/purchases/invoices";
 
 // Tope de seguridad para no traer un historial completo de anios a la pantalla de un jalon:
-// si una busqueda sin acotar por fecha regresa mas de esto, se avisa para que se agregue un filtro.
-const ROW_LIMIT = 500;
+// si una busqueda sin acotar por fecha regresa mas de esto, se avisa para que se agregue un
+// filtro. Da para un mes completo de la sucursal que mas compra, que es la vista por omision.
+const ROW_LIMIT = 1000;
 
 function readParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -41,12 +42,17 @@ export default async function PurchasesPage({
   };
   const touched = readParam(raw.touched) === "1";
 
-  // Sin ningun filtro y sin que el usuario haya tocado nada todavia: se acota a las compras de
-  // hoy para no cargar el historial completo. En cuanto se usa cualquier filtro, se respeta tal
-  // cual (busqueda/folio sin fecha buscan en todo el historial, no solo en el dia).
-  const isDefaultToday = !touched && !hasAnyPurchaseFilter(filters);
+  // Sin ningun filtro y sin que el usuario haya tocado nada todavia: el mes en curso, el mismo
+  // periodo que la pestana de facturas. Antes era solo el dia de hoy, y una factura casi nunca
+  // tiene la fecha de hoy: se subia el XML del lunes, se guardaba bien, y el martes la lista
+  // salia vacia como si la compra no existiera. En cuanto se usa cualquier filtro se respeta
+  // tal cual (busqueda/folio sin fecha buscan en todo el historial, no solo en el mes).
+  const isDefaultMonth = !touched && !hasAnyPurchaseFilter(filters);
+  const monthStart = monthStartDateInputValue();
   const today = todayDateInputValue();
-  const effectiveFilters = isDefaultToday ? { ...filters, dateFrom: today, dateTo: today } : filters;
+  const effectiveFilters = isDefaultMonth
+    ? { ...filters, dateFrom: monthStart, dateTo: today }
+    : filters;
 
   const suppliersForFilter = await prisma.supplier.findMany({
     where: { organizationId: user.organizationId },
@@ -56,8 +62,8 @@ export default async function PurchasesPage({
   const supplierOptions = suppliersForFilter.map((s) => s.name);
 
   // El catalogo completo, no solo las categorias que aparecen en lo que ya se trajo: si las
-  // opciones se recortaran a lo visible, con el filtro de "hoy" puesto el selector saldria casi
-  // vacio y no se podria elegir una categoria que no se compro hoy.
+  // opciones se recortaran a lo visible, con el periodo por omision puesto el selector saldria
+  // casi vacio y no se podria elegir una categoria que no se compro en ese periodo.
   const categoriesForFilter = await prisma.productCategory.findMany({
     where: { organizationId: user.organizationId },
     orderBy: { name: "asc" },
@@ -77,11 +83,9 @@ export default async function PurchasesPage({
       dateTo: filters.dateTo,
       supplier: filters.supplier,
     };
-    const isDefaultMonth = !touched && !hasAnyInvoiceFilter(invoiceFilters);
-    const monthStart = monthStartDateInputValue();
-    const hoy = todayDateInputValue();
-    const effectiveInvoiceFilters = isDefaultMonth
-      ? { ...invoiceFilters, dateFrom: monthStart, dateTo: hoy }
+    const isDefaultInvoiceMonth = !touched && !hasAnyInvoiceFilter(invoiceFilters);
+    const effectiveInvoiceFilters = isDefaultInvoiceMonth
+      ? { ...invoiceFilters, dateFrom: monthStart, dateTo: today }
       : invoiceFilters;
 
     const summary = await loadPurchaseInvoices(
@@ -100,9 +104,9 @@ export default async function PurchasesPage({
           taxes={summary.taxes}
           supplierOptions={supplierOptions}
           filters={invoiceFilters}
-          isDefaultMonth={isDefaultMonth}
+          isDefaultMonth={isDefaultInvoiceMonth}
           defaultFrom={monthStart}
-          defaultTo={hoy}
+          defaultTo={today}
         />
       </PurchasesShell>
     );
@@ -158,9 +162,11 @@ export default async function PurchasesPage({
         filteredTaxes={filteredTaxes}
         filteredCount={filteredCount}
         filters={filters}
-        isDefaultToday={isDefaultToday}
-        today={today}
+        isDefaultMonth={isDefaultMonth}
+        defaultFrom={monthStart}
+        defaultTo={today}
         truncated={rows.length === ROW_LIMIT}
+        rowLimit={ROW_LIMIT}
       />
     </PurchasesShell>
   );
