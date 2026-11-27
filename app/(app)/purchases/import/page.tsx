@@ -1,39 +1,12 @@
 import Link from "next/link";
 import { requireSucursalContext } from "@/lib/tenant";
-import { prisma } from "@/lib/prisma";
-import type { OpcionProducto } from "@/lib/compras/importar-tipos";
-import type { UnitValue } from "@/lib/units";
+import { cargarCatalogoDeCompras } from "@/lib/compras/catalogo";
 import SubirDocumento from "./SubirDocumento";
 
 export default async function ImportarCompraPage() {
   const user = await requireSucursalContext();
 
-  const [productos, proveedores] = await Promise.all([
-    prisma.product.findMany({
-      where: { organizationId: user.organizationId, archivedAt: null },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        baseUnit: true,
-        presentationUnitLabel: true,
-        presentationUnitQty: true,
-      },
-    }),
-    prisma.supplier.findMany({
-      where: { organizationId: user.organizationId, isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-  ]);
-
-  const opciones: OpcionProducto[] = productos.map((p) => ({
-    id: p.id,
-    name: p.name,
-    baseUnit: p.baseUnit as UnitValue,
-    presentationUnitLabel: p.presentationUnitLabel,
-    presentationUnitQty: p.presentationUnitQty ? p.presentationUnitQty.toString() : null,
-  }));
+  const { productos, proveedores } = await cargarCatalogoDeCompras(user.organizationId);
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -59,7 +32,7 @@ export default async function ImportarCompraPage() {
       </div>
 
       <SubirDocumento
-        productos={opciones}
+        productos={productos}
         proveedores={proveedores}
         iaDisponible={Boolean(process.env.ANTHROPIC_API_KEY)}
       />

@@ -1,10 +1,17 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Decimal from "decimal.js";
 import SearchableSelect from "@/app/(app)/_components/SearchableSelect";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
-import type { CompraResuelta, OpcionProducto, OpcionProveedor } from "@/lib/compras/importar-tipos";
+import { asociacionDeRenglon, convertirCaptura, esBulto } from "@/lib/compras/captura";
+import type {
+  CompraResuelta,
+  OpcionProducto,
+  OpcionProveedor,
+  UnidadCaptura,
+} from "@/lib/compras/importar-tipos";
 import { createPurchase } from "../actions";
 
 type Fila = {
@@ -13,12 +20,9 @@ type Fila = {
   cantidadDocumento: string;
   unidadDocumento: string;
   productId: string;
-  presentationQty: string;
-  presentationUnit: UnitValue | "";
-  /** La etiqueta que propuso el emparejado ("3 Botellas"). Se pierde al editar a mano. */
-  presentationLabel: string;
-  qtyPropuesta: string;
-  unitPropuesta: UnitValue | "";
+  /** Lo que se teclea. Son bultos o unidades segun `unidad`. */
+  cantidad: string;
+  unidad: UnidadCaptura;
   importe: string;
   ivaRate: string | null;
   iepsRate: string | null;
@@ -32,15 +36,21 @@ function numero(texto: string): number {
 
 const pesos = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const cifras = (d: Decimal) =>
+  d.toDecimalPlaces(4).toNumber().toLocaleString("es-MX", { maximumFractionDigits: 4 });
+
 export default function RevisarCompra({
   compra,
   productos,
   proveedores,
+  archivo,
   onDescartar,
 }: {
   compra: CompraResuelta;
   productos: OpcionProducto[];
   proveedores: OpcionProveedor[];
+  /** El documento que se subio, para guardarlo junto con la compra. */
+  archivo: File | null;
   onDescartar: () => void;
 }) {
   const [state, formAction, pending] = useActionState(createPurchase, undefined);
@@ -48,6 +58,7 @@ export default function RevisarCompra({
   const [fecha, setFecha] = useState(compra.fecha ?? "");
   const [supplierId, setSupplierId] = useState(compra.proveedor.supplierId ?? "");
   const [folio, setFolio] = useState(compra.folio ?? "");
+  const [recordar, setRecordar] = useState(true);
   const [filas, setFilas] = useState<Fila[]>(() =>
     compra.lineas.map((l) => ({
       id: l.id,
@@ -55,17 +66,30 @@ export default function RevisarCompra({
       cantidadDocumento: l.cantidad,
       unidadDocumento: l.unidadDocumento,
       productId: l.productId ?? "",
-      presentationQty: l.presentationQty,
-      presentationUnit: l.presentationUnit,
-      presentationLabel: l.presentationLabel,
-      qtyPropuesta: l.presentationQty,
-      unitPropuesta: l.presentationUnit,
+      cantidad: l.cantidadCaptura,
+      unidad: l.unidadCaptura,
       importe: l.importe,
       ivaRate: l.ivaRate,
       iepsRate: l.iepsRate,
       coincidencia: l.coincidencia,
     })),
   );
+
+  // El archivo viaja otra vez al servidor dentro del mismo envio que guarda la compra, para
+  // que se archive con el folio que le toque. Un input de archivo no se puede llenar desde
+  // React, pero si se le puede asignar un FileList armado a mano.
+  const inputDocumento = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = inputDocumento.current;
+    if (!input || !archivo) return;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(archivo);
+      input.files = dt.files;
+    } catch {
+      // Sin esto la compra se guarda igual, nomas sin el respaldo del documento.
+    }
+  }, [archivo]);
 
   const productoPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos]);
   const opcionesProducto = useMemo(
@@ -86,18 +110,21 @@ export default function RevisarCompra({
     setFilas((prev) =>
       prev.map((f) => {
         if (f.id !== id) return f;
-        // Si la unidad que traia no mide lo mismo que el producto nuevo, no sirve: se cambia a
-        // la unidad base en vez de dejar una conversion imposible en pantalla.
+        // La unidad que traia era para el producto anterior: un bulto de aquel no existe en
+        // este, y una unidad de peso no sirve si este se mide en litros. Se arranca de nuevo
+        // con el primer bulto del producto nuevo, o con su unidad base.
         const compatible =
-          producto && f.presentationUnit
-            ? UNIT_META[f.presentationUnit].type === UNIT_META[producto.baseUnit].type
+          producto && f.unidad && !esBulto(f.unidad)
+            ? UNIT_META[f.unidad as UnitValue].type === UNIT_META[producto.baseUnit].type
             : false;
-        return {
-          ...f,
-          productId,
-          presentationUnit: compatible ? f.presentationUnit : (producto?.baseUnit ?? ""),
-          presentationLabel: "",
-        };
+        const nueva: UnidadCaptura = compatible
+          ? f.unidad
+          : producto
+            ? producto.bultos.length > 0
+              ? `PRES:${producto.bultos[0].id}`
+              : producto.baseUnit
+            : "";
+        return { ...f, productId, unidad: nueva };
       }),
     );
   }
@@ -107,10 +134,12 @@ export default function RevisarCompra({
     if (!fila.productId) return "Elige el producto";
     const producto = productoPorId.get(fila.productId);
     if (!producto) return "Elige el producto";
-    if (numero(fila.presentationQty) <= 0) return "Falta la cantidad";
-    if (!fila.presentationUnit) return "Falta la unidad";
-    if (UNIT_META[fila.presentationUnit].type !== UNIT_META[producto.baseUnit].type) {
-      return `No se puede pasar de ${UNIT_LABELS[fila.presentationUnit]} a ${UNIT_LABELS[producto.baseUnit]}`;
+    if (numero(fila.cantidad) <= 0) return "Falta la cantidad";
+    if (!fila.unidad) return "Falta la unidad";
+    const convertido = convertirCaptura(fila.cantidad, fila.unidad, producto);
+    if (!convertido) return "Elige la unidad otra vez";
+    if (UNIT_META[convertido.presentationUnit].type !== UNIT_META[producto.baseUnit].type) {
+      return `No se puede pasar de ${UNIT_LABELS[convertido.presentationUnit]} a ${UNIT_LABELS[producto.baseUnit]}`;
     }
     if (numero(fila.importe) <= 0) return "Falta el importe";
     return null;
@@ -125,20 +154,35 @@ export default function RevisarCompra({
   const subtotalDoc = compra.subtotal ? numero(compra.subtotal) : null;
   const descuadre = subtotalDoc !== null && Math.abs(sumaTodas - subtotalDoc) > 0.05;
 
-  const rows = listas.map((f) => ({
-    productId: f.productId,
-    presentationLabel:
-      f.presentationQty === f.qtyPropuesta && f.presentationUnit === f.unitPropuesta
-        ? f.presentationLabel
-        : "",
-    presentationQty: f.presentationQty,
-    presentationUnit: f.presentationUnit,
-    totalPrice: f.importe,
-    ...(f.ivaRate !== null ? { ivaRate: f.ivaRate } : {}),
-    ...(f.iepsRate !== null ? { iepsRate: f.iepsRate } : {}),
-  }));
+  const rows = listas.flatMap((f) => {
+    const convertido = convertirCaptura(f.cantidad, f.unidad, productoPorId.get(f.productId));
+    if (!convertido) return [];
+    return [
+      {
+        productId: f.productId,
+        presentationLabel: convertido.presentationLabel,
+        presentationQty: convertido.presentationQty,
+        presentationUnit: convertido.presentationUnit,
+        totalPrice: f.importe,
+        ...(f.ivaRate !== null ? { ivaRate: f.ivaRate } : {}),
+        ...(f.iepsRate !== null ? { iepsRate: f.iepsRate } : {}),
+      },
+    ];
+  });
 
-  const puedeGuardar = Boolean(fecha) && listas.length > 0 && !pending;
+  // La asociacion guarda como se traduce ESTE texto de ESTE proveedor, para no volver a
+  // emparejarlo a mano la proxima vez. El factor es por una unidad del documento: asi sigue
+  // sirviendo cuando la siguiente factura traiga otra cantidad.
+  const asociaciones = recordar
+    ? listas.flatMap((f) => {
+        const convertido = convertirCaptura(f.cantidad, f.unidad, productoPorId.get(f.productId));
+        if (!convertido) return [];
+        const asociacion = asociacionDeRenglon(f, convertido);
+        return asociacion ? [asociacion] : [];
+      })
+    : [];
+
+  const puedeGuardar = Boolean(fecha) && rows.length > 0 && !pending;
 
   return (
     <div className="space-y-5">
@@ -193,6 +237,9 @@ export default function RevisarCompra({
 
       <form action={formAction} className="space-y-5">
         <input type="hidden" name="rows" value={JSON.stringify(rows)} />
+        <input type="hidden" name="asociaciones" value={JSON.stringify(asociaciones)} />
+        <input type="hidden" name="documentoTipo" value={compra.origen === "xml" ? "XML" : "FOTO"} />
+        <input ref={inputDocumento} type="file" name="documento" className="hidden" tabIndex={-1} />
 
         <div className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:grid-cols-3">
           <div className="space-y-1">
@@ -241,7 +288,7 @@ export default function RevisarCompra({
                 <th className="px-3 py-3">Dice el documento</th>
                 <th className="px-3 py-3">Producto</th>
                 <th className="px-3 py-3 w-28">Cantidad</th>
-                <th className="px-3 py-3 w-24">Unidad</th>
+                <th className="px-3 py-3 w-40">Unidad</th>
                 <th className="px-3 py-3 w-32">Importe sin IVA</th>
                 <th className="px-3 py-3 w-10"></th>
               </tr>
@@ -253,12 +300,18 @@ export default function RevisarCompra({
                 const unidades = producto
                   ? UNITS.filter((u) => UNIT_META[u].type === UNIT_META[producto.baseUnit].type)
                   : UNITS;
+                const convertido = convertirCaptura(fila.cantidad, fila.unidad, producto);
                 return (
                   <tr key={fila.id} className={`border-t border-neutral-100 ${problema ? "bg-amber-50/60" : ""}`}>
                     <td className="px-3 py-2 align-top">
                       <p className="font-medium text-neutral-900 wrap-anywhere">{fila.descripcion}</p>
                       <p className="text-xs text-neutral-500">
                         {fila.cantidadDocumento || "?"} {fila.unidadDocumento}
+                        {fila.coincidencia === "guardada" && (
+                          <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
+                            ya asociado
+                          </span>
+                        )}
                         {fila.coincidencia === "parecida" && (
                           <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
                             parecido, confirma
@@ -281,20 +334,29 @@ export default function RevisarCompra({
                         type="number"
                         step="any"
                         min="0"
-                        value={fila.presentationQty}
-                        onChange={(e) => actualizar(fila.id, { presentationQty: e.target.value })}
+                        value={fila.cantidad}
+                        onChange={(e) => actualizar(fila.id, { cantidad: e.target.value })}
                         className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm tabular-nums"
                       />
+                      {convertido && convertido.bulto && (
+                        <p className="mt-1 text-xs text-neutral-500 tabular-nums">
+                          = {cifras(new Decimal(convertido.presentationQty))}{" "}
+                          {UNIT_LABELS[convertido.presentationUnit]}
+                        </p>
+                      )}
                     </td>
                     <td className="px-3 py-2 align-top">
                       <select
-                        value={fila.presentationUnit}
-                        onChange={(e) =>
-                          actualizar(fila.id, { presentationUnit: e.target.value as UnitValue | "" })
-                        }
+                        value={fila.unidad}
+                        onChange={(e) => actualizar(fila.id, { unidad: e.target.value as UnidadCaptura })}
                         className="w-full rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
                       >
                         <option value="">-</option>
+                        {producto?.bultos.map((b) => (
+                          <option key={b.id} value={`PRES:${b.id}`}>
+                            {b.label} ({cifras(new Decimal(b.quantity))} {UNIT_LABELS[b.unit]})
+                          </option>
+                        ))}
                         {unidades.map((u) => (
                           <option key={u} value={u}>
                             {UNIT_LABELS[u]}
@@ -351,6 +413,29 @@ export default function RevisarCompra({
           </table>
         </div>
 
+        <label className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <input
+            type="checkbox"
+            checked={recordar}
+            onChange={(e) => setRecordar(e.target.checked)}
+            className="mt-0.5 size-4 rounded border-neutral-300"
+          />
+          <span className="text-sm text-neutral-600">
+            <span className="font-medium text-neutral-900">Recordar estas asociaciones</span>
+            <br />
+            La proxima vez que llegue un documento con los mismos renglones, el producto y la
+            unidad se llenan solos. Se pueden revisar y borrar en{" "}
+            <Link
+              href="/purchases/asociaciones"
+              className="font-medium text-brand-600 hover:underline"
+              target="_blank"
+            >
+              Compras &gt; Asociaciones
+            </Link>
+            .
+          </span>
+        </label>
+
         {pendientes > 0 && (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             {pendientes === 1
@@ -372,7 +457,7 @@ export default function RevisarCompra({
           >
             {pending
               ? "Guardando..."
-              : `Guardar ${listas.length} ${listas.length === 1 ? "renglon" : "renglones"} · ${pesos(sumaListas)}`}
+              : `Guardar ${rows.length} ${rows.length === 1 ? "renglon" : "renglones"} · ${pesos(sumaListas)}`}
           </button>
           <Link
             href="/purchases"

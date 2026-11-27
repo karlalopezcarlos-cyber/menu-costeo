@@ -32,6 +32,9 @@ export default function SubirDocumento({
 
   const inputFoto = useRef<HTMLInputElement>(null);
   const [foto, setFoto] = useState<{ url: string; nombre: string; bytes: number } | null>(null);
+  // El archivo se guarda tambien aqui porque la pantalla de revision lo vuelve a mandar para
+  // archivarlo con la compra, y para entonces este formulario ya no esta en pantalla.
+  const [archivo, setArchivo] = useState<File | null>(null);
   const [avisoPegado, setAvisoPegado] = useState<string | null>(null);
   const [sePuedePegar, setSePuedePegar] = useState(true);
 
@@ -49,11 +52,12 @@ export default function SubirDocumento({
     }
   }
 
-  function mostrar(archivo: File | null) {
+  function mostrar(elegido: File | null) {
+    setArchivo(elegido);
     setFoto((previa) => {
       if (previa) URL.revokeObjectURL(previa.url);
-      return archivo
-        ? { url: URL.createObjectURL(archivo), nombre: archivo.name || "captura", bytes: archivo.size }
+      return elegido
+        ? { url: URL.createObjectURL(elegido), nombre: elegido.name || "captura", bytes: elegido.size }
         : null;
     });
   }
@@ -108,12 +112,17 @@ export default function SubirDocumento({
     setAvisoPegado(null);
   }
 
+  function elegirXml(elegido: File | null) {
+    setArchivo(elegido);
+  }
+
   if (state.compra) {
     return (
       <RevisarCompra
         compra={state.compra}
         productos={productos}
         proveedores={proveedores}
+        archivo={archivo}
         // Recargar deja la pantalla limpia sin arrastrar lo ya corregido. useActionState no
         // se puede vaciar sin inventar una accion de adorno que viaje al servidor para nada.
         onDescartar={() => window.location.reload()}
@@ -168,6 +177,7 @@ export default function SubirDocumento({
                 type="file"
                 required
                 accept=".xml,text/xml,application/xml"
+                onChange={(e) => elegirXml(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-200 file:bg-neutral-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-700"
               />
             </div>

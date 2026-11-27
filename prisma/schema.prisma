@@ -163,6 +163,8 @@ model Organization {
   expenses                  Expense[]
   expenseCategories         ExpenseCategory[]
   costeadores               Costeador[]
+  asociacionesProveedor     SupplierItemMapping[]
+  documentosDeCompra        PurchaseDocument[]
 
   @@map("organizations")
 }
@@ -338,6 +340,7 @@ model Sucursal {
   expenses                  Expense[]
   productCosts              SucursalProductCost[]
   costeadores               Costeador[]
+  documentosDeCompra        PurchaseDocument[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -386,6 +389,8 @@ model User {
   sucursales                UserSucursal[]
   expensesCreated           Expense[]                  @relation("ExpenseCreatedBy")
   costeadores               Costeador[]                @relation("CosteadorCreatedBy")
+  asociacionesProveedor     SupplierItemMapping[]      @relation("SupplierItemMappingCreatedBy")
+  documentosDeCompra        PurchaseDocument[]         @relation("PurchaseDocumentCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -489,6 +494,7 @@ model Product {
   transformationTemplateOutputs   TransformationTemplateOutput[] @relation("TransformationTemplateOutput")
   expenses                        Expense[]
   costeadorItems                  CosteadorItem[]
+  asociacionesProveedor           SupplierItemMapping[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -596,8 +602,9 @@ model Supplier {
   supplierPayments   SupplierPayment[]
   phones             SupplierPhone[]
   emails             SupplierEmail[]
-  defaultForProducts Product[]         @relation("ProductDefaultSupplier")
+  defaultForProducts Product[]             @relation("ProductDefaultSupplier")
   expenses           Expense[]
+  asociaciones       SupplierItemMapping[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1705,4 +1712,91 @@ model CosteadorItem {
   @@index([productId])
   @@index([subRecipeId])
   @@map("costeador_items")
+}
+
+/// Como se traduce un renglon de un documento de un proveedor a un producto del catalogo.
+///
+/// Existe para no emparejar dos veces lo mismo: la primera vez que alguien dice que
+/// "LICOR GRAND MARNIER C.ROJO 12/700" de Mercantil Zapotlan es tal producto y que viene por
+/// botella de 700 ML, se guarda aqui y la siguiente factura de ese proveedor llega resuelta.
+///
+/// La llave incluye la unidad del documento a proposito: el mismo producto facturado por pieza
+/// y facturado por kilo son dos traducciones distintas, y confundirlas mete un error de
+/// factor directo al costo unitario.
+///
+/// `factor` es por cuanto se multiplica la cantidad del documento para llegar a
+/// `presentationUnit`. Tres piezas de 700 ML con unidad base LT dan factor 0.7. Se guarda el
+/// factor y no "son botellas" porque el factor es lo que de verdad se usa al calcular, y
+/// porque sobrevive a que despues le cambien la presentacion al producto: lo que decia aquella
+/// factura no cambia porque hoy el producto se compre en caja.
+model SupplierItemMapping {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  /// Nulo cuando el documento no traia un proveedor del catalogo (tipico de una nota de papel).
+  /// Una asociacion sin proveedor aplica a toda la organizacion y solo se usa cuando no hay
+  /// una del proveedor exacto.
+  supplierId        String?
+  supplier          Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  /// La descripcion del documento normalizada (sin acentos, mayusculas, sin puntuacion), que
+  /// es contra lo que se compara.
+  claveDescripcion  String
+  /// La descripcion tal como venia, para que se reconozca en pantalla.
+  descripcion       String
+  /// La unidad tal como venia en el documento ("H87", "KGM", "Pieza"). Parte de la llave.
+  unidadDocumento   String
+  productId         String
+  product           Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  factor            Decimal      @db.Decimal(18, 8)
+  presentationUnit  Unit
+  /// Texto de la presentacion cuando se capturo por bulto ("Botella"), para rearmar la etiqueta.
+  presentationLabel String?
+  /// Cuantas veces se ha aprovechado. Sirve para ver cuales de verdad estan trabajando.
+  vecesUsada        Int          @default(0)
+  lastUsedAt        DateTime?
+  createdByUserId   String?
+  createdBy         User?        @relation("SupplierItemMappingCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([organizationId, supplierId, claveDescripcion, unidadDocumento])
+  @@index([organizationId, claveDescripcion])
+  @@index([productId])
+  @@map("supplier_item_mappings")
+}
+
+/// El documento del que salio una compra: la foto de la nota o el XML de la factura.
+///
+/// Se guarda el original, no una version "limpia": es el respaldo de lo que se capturo. Si
+/// manana el costo de un producto se ve raro, se abre la compra y se mira el papel, sin ir a
+/// buscar el archivo a un celular.
+///
+/// Cuelga del folio y no de un renglon porque una compra son varios renglones con un mismo
+/// folio, y el documento es de la compra entera. Los bytes viven en la base, igual que la foto
+/// de una receta: un restaurante captura unas cuantas compras al dia y no vale la pena meter
+/// un servicio de archivos aparte para eso.
+model PurchaseDocument {
+  id              String               @id @default(cuid())
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal             @relation(fields: [sucursalId], references: [id])
+  /// Folio interno de la compra (el que comparten todos sus renglones).
+  folio           Int
+  tipo            PurchaseDocumentType
+  mimeType        String
+  /// Nombre del archivo como venia, cuando lo traia.
+  nombre          String?
+  contenido       Bytes
+  createdByUserId String?
+  createdBy       User?                @relation("PurchaseDocumentCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime             @default(now())
+
+  @@index([organizationId, folio])
+  @@map("purchase_documents")
+}
+
+enum PurchaseDocumentType {
+  FOTO
+  XML
 }

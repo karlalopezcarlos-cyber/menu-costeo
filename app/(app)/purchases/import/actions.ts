@@ -1,13 +1,12 @@
 "use server";
 
 import Decimal from "decimal.js";
-import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { leerCfdi } from "@/lib/compras/cfdi";
 import { leerNotaDeFoto } from "@/lib/compras/foto-ia";
 import { resolverBorrador } from "@/lib/compras/emparejar";
-import type { CompraResuelta, OpcionProducto } from "@/lib/compras/importar-tipos";
-import type { UnitValue } from "@/lib/units";
+import { cargarCatalogoDeCompras } from "@/lib/compras/catalogo";
+import type { CompraResuelta } from "@/lib/compras/importar-tipos";
 
 export type LeerState = {
   error?: string;
@@ -21,37 +20,6 @@ const TIPOS_IMAGEN = {
   "image/png": "image/png",
   "image/webp": "image/webp",
 } as const;
-
-async function catalogo(organizationId: string) {
-  const [productos, proveedores] = await Promise.all([
-    prisma.product.findMany({
-      where: { organizationId, archivedAt: null },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        baseUnit: true,
-        presentationUnitLabel: true,
-        presentationUnitQty: true,
-      },
-    }),
-    prisma.supplier.findMany({
-      where: { organizationId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, rfc: true },
-    }),
-  ]);
-
-  const opciones: OpcionProducto[] = productos.map((p) => ({
-    id: p.id,
-    name: p.name,
-    baseUnit: p.baseUnit as UnitValue,
-    presentationUnitLabel: p.presentationUnitLabel,
-    presentationUnitQty: p.presentationUnitQty ? p.presentationUnitQty.toString() : null,
-  }));
-
-  return { productos: opciones, proveedores };
-}
 
 /**
  * Lee el documento y devuelve un borrador para revisar. No escribe nada.
@@ -82,7 +50,9 @@ export async function leerDocumento(
     };
   }
 
-  const { productos, proveedores } = await catalogo(user.organizationId);
+  const { productos, proveedores, asociaciones } = await cargarCatalogoDeCompras(
+    user.organizationId,
+  );
 
   if (modo === "xml") {
     let texto: string;
@@ -93,7 +63,7 @@ export async function leerDocumento(
     }
     const resultado = leerCfdi(texto);
     if ("error" in resultado) return { error: resultado.error };
-    return { compra: resolverBorrador(resultado.borrador, productos, proveedores) };
+    return { compra: resolverBorrador(resultado.borrador, productos, proveedores, asociaciones) };
   }
 
   if (modo === "foto") {
@@ -119,7 +89,7 @@ export async function leerDocumento(
 
     const resultado = await leerNotaDeFoto(base64, mediaType, ivaNota);
     if ("error" in resultado) return { error: resultado.error };
-    return { compra: resolverBorrador(resultado.borrador, productos, proveedores) };
+    return { compra: resolverBorrador(resultado.borrador, productos, proveedores, asociaciones) };
   }
 
   return { error: "Indica si vas a subir un XML o una foto." };

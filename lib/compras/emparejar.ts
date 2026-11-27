@@ -1,12 +1,14 @@
 import Decimal from "decimal.js";
 import { UNIT_META, UNIT_LABELS, type UnitValue } from "@/lib/units";
 import type {
+  AsociacionGuardada,
   BorradorCompra,
   CompraResuelta,
   Coincidencia,
   LineaResuelta,
   OpcionProducto,
   OpcionProveedor,
+  UnidadCaptura,
 } from "./importar-tipos";
 
 /**
@@ -21,7 +23,7 @@ import type {
  */
 
 /** Sin acentos, sin puntuacion y con espacios colapsados, para poder comparar nombres. */
-function normalizar(texto: string): string {
+export function normalizar(texto: string): string {
   return texto
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -117,17 +119,6 @@ function parecido(a: string, b: string): number {
 /** Debajo de esto no se propone nada: mas vale pedir que elija que proponerle lo que no es. */
 const UMBRAL_PARECIDO = 0.6;
 
-/**
- * Plural en espanol, lo suficiente para una etiqueta de presentacion: "Botella" -> "Botellas",
- * "Galon" -> "Galones". No es gramatica completa (no acentua "Galon" ni sabe de "Z" final),
- * pero "3 Galons" en una compra se ve a mal hecho y esto cuesta tres lineas.
- */
-function pluralizar(etiqueta: string): string {
-  const limpia = etiqueta.trim();
-  if (!limpia) return limpia;
-  return /[aeiouaeiou]$/i.test(limpia) ? `${limpia}s` : `${limpia}es`;
-}
-
 function buscarProducto(
   descripcion: string,
   productos: OpcionProducto[],
@@ -180,21 +171,55 @@ function buscarProveedor(
 }
 
 /**
- * Traduce "2 CAJAS" o "5 KG" a la cantidad y unidad con las que Compras calcula el costo.
+ * Cual de los bultos del producto corresponde a lo que dice el papel.
+ *
+ * Se prefiere el que el papel nombra ("2 CAJAS", "6 BOTELLAS"); si no nombra ninguno, el
+ * primero, que es la presentacion fija del producto cuando la tiene.
+ */
+function bultoParaUnidad(unidadTexto: string, descripcion: string, producto: OpcionProducto) {
+  if (producto.bultos.length === 0) return null;
+
+  // Que el papel nombre el bulto es la mejor pista: "2 CAJAS", "6 BOTELLAS".
+  const textoUnidad = normalizar(unidadTexto);
+  const textoDescripcion = normalizar(descripcion);
+  const porNombre = producto.bultos.find((b) => {
+    const etiqueta = normalizar(b.label);
+    if (!etiqueta) return false;
+    return (
+      textoUnidad === etiqueta ||
+      textoUnidad.startsWith(etiqueta) ||
+      textoDescripcion.split(" ").includes(etiqueta)
+    );
+  });
+  if (porNombre) return porNombre;
+
+  // Si no lo nombra, se ofrece el primero (la presentacion fija del producto, cuando tiene).
+  // Es un punto de partida que la persona ve y puede cambiar en la lista, no un dato guardado.
+  return producto.bultos[0];
+}
+
+/**
+ * Traduce lo que dice el papel a la casilla de cantidad y su unidad.
+ *
+ * Lo que devuelve es lo que se CAPTURA, no lo que se guarda: un bulto quiere decir que la
+ * cantidad se cuenta en botellas o cajas y la pantalla multiplica por lo que trae cada una.
+ * Se prefiere asi porque es como lo lee una persona al cotejar contra la factura: ahi dice
+ * "3 Botellas", no "2.1 LT".
  *
  * Tres caminos, en este orden:
  * 1. La unidad del papel mide lo mismo que la unidad base del producto (KG contra KG, LT
  *    contra ML): se usa tal cual y la app convierte.
- * 2. El papel viene por bulto (piezas, cajas, botellas) y el producto tiene capturado cuanto
- *    trae su presentacion: se multiplica.
+ * 2. El papel viene por bulto (piezas, cajas, botellas) y el producto tiene configurado al
+ *    menos un bulto: se captura en bultos.
  * 3. Ninguno de los dos: se deja el renglon marcado para que la persona lo resuelva. No se
  *    adivina una equivalencia.
  */
 function traducirCantidad(
   cantidadTexto: string,
   unidadTexto: string,
+  descripcion: string,
   producto: OpcionProducto,
-): { qty: string; unit: UnitValue | ""; label: string; problema: string | null } {
+): { cantidad: string; unidad: UnidadCaptura; problema: string | null } {
   let cantidad: Decimal;
   try {
     cantidad = new Decimal(cantidadTexto || "0");
@@ -202,87 +227,152 @@ function traducirCantidad(
     cantidad = new Decimal(0);
   }
   if (!cantidad.isFinite() || cantidad.lte(0)) {
-    return { qty: "", unit: "", label: "", problema: "No se leyo la cantidad: capturala." };
+    return { cantidad: "", unidad: "", problema: "No se leyo la cantidad: capturala." };
   }
 
   const baseUnit = producto.baseUnit;
   const unidad = unidadDeTexto(unidadTexto);
 
   if (unidad && UNIT_META[unidad].type === UNIT_META[baseUnit].type) {
-    return {
-      qty: cantidad.toString(),
-      unit: unidad,
-      label: `${cantidad.toNumber().toLocaleString("es-MX", { maximumFractionDigits: 2 })} ${UNIT_LABELS[unidad]}`,
-      problema: null,
-    };
+    return { cantidad: cantidad.toString(), unidad, problema: null };
   }
 
-  // Viene por bulto: piezas, cajas, botellas, manojos. Solo se puede convertir si el producto
-  // tiene capturado cuanto trae su presentacion.
-  const contenido = producto.presentationUnitQty ? new Decimal(producto.presentationUnitQty) : null;
-  if (contenido && contenido.gt(0)) {
-    const etiqueta = producto.presentationUnitLabel ?? "presentacion";
-    const piezas = cantidad.toNumber().toLocaleString("es-MX", { maximumFractionDigits: 2 });
-    return {
-      qty: cantidad.times(contenido).toString(),
-      unit: baseUnit,
-      label: `${piezas} ${cantidad.equals(1) ? etiqueta : pluralizar(etiqueta)}`,
-      problema: null,
-    };
+  const bulto = bultoParaUnidad(unidadTexto, descripcion, producto);
+  if (bulto) {
+    return { cantidad: cantidad.toString(), unidad: `PRES:${bulto.id}`, problema: null };
   }
 
   const comoViene = unidadTexto.trim() || "sin unidad";
   return {
-    qty: "",
-    unit: "",
-    label: "",
-    problema: `El documento dice "${comoViene}" y ${producto.name} se mide en ${UNIT_LABELS[baseUnit]}. Captura cuanto llego en ${UNIT_LABELS[baseUnit]}, o configurale la presentacion al producto.`,
+    cantidad: cantidad.toString(),
+    unidad: "",
+    problema: `El documento dice "${comoViene}" y ${producto.name} se mide en ${UNIT_LABELS[baseUnit]}. Elige la unidad, o configurale la presentacion al producto para poder capturarlo por bulto.`,
   };
+}
+
+/**
+ * Aplica una asociacion ya confirmada antes.
+ *
+ * Si aquella vez se capturo por bulto y el producto sigue teniendo ese bulto, se vuelve a
+ * ofrecer por bulto, que es como lo lee la persona. Si al producto le quitaron esa
+ * presentacion desde entonces, se cae al factor guardado, que es el numero con el que de
+ * verdad se calculo aquella vez.
+ */
+function aplicarAsociacion(
+  asociacion: AsociacionGuardada,
+  cantidadTexto: string,
+  producto: OpcionProducto,
+): { cantidad: string; unidad: UnidadCaptura; problema: string | null } {
+  let cantidad: Decimal;
+  try {
+    cantidad = new Decimal(cantidadTexto || "0");
+  } catch {
+    cantidad = new Decimal(0);
+  }
+  if (!cantidad.isFinite() || cantidad.lte(0)) {
+    return { cantidad: "", unidad: "", problema: "No se leyo la cantidad: capturala." };
+  }
+
+  if (asociacion.presentationLabel) {
+    const etiqueta = normalizar(asociacion.presentationLabel);
+    const bulto = producto.bultos.find((b) => normalizar(b.label) === etiqueta);
+    if (bulto) {
+      return { cantidad: cantidad.toString(), unidad: `PRES:${bulto.id}`, problema: null };
+    }
+  }
+
+  const convertida = cantidad.times(asociacion.factor);
+  return { cantidad: convertida.toString(), unidad: asociacion.presentationUnit, problema: null };
+}
+
+/** La llave con la que se busca y se guarda una asociacion. */
+export function claveDeAsociacion(descripcion: string): string {
+  return normalizar(descripcion);
+}
+
+function buscarAsociacion(
+  descripcion: string,
+  unidadDocumento: string,
+  supplierId: string | null,
+  asociaciones: AsociacionGuardada[],
+): AsociacionGuardada | null {
+  const clave = claveDeAsociacion(descripcion);
+  const unidad = unidadDocumento.trim().toUpperCase();
+  const coincide = (a: AsociacionGuardada) =>
+    a.claveDescripcion === clave && a.unidadDocumento.trim().toUpperCase() === unidad;
+
+  // La del proveedor exacto manda sobre la general: el mismo texto puede querer decir cosas
+  // distintas en la factura de dos proveedores.
+  const delProveedor = supplierId
+    ? (asociaciones.find((a) => a.supplierId === supplierId && coincide(a)) ?? null)
+    : null;
+  if (delProveedor) return delProveedor;
+  return asociaciones.find((a) => a.supplierId === null && coincide(a)) ?? null;
 }
 
 export function resolverBorrador(
   borrador: BorradorCompra,
   productos: OpcionProducto[],
   proveedores: (OpcionProveedor & { rfc: string | null })[],
+  asociaciones: AsociacionGuardada[] = [],
 ): CompraResuelta {
   const proveedor = buscarProveedor(borrador.proveedor.nombre, borrador.proveedor.rfc, proveedores);
+  const productoPorId = new Map(productos.map((p) => [p.id, p]));
 
   const lineas: LineaResuelta[] = borrador.lineas.map((linea) => {
-    const encontrado = buscarProducto(linea.descripcion, productos);
-    if (!encontrado) {
-      return {
-        ...linea,
-        productId: null,
-        productoNombre: null,
-        coincidencia: "ninguna" as const,
-        presentationQty: "",
-        presentationUnit: "" as const,
-        presentationLabel: "",
-        problema: "Elige a que producto del catalogo corresponde.",
-      };
+    const sinResolver = (problema: string): LineaResuelta => ({
+      ...linea,
+      productId: null,
+      productoNombre: null,
+      coincidencia: "ninguna" as const,
+      cantidadCaptura: linea.cantidad,
+      unidadCaptura: "" as const,
+      problema,
+    });
+
+    // Primero lo que alguien ya confirmo; el parecido del nombre es el respaldo.
+    const guardada = buscarAsociacion(
+      linea.descripcion,
+      linea.unidadDocumento,
+      proveedor?.id ?? null,
+      asociaciones,
+    );
+    if (guardada) {
+      const producto = productoPorId.get(guardada.productId);
+      if (producto) {
+        const traducido = aplicarAsociacion(guardada, linea.cantidad, producto);
+        return {
+          ...linea,
+          productId: producto.id,
+          productoNombre: producto.name,
+          coincidencia: "guardada" as const,
+          cantidadCaptura: traducido.cantidad,
+          unidadCaptura: traducido.unidad,
+          problema: traducido.problema ?? problemaDeImporte(linea.importe),
+        };
+      }
+      // La asociacion apunta a un producto archivado o borrado: se ignora en vez de fallar.
     }
+
+    const encontrado = buscarProducto(linea.descripcion, productos);
+    if (!encontrado) return sinResolver("Elige a que producto del catalogo corresponde.");
 
     const { producto, coincidencia } = encontrado;
-    const traducido = traducirCantidad(linea.cantidad, linea.unidadDocumento, producto);
-
-    let problema = traducido.problema;
-    if (!problema) {
-      try {
-        if (new Decimal(linea.importe || "0").lte(0)) problema = "No se leyo el importe: capturalo.";
-      } catch {
-        problema = "El importe no es un numero: capturalo.";
-      }
-    }
+    const traducido = traducirCantidad(
+      linea.cantidad,
+      linea.unidadDocumento,
+      linea.descripcion,
+      producto,
+    );
 
     return {
       ...linea,
       productId: producto.id,
       productoNombre: producto.name,
       coincidencia,
-      presentationQty: traducido.qty,
-      presentationUnit: traducido.unit,
-      presentationLabel: traducido.label,
-      problema,
+      cantidadCaptura: traducido.cantidad,
+      unidadCaptura: traducido.unidad,
+      problema: traducido.problema ?? problemaDeImporte(linea.importe),
     };
   });
 
@@ -301,4 +391,12 @@ export function resolverBorrador(
     lineas,
     avisos: borrador.avisos,
   };
+}
+
+function problemaDeImporte(importe: string): string | null {
+  try {
+    return new Decimal(importe || "0").lte(0) ? "No se leyo el importe: capturalo." : null;
+  } catch {
+    return "El importe no es un numero: capturalo.";
+  }
 }

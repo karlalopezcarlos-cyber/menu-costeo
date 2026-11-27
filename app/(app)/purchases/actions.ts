@@ -9,6 +9,11 @@ import { applyYieldFactor, computeUnitCost, convertQty, UNITS, UNIT_LABELS, type
 import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatOrderFolio } from "@/lib/orders/folio";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
+import {
+  guardarAsociaciones,
+  leerAsociaciones,
+  leerDocumentoDeCompra,
+} from "@/lib/compras/extras-de-compra";
 
 function parseUnit(value: unknown): UnitValue {
   if (typeof value === "string" && (UNITS as readonly string[]).includes(value)) {
@@ -65,6 +70,13 @@ export async function createPurchase(
     const rowsRaw = String(formData.get("rows") ?? "[]");
     purchaseOrderId = String(formData.get("purchaseOrderId") ?? "").trim() || null;
 
+    // Extras de una compra subida (XML o foto). La captura a mano no los manda y aqui quedan
+    // en nada: el camino de guardar es el mismo para las tres vias.
+    const documento = await leerDocumentoDeCompra(
+      formData.get("documento"),
+      formData.get("documentoTipo"),
+    );
+
     if (!purchaseDateRaw) throw new Error("Indica la fecha de compra.");
 
     let rows: PurchaseRowInput[];
@@ -93,6 +105,7 @@ export async function createPurchase(
     if (purchaseOrderId && !purchaseOrder) throw new Error("Pedido no encontrado.");
 
     const productIds = [...new Set(rows.map((r) => r.productId))];
+    const asociaciones = leerAsociaciones(formData.get("asociaciones"), new Set(productIds));
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, organizationId: user.organizationId },
     });
@@ -192,6 +205,9 @@ export async function createPurchase(
       note: noteByProduct.get(entry.productId) ?? null,
     }));
 
+    // El folio de esta compra, para poder archivar el documento despues de la transaccion.
+    let folioAsignado = 0;
+
     await prisma.$transaction(async (tx) => {
       // Todos los productos capturados en este envio del formulario comparten un solo folio,
       // sin importar cuantos renglones tenga la compra.
@@ -201,6 +217,7 @@ export async function createPurchase(
         select: { nextPurchaseFolio: true },
       });
       const folio = org.nextPurchaseFolio - 1;
+      folioAsignado = folio;
       // Si no capturaron el folio de la factura del proveedor, se guarda el folio interno
       // (COM-0043) para que la compra siempre sea localizable por folio desde el buscador.
       const invoiceFolio = invoiceFolioInput || formatPurchaseFolio(folio);
@@ -231,6 +248,44 @@ export async function createPurchase(
         });
       }
     });
+
+    // Los extras van fuera de la transaccion a proposito. Esa transaccion incrementa el folio
+    // de la organizacion, asi que mientras este abierta nadie mas puede guardar una compra:
+    // meterle ahi un archivo de megas y una vuelta por renglon haria esperar a las demas
+    // sucursales. Y si uno de los dos falla, la compra ya quedo bien, que es lo que importa;
+    // se registra el error y se sigue, porque devolver "no se pudo registrar la compra" cuando
+    // si se registro manda a capturarla otra vez y la deja duplicada.
+    if (documento) {
+      try {
+        await prisma.purchaseDocument.create({
+          data: {
+            organizationId: user.organizationId,
+            sucursalId: user.sucursalId,
+            folio: folioAsignado,
+            tipo: documento.tipo,
+            mimeType: documento.mimeType,
+            nombre: documento.nombre,
+            contenido: documento.contenido,
+            createdByUserId: user.id,
+          },
+        });
+      } catch (error) {
+        console.error("No se pudo archivar el documento de la compra:", error);
+      }
+    }
+
+    if (asociaciones.length > 0) {
+      try {
+        await guardarAsociaciones({
+          organizationId: user.organizationId,
+          supplierId,
+          createdByUserId: user.id,
+          asociaciones,
+        });
+      } catch (error) {
+        console.error("No se pudieron guardar las asociaciones de la compra:", error);
+      }
+    }
 
     for (const productId of productIds) {
       await recalcProductCurrentCost(productId);

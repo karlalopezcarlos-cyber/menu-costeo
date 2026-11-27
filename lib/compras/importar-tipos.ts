@@ -46,17 +46,31 @@ export type BorradorCompra = {
   avisos: string[];
 };
 
-export type Coincidencia = "exacta" | "parecida" | "ninguna";
+/**
+ * De donde salio el emparejado.
+ *
+ * "guardada" es una asociacion que alguien ya confirmo antes para ese proveedor y esa
+ * descripcion; las otras dos son el parecido del nombre, que es una corazonada.
+ */
+export type Coincidencia = "guardada" | "exacta" | "parecida" | "ninguna";
+
+/**
+ * La unidad con la que se captura la cantidad.
+ *
+ * `PRES:<id>` quiere decir uno de los bultos del producto (botella, caja, galon): la cantidad
+ * se cuenta en bultos y la app la multiplica por lo que trae cada uno. Es una opcion de
+ * captura, no una unidad de medida: al guardar siempre se convierte a una unidad real.
+ */
+export type UnidadCaptura = UnitValue | `PRES:${string}` | "";
 
 /** El mismo renglon, ya cruzado contra el catalogo y traducido a lo que Compras necesita. */
 export type LineaResuelta = LineaDocumento & {
   productId: string | null;
   productoNombre: string | null;
   coincidencia: Coincidencia;
-  /** Cantidad en una unidad compatible con la unidad base del producto. */
-  presentationQty: string;
-  presentationUnit: UnitValue | "";
-  presentationLabel: string;
+  /** Lo que va en la casilla de cantidad. Que significa depende de unidadCaptura. */
+  cantidadCaptura: string;
+  unidadCaptura: UnidadCaptura;
   /** Lo que impide guardar este renglon tal como esta, en espanol y para la persona. */
   problema: string | null;
 };
@@ -78,6 +92,21 @@ export type CompraResuelta = {
   avisos: string[];
 };
 
+/**
+ * Una forma de comprar un producto por bulto: "Botella" de 700 ML, "Caja" de 24 PZA.
+ *
+ * La primera (id "legacy") es la presentacion fija del producto; las demas son las
+ * presentaciones con nombre que se le hayan configurado. La pantalla de revision las ofrece
+ * en la lista de unidades para poder capturar "3 botellas" en vez de "2.1 LT".
+ */
+export type OpcionBulto = {
+  id: string;
+  label: string;
+  /** Cuanto trae un bulto, en `unit`. */
+  quantity: string;
+  unit: UnitValue;
+};
+
 /** Catalogo que la pantalla de revision necesita para poder corregir a mano. */
 export type OpcionProducto = {
   id: string;
@@ -85,6 +114,21 @@ export type OpcionProducto = {
   baseUnit: UnitValue;
   presentationUnitLabel: string | null;
   presentationUnitQty: string | null;
+  bultos: OpcionBulto[];
 };
 
 export type OpcionProveedor = { id: string; name: string };
+
+/** Una asociacion ya guardada, como la necesita el emparejado. */
+export type AsociacionGuardada = {
+  id: string;
+  supplierId: string | null;
+  claveDescripcion: string;
+  unidadDocumento: string;
+  productId: string;
+  /** Por cuanto se multiplica la cantidad del documento para llegar a presentationUnit. */
+  factor: string;
+  presentationUnit: UnitValue;
+  /** Con valor cuando se capturo por bulto: asi se vuelve a ofrecer en bultos. */
+  presentationLabel: string | null;
+};

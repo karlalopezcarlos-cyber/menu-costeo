@@ -29,7 +29,7 @@ export default async function PurchaseDetailPage({
   const folio = parsePurchaseFolio(folioParam);
   if (!folio) notFound();
 
-  const [purchases, recipe, products] = await Promise.all([
+  const [purchases, recipe, products, documento] = await Promise.all([
     prisma.purchase.findMany({
       where: { sucursalId: user.sucursalId, folio },
       include: { product: true },
@@ -45,6 +45,14 @@ export default async function PurchaseDetailPage({
       where: { organizationId: user.organizationId, archivedAt: null, isProcessed: false },
       orderBy: { name: "asc" },
       select: { id: true, name: true, baseUnit: true, yieldPercentage: true },
+    }),
+    // El papel del que salio la compra, cuando se subio por XML o por foto. Aqui solo se
+    // pregunta si existe y de que tipo es: el archivo se sirve aparte, para no cargar megas
+    // de foto en una pagina que casi siempre se abre nomas a corregir un importe.
+    prisma.purchaseDocument.findFirst({
+      where: { organizationId: user.organizationId, sucursalId: user.sucursalId, folio },
+      orderBy: { createdAt: "desc" },
+      select: { tipo: true, nombre: true, createdAt: true },
     }),
   ]);
   if (purchases.length === 0) notFound();
@@ -119,6 +127,45 @@ export default async function PurchaseDetailPage({
             El costo del negocio es el subtotal: el IVA de compras es acreditable y no entra al
             costeo. El total con impuestos es lo que se le paga al proveedor.
           </p>
+        )}
+
+        {documento && (
+          <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-neutral-900">
+              {documento.tipo === "XML" ? "XML de la factura" : "Foto de la nota"}
+            </p>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              {documento.nombre ? `${documento.nombre} · ` : ""}
+              subido el{" "}
+              {documento.createdAt.toLocaleDateString("es-MX", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+            {documento.tipo === "FOTO" ? (
+              <a
+                href={`/api/purchases/${folioLabel}/documento`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block w-fit"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/purchases/${folioLabel}/documento`}
+                  alt="Nota de la compra"
+                  className="max-h-56 rounded-md border border-neutral-200 object-contain"
+                />
+              </a>
+            ) : (
+              <a
+                href={`/api/purchases/${folioLabel}/documento`}
+                className="mt-2 inline-block text-sm font-medium text-brand-600 hover:underline"
+              >
+                Descargar el XML
+              </a>
+            )}
+          </div>
         )}
 
         <div className="mt-3">
