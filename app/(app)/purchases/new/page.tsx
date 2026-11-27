@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { computeUnitCost, type UnitValue } from "@/lib/units";
@@ -115,7 +116,15 @@ export default async function NewPurchasePage({
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Registrar compra</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Registrar compra</h1>
+        <Link
+          href="/purchases/import"
+          className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+        >
+          Subir XML o foto
+        </Link>
+      </div>
       {products.length === 0 ? (
         <p className="text-sm text-neutral-500">
           Primero agrega al menos un producto en el catalogo.
