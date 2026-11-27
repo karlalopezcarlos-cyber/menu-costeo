@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { leerDocumento, type LeerState } from "./actions";
 import RevisarCompra from "./RevisarCompra";
@@ -9,6 +9,14 @@ import type { OpcionProducto, OpcionProveedor } from "@/lib/compras/importar-tip
 const initialState: LeerState = {};
 
 type Modo = "xml" | "foto";
+
+const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp"];
+
+function pesoLegible(bytes: number): string {
+  return bytes < 1024 * 1024
+    ? `${Math.round(bytes / 1024)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function SubirDocumento({
   productos,
@@ -21,6 +29,84 @@ export default function SubirDocumento({
 }) {
   const [state, formAction, pending] = useActionState(leerDocumento, initialState);
   const [modo, setModo] = useState<Modo>("xml");
+
+  const inputFoto = useRef<HTMLInputElement>(null);
+  const [foto, setFoto] = useState<{ url: string; nombre: string; bytes: number } | null>(null);
+  const [avisoPegado, setAvisoPegado] = useState<string | null>(null);
+  const [sePuedePegar, setSePuedePegar] = useState(true);
+
+  /** Deja la imagen dentro del input de archivo para que viaje en el envio normal del formulario. */
+  function ponerEnElInput(archivo: File): boolean {
+    const input = inputFoto.current;
+    if (!input) return false;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(archivo);
+      input.files = dt.files;
+      return input.files.length === 1;
+    } catch {
+      return false;
+    }
+  }
+
+  function mostrar(archivo: File | null) {
+    setFoto((previa) => {
+      if (previa) URL.revokeObjectURL(previa.url);
+      return archivo
+        ? { url: URL.createObjectURL(archivo), nombre: archivo.name || "captura", bytes: archivo.size }
+        : null;
+    });
+  }
+
+  // Pegar funciona en toda la pantalla, no solo dentro de un recuadro: quien acaba de tomar
+  // una captura aprieta Cmd+V donde sea y espera que caiga.
+  useEffect(() => {
+    if (modo !== "foto") return;
+
+    function alPegar(evento: ClipboardEvent) {
+      const archivos = Array.from(evento.clipboardData?.items ?? [])
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter((archivo): archivo is File => archivo !== null);
+
+      const imagen = archivos.find((archivo) => TIPOS_IMAGEN.includes(archivo.type));
+      if (!imagen) {
+        // Pegar texto en un campo no es un error, es lo normal: solo se avisa cuando lo que
+        // se pego era un archivo y no servia.
+        if (archivos.length > 0) {
+          setAvisoPegado("Lo que pegaste no es una imagen JPG, PNG o WEBP.");
+        }
+        return;
+      }
+
+      evento.preventDefault();
+      if (ponerEnElInput(imagen)) {
+        mostrar(imagen);
+        setAvisoPegado(null);
+      } else {
+        setSePuedePegar(false);
+        setAvisoPegado("Tu navegador no deja pegar la imagen aqui. Usa el boton de archivo.");
+      }
+    }
+
+    document.addEventListener("paste", alPegar);
+    return () => document.removeEventListener("paste", alPegar);
+  }, [modo]);
+
+  // La vista previa es un objeto en memoria del navegador: hay que soltarlo al salir.
+  useEffect(() => {
+    return () => {
+      if (foto) URL.revokeObjectURL(foto.url);
+    };
+    // Solo al desmontar: mostrar() ya libera la anterior en cada cambio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function cambiarModo(nuevo: Modo) {
+    setModo(nuevo);
+    mostrar(null);
+    setAvisoPegado(null);
+  }
 
   if (state.compra) {
     return (
@@ -40,7 +126,7 @@ export default function SubirDocumento({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setModo("xml")}
+          onClick={() => cambiarModo("xml")}
           className={`rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
             modo === "xml"
               ? "bg-neutral-900 text-white shadow-sm"
@@ -51,7 +137,7 @@ export default function SubirDocumento({
         </button>
         <button
           type="button"
-          onClick={() => setModo("foto")}
+          onClick={() => cambiarModo("foto")}
           className={`rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
             modo === "foto"
               ? "bg-neutral-900 text-white shadow-sm"
@@ -91,9 +177,9 @@ export default function SubirDocumento({
             </p>
           </div>
         ) : (
-          <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+          <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-neutral-600">
-              Para la nota de papel del mercado, la que no trae XML. La IA lee la foto y arma el
+              Para la nota de papel del mercado, la que no trae XML. La IA lee la imagen y arma el
               borrador; tu lo revisas renglon por renglon antes de guardar.
             </p>
             {!iaDisponible && (
@@ -102,17 +188,64 @@ export default function SubirDocumento({
                 Anthropic). Mientras tanto, el XML si funciona.
               </p>
             )}
+
+            <div
+              className={`rounded-lg border-2 border-dashed p-5 text-center transition-colors ${
+                foto ? "border-emerald-300 bg-emerald-50/50" : "border-neutral-200 bg-neutral-50"
+              }`}
+            >
+              {foto ? (
+                <div className="space-y-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={foto.url}
+                    alt="Vista previa de la nota"
+                    className="mx-auto max-h-64 rounded-md border border-neutral-200 bg-white object-contain"
+                  />
+                  <p className="text-sm text-neutral-600">
+                    {foto.nombre} · {pesoLegible(foto.bytes)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      mostrar(null);
+                      if (inputFoto.current) inputFoto.current.value = "";
+                    }}
+                    className="text-sm font-medium text-neutral-500 transition-colors hover:text-red-600"
+                  >
+                    Quitar la imagen
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-neutral-700">
+                    {sePuedePegar ? "Pega aqui la imagen con ⌘V" : "Elige la imagen con el boton de abajo"}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {sePuedePegar
+                      ? "Sirve una captura de pantalla o una foto copiada: no hace falta guardarla en el disco."
+                      : "Tu navegador no permite pegar imagenes en esta pantalla."}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <label htmlFor="file-foto" className="text-sm font-medium text-neutral-700">
-                Foto de la nota
+                O elige el archivo
               </label>
               <input
+                ref={inputFoto}
                 id="file-foto"
                 name="file"
                 type="file"
                 required
                 accept="image/jpeg,image/png,image/webp"
                 capture="environment"
+                onChange={(e) => {
+                  mostrar(e.target.files?.[0] ?? null);
+                  setAvisoPegado(null);
+                }}
                 className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-200 file:bg-neutral-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-700"
               />
               <p className="text-xs text-neutral-500">
@@ -120,6 +253,13 @@ export default function SubirDocumento({
                 mal.
               </p>
             </div>
+
+            {avisoPegado && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {avisoPegado}
+              </p>
+            )}
+
             <div className="space-y-1">
               <label htmlFor="ivaNota" className="text-sm font-medium text-neutral-700">
                 IVA de esa nota
@@ -152,7 +292,7 @@ export default function SubirDocumento({
         >
           {pending
             ? modo === "foto"
-              ? "Leyendo la foto..."
+              ? "Leyendo la imagen..."
               : "Leyendo el XML..."
             : "Leer y revisar"}
         </button>
