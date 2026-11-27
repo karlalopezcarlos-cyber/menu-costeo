@@ -9,6 +9,8 @@ import { applyYieldFactor, computeUnitCost, convertQty, UNITS, UNIT_LABELS, type
 import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatOrderFolio } from "@/lib/orders/folio";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
+import { anotarEnBitacora } from "@/lib/purchases/bitacora";
+import { formatMoney } from "@/lib/format";
 import {
   guardarAsociaciones,
   leerAsociaciones,
@@ -223,6 +225,25 @@ export async function createPurchase(
       const invoiceFolio = invoiceFolioInput || formatPurchaseFolio(folio);
       const withFolios = toCreateWithNotes.map((entry) => ({ ...entry, folio, invoiceFolio }));
       await tx.purchase.createMany({ data: withFolios });
+
+      // La anotacion va dentro de la transaccion: es una sola fila y tiene que quedar si y
+      // solo si la compra quedo. Una compra sin su "quien la registro" seria justo el renglon
+      // que nadie puede explicar despues.
+      const total = toCreate.reduce((suma, fila) => suma.plus(fila.totalPrice), new Decimal(0));
+      const origen = documento
+        ? documento.tipo === "XML"
+          ? " desde el XML de la factura"
+          : " desde la foto de la nota"
+        : "";
+      await anotarEnBitacora(tx, {
+        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
+        folio,
+        type: "REGISTRADA",
+        message: `Registro la compra${origen}: ${rows.length} ${rows.length === 1 ? "renglon" : "renglones"} por ${formatMoney(total.toNumber())}.`,
+        createdByUserId: user.id,
+      });
+
       if (!purchaseOrder) return;
 
       for (const item of purchaseOrder.items) {

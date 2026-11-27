@@ -9,6 +9,7 @@ import { applyYieldFactor, computeUnitCost, UNITS, UNIT_LABELS, type UnitValue }
 import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import { formatMoney } from "@/lib/format";
+import { anotarEnBitacora, describirCambios, fechaDeCompra } from "@/lib/purchases/bitacora";
 
 export type DeletePurchaseResult = { error?: string; paymentHref?: string };
 
@@ -74,7 +75,7 @@ export async function updatePurchase(
 
   const purchase = await prisma.purchase.findFirst({
     where: { id: purchaseId, sucursalId: user.sucursalId },
-    include: { product: true },
+    include: { product: true, supplier: { select: { name: true } } },
   });
   if (!purchase) return { error: "Compra no encontrada." };
 
@@ -90,11 +91,13 @@ export async function updatePurchase(
 
     const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
     const supplierId = supplierIdRaw || null;
+    let supplierName: string | null = null;
     if (supplierId) {
       const supplier = await prisma.supplier.findFirst({
         where: { id: supplierId, organizationId: user.organizationId },
       });
       if (!supplier) throw new Error("Proveedor no encontrado.");
+      supplierName = supplier.name;
     }
 
     const presentationQty = new Decimal(String(formData.get("presentationQty") ?? "0"));
@@ -146,6 +149,42 @@ export async function updatePurchase(
     });
 
     await recalcProductCurrentCost(purchase.productId);
+
+    const cambios = describirCambios([
+      {
+        campo: "Fecha",
+        antes: fechaDeCompra(purchase.purchaseDate),
+        despues: fechaDeCompra(new Date(purchaseDateRaw)),
+      },
+      {
+        campo: "Proveedor",
+        antes: purchase.supplier?.name ?? "sin proveedor",
+        despues: supplierName ?? "sin proveedor",
+      },
+      {
+        campo: "Cantidad",
+        antes: `${purchase.presentationQty} ${UNIT_LABELS[purchase.presentationUnit as UnitValue]}`,
+        despues: `${presentationQty.toString()} ${UNIT_LABELS[presentationUnit]}`,
+      },
+      {
+        campo: "Precio",
+        antes: formatMoney(Number(purchase.totalPrice)),
+        despues: formatMoney(totalPrice.toNumber()),
+      },
+      { campo: "IVA", antes: `${purchase.ivaRate}%`, despues: `${ivaRate}%` },
+      { campo: "IEPS", antes: `${purchase.iepsRate}%`, despues: `${iepsRate}%` },
+      { campo: "Comentario", antes: purchase.comment ?? "", despues: comment ?? "" },
+    ]);
+    if (cambios) {
+      await anotarEnBitacora(prisma, {
+        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
+        folio: purchase.folio,
+        type: "RENGLON_EDITADO",
+        message: `Edito ${purchase.product.name}. ${cambios}`,
+        createdByUserId: user.id,
+      });
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar la compra." };
   }
@@ -221,6 +260,15 @@ export async function addPurchaseItem(
     });
 
     await recalcProductCurrentCost(product.id);
+
+    await anotarEnBitacora(prisma, {
+      organizationId: user.organizationId,
+      sucursalId: user.sucursalId,
+      folio,
+      type: "RENGLON_AGREGADO",
+      message: `Agrego ${product.name}: ${presentationLabel} por ${formatMoney(totalPrice.toNumber())}.`,
+      createdByUserId: user.id,
+    });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo agregar el producto." };
   }
@@ -239,6 +287,7 @@ export async function deletePurchase(
   const user = await requireSucursalContext();
   const purchase = await prisma.purchase.findFirst({
     where: { id: purchaseId, sucursalId: user.sucursalId },
+    include: { product: { select: { name: true } } },
   });
   if (!purchase) throw new Error("Compra no encontrada.");
 
@@ -247,6 +296,17 @@ export async function deletePurchase(
 
   await prisma.purchase.delete({ where: { id: purchase.id } });
   await recalcProductCurrentCost(purchase.productId);
+
+  // Se anota despues de borrar, con el nombre ya resuelto: el renglon ya no existe para ir a
+  // preguntarle que decia, y justo por eso la bitacora tiene que conservarlo.
+  await anotarEnBitacora(prisma, {
+    organizationId: user.organizationId,
+    sucursalId: user.sucursalId,
+    folio: purchase.folio,
+    type: "RENGLON_BORRADO",
+    message: `Borro ${purchase.product.name}: ${purchase.presentationLabel} por ${formatMoney(Number(purchase.totalPrice))}.`,
+    createdByUserId: user.id,
+  });
 
   const remaining = await prisma.purchase.count({
     where: { sucursalId: user.sucursalId, folio: purchase.folio },
@@ -341,7 +401,13 @@ export async function updatePurchaseHeader(
 
   const purchases = await prisma.purchase.findMany({
     where: { sucursalId: user.sucursalId, folio },
-    select: { id: true, supplierId: true },
+    select: {
+      id: true,
+      supplierId: true,
+      purchaseDate: true,
+      invoiceFolio: true,
+      supplier: { select: { name: true } },
+    },
   });
   if (purchases.length === 0) return { error: "Compra no encontrada." };
 
@@ -358,12 +424,14 @@ export async function updatePurchaseHeader(
 
     const supplierIdRaw = String(formData.get("supplierId") ?? "").trim();
     const supplierId = supplierIdRaw || null;
+    let supplierName: string | null = null;
     if (supplierId) {
       const supplier = await prisma.supplier.findFirst({
         where: { id: supplierId, organizationId: user.organizationId },
-        select: { id: true },
+        select: { id: true, name: true },
       });
       if (!supplier) throw new Error("Proveedor no encontrado.");
+      supplierName = supplier.name;
     }
 
     const invoiceFolioRaw = String(formData.get("invoiceFolio") ?? "").trim().slice(0, 60);
@@ -377,6 +445,31 @@ export async function updatePurchaseHeader(
         invoiceFolio,
       },
     });
+
+    const antes = purchases[0];
+    const cambios = describirCambios([
+      {
+        campo: "Fecha",
+        antes: fechaDeCompra(antes.purchaseDate),
+        despues: fechaDeCompra(new Date(`${purchaseDateRaw}T00:00:00.000Z`)),
+      },
+      {
+        campo: "Proveedor",
+        antes: antes.supplier?.name ?? "sin proveedor",
+        despues: supplierName ?? "sin proveedor",
+      },
+      { campo: "Folio de factura", antes: antes.invoiceFolio ?? "", despues: invoiceFolio },
+    ]);
+    if (cambios) {
+      await anotarEnBitacora(prisma, {
+        organizationId: user.organizationId,
+        sucursalId: user.sucursalId,
+        folio,
+        type: "DATOS_EDITADOS",
+        message: `Cambio los datos de la factura. ${cambios}`,
+        createdByUserId: user.id,
+      });
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : "No se pudo actualizar la compra." };
   }

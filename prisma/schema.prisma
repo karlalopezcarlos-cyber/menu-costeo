@@ -165,6 +165,7 @@ model Organization {
   costeadores               Costeador[]
   asociacionesProveedor     SupplierItemMapping[]
   documentosDeCompra        PurchaseDocument[]
+  bitacoraDeCompras         PurchaseActivity[]
 
   @@map("organizations")
 }
@@ -341,6 +342,7 @@ model Sucursal {
   productCosts              SucursalProductCost[]
   costeadores               Costeador[]
   documentosDeCompra        PurchaseDocument[]
+  bitacoraDeCompras         PurchaseActivity[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -391,6 +393,7 @@ model User {
   costeadores               Costeador[]                @relation("CosteadorCreatedBy")
   asociacionesProveedor     SupplierItemMapping[]      @relation("SupplierItemMappingCreatedBy")
   documentosDeCompra        PurchaseDocument[]         @relation("PurchaseDocumentCreatedBy")
+  bitacoraDeCompras         PurchaseActivity[]         @relation("PurchaseActivityCreatedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -1799,4 +1802,37 @@ model PurchaseDocument {
 enum PurchaseDocumentType {
   FOTO
   XML
+}
+
+/// Bitacora de una compra: quien la registro, quien le movio algo despues y a que hora.
+///
+/// Va por folio y no por renglon a proposito: un renglon se puede borrar, y justo ese
+/// movimiento es el que hay que poder ver despues. El costo de un platillo sale del precio de
+/// una compra; si alguien lo corrige tres semanas despues, tiene que quedar quien y cuando.
+model PurchaseActivity {
+  id              String               @id @default(cuid())
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  sucursalId      String
+  sucursal        Sucursal             @relation(fields: [sucursalId], references: [id])
+  /// Folio interno de la compra (el que comparten todos sus renglones).
+  folio           Int
+  type            PurchaseActivityType
+  /// Ya redactado y en espanol, con lo que cambio y de que a que. Se guarda hecho texto para
+  /// que siga diciendo lo mismo dentro de un anio, aunque el producto se haya renombrado.
+  message         String
+  createdByUserId String?
+  createdBy       User?                @relation("PurchaseActivityCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime             @default(now())
+
+  @@index([organizationId, folio, createdAt])
+  @@map("purchase_activities")
+}
+
+enum PurchaseActivityType {
+  REGISTRADA
+  RENGLON_AGREGADO
+  RENGLON_EDITADO
+  RENGLON_BORRADO
+  DATOS_EDITADOS
 }

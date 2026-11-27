@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSucursalContext } from "@/lib/tenant";
 import { formatPurchaseFolio, parsePurchaseFolio } from "@/lib/purchases/folio";
 import { formatMoney } from "@/lib/format";
+import { cargarBitacora, momento } from "@/lib/purchases/bitacora";
 import { sumTaxes } from "@/lib/taxes";
 import type { UnitValue } from "@/lib/units";
 import PurchaseEditForm from "./PurchaseEditForm";
@@ -29,7 +30,7 @@ export default async function PurchaseDetailPage({
   const folio = parsePurchaseFolio(folioParam);
   if (!folio) notFound();
 
-  const [purchases, recipe, products, documento] = await Promise.all([
+  const [purchases, recipe, products, documento, bitacora] = await Promise.all([
     prisma.purchase.findMany({
       where: { sucursalId: user.sucursalId, folio },
       include: { product: true },
@@ -54,6 +55,7 @@ export default async function PurchaseDetailPage({
       orderBy: { createdAt: "desc" },
       select: { tipo: true, nombre: true, createdAt: true },
     }),
+    cargarBitacora(user.organizationId, user.sucursalId, folio),
   ]);
   if (purchases.length === 0) notFound();
 
@@ -167,6 +169,40 @@ export default async function PurchaseDetailPage({
             )}
           </div>
         )}
+
+        {!documento && (
+          <p className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
+            Esta compra no tiene documento guardado. Se archiva el papel cuando la compra se
+            sube con{" "}
+            <Link href="/purchases/import" className="font-medium text-brand-600 hover:underline">
+              Subir XML o foto
+            </Link>
+            ; las que se capturan a mano no tienen de donde sacarlo.
+          </p>
+        )}
+
+        <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-neutral-900">Bitacora</p>
+          {bitacora.reconstruida && (
+            <p className="mt-0.5 text-xs text-neutral-500">
+              Reconstruida de los renglones: esta compra es anterior a la bitacora, asi que se
+              sabe quien la registro pero no si alguien la edito despues.
+            </p>
+          )}
+          <ul className="mt-2 space-y-2">
+            {bitacora.entradas.map((entrada) => (
+              <li key={entrada.id} className="border-l-2 border-neutral-200 pl-3 text-sm">
+                <p className="text-neutral-700">{entrada.mensaje}</p>
+                <p className="text-xs text-neutral-500">
+                  {entrada.quien} · {momento(entrada.cuando)}
+                </p>
+              </li>
+            ))}
+            {bitacora.entradas.length === 0 && (
+              <li className="text-sm text-neutral-500">Sin movimientos registrados.</li>
+            )}
+          </ul>
+        </div>
 
         <div className="mt-3">
           <PurchaseHeaderForm
