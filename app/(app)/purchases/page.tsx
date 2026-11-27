@@ -182,12 +182,20 @@ function PurchasesShell({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Compras</h1>
-        <Link
-          href="/purchases/new"
-          className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
-        >
-          Registrar compra
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/purchases/import"
+            className="rounded-md border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+          >
+            Subir XML o foto
+          </Link>
+          <Link
+            href="/purchases/new"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800"
+          >
+            Registrar compra
+          </Link>
+        </div>
       </div>
 
       <nav className="flex gap-4 border-b border-neutral-200 text-sm">
