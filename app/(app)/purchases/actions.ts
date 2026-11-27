@@ -10,6 +10,7 @@ import { recalcProductCurrentCost } from "@/lib/costing";
 import { formatOrderFolio } from "@/lib/orders/folio";
 import { formatPurchaseFolio } from "@/lib/purchases/folio";
 import { anotarEnBitacora } from "@/lib/purchases/bitacora";
+import { problemaDeCuadre } from "@/lib/compras/cuadre";
 import { formatMoney } from "@/lib/format";
 import {
   guardarAsociaciones,
@@ -202,6 +203,19 @@ export async function createPurchase(
         noteByProduct.set(item.productId, note);
       }
     }
+    // El cuadre contra el papel se revisa aqui tambien, no solo en la pantalla: una pestana
+    // que lleva horas abierta manda numeros viejos, y una compra descuadrada no se arregla
+    // despues porque nadie vuelve a mirar una compra que ya se guardo.
+    const descuadre = problemaDeCuadre(
+      toCreate.map((entry) => ({
+        subtotal: entry.totalPrice,
+        rates: { ivaRate: Number(entry.ivaRate), iepsRate: Number(entry.iepsRate) },
+      })),
+      String(formData.get("documentoTotal") ?? ""),
+      String(formData.get("documentoRetenciones") ?? ""),
+    );
+    if (descuadre) throw new Error(descuadre);
+
     const toCreateWithNotes = toCreate.map((entry) => ({
       ...entry,
       note: noteByProduct.get(entry.productId) ?? null,

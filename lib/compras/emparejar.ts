@@ -382,6 +382,8 @@ export function resolverBorrador(
     folio: borrador.folio,
     subtotal: borrador.subtotal,
     total: borrador.total,
+    desglosaIva: borrador.desglosaIva,
+    retenciones: borrador.retenciones,
     proveedor: {
       nombre: borrador.proveedor.nombre,
       rfc: borrador.proveedor.rfc,

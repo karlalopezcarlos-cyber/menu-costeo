@@ -5,7 +5,9 @@ import Link from "next/link";
 import Decimal from "decimal.js";
 import SearchableSelect from "@/app/(app)/_components/SearchableSelect";
 import { UNITS, UNIT_LABELS, UNIT_META, type UnitValue } from "@/lib/units";
+import { sumTaxes } from "@/lib/taxes";
 import { asociacionDeRenglon, convertirCaptura, esBulto } from "@/lib/compras/captura";
+import { TOLERANCIA_CUADRE } from "@/lib/compras/cuadre";
 import type {
   CompraResuelta,
   OpcionProducto,
@@ -23,11 +25,20 @@ type Fila = {
   /** Lo que se teclea. Son bultos o unidades segun `unidad`. */
   cantidad: string;
   unidad: UnidadCaptura;
+  /** El importe tal como venia en el papel, para poder recalcular si cambia la respuesta del IVA. */
+  importeDocumento: string;
   importe: string;
-  ivaRate: string | null;
-  iepsRate: string | null;
+  ivaRate: string;
+  iepsRate: string;
   coincidencia: CompraResuelta["lineas"][number]["coincidencia"];
 };
+
+/** Lo que se puede contestar cuando la nota no desglosa IVA. */
+const RESPUESTAS_IVA = [
+  { valor: "0", etiqueta: "No causa IVA: los precios son el costo" },
+  { valor: "16", etiqueta: "Si lo traen, al 16%" },
+  { valor: "8", etiqueta: "Si lo traen, al 8% (frontera)" },
+];
 
 function numero(texto: string): number {
   const n = Number(texto);
@@ -38,6 +49,14 @@ const pesos = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigi
 
 const cifras = (d: Decimal) =>
   d.toDecimalPlaces(4).toNumber().toLocaleString("es-MX", { maximumFractionDigits: 4 });
+
+/** Le quita a un importe el impuesto que ya trae adentro. Dividir, no restar el porcentaje. */
+function sinImpuesto(importe: string, tasa: string): string {
+  const bruto = new Decimal(numero(importe));
+  const porciento = new Decimal(numero(tasa));
+  if (porciento.lte(0)) return bruto.toDecimalPlaces(2).toString();
+  return bruto.dividedBy(new Decimal(1).plus(porciento.dividedBy(100))).toDecimalPlaces(2).toString();
+}
 
 export default function RevisarCompra({
   compra,
@@ -55,24 +74,38 @@ export default function RevisarCompra({
 }) {
   const [state, formAction, pending] = useActionState(createPurchase, undefined);
 
+  const productoPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos]);
+
   const [fecha, setFecha] = useState(compra.fecha ?? "");
   const [supplierId, setSupplierId] = useState(compra.proveedor.supplierId ?? "");
   const [folio, setFolio] = useState(compra.folio ?? "");
   const [recordar, setRecordar] = useState(true);
+  // El total del papel. Es el numero contra el que tiene que cuadrar todo lo demas.
+  const [totalNota, setTotalNota] = useState(compra.total ?? "");
+  // Solo cuando el documento no desglosa IVA: que contesto la persona. Vacio = sin contestar,
+  // y sin contestar no se guarda, porque la diferencia entre 0% y 16% es el costo del insumo.
+  const [respuestaIva, setRespuestaIva] = useState("");
+
   const [filas, setFilas] = useState<Fila[]>(() =>
-    compra.lineas.map((l) => ({
-      id: l.id,
-      descripcion: l.descripcion,
-      cantidadDocumento: l.cantidad,
-      unidadDocumento: l.unidadDocumento,
-      productId: l.productId ?? "",
-      cantidad: l.cantidadCaptura,
-      unidad: l.unidadCaptura,
-      importe: l.importe,
-      ivaRate: l.ivaRate,
-      iepsRate: l.iepsRate,
-      coincidencia: l.coincidencia,
-    })),
+    compra.lineas.map((l) => {
+      const producto = l.productId ? productoPorId.get(l.productId) : undefined;
+      return {
+        id: l.id,
+        descripcion: l.descripcion,
+        cantidadDocumento: l.cantidad,
+        unidadDocumento: l.unidadDocumento,
+        productId: l.productId ?? "",
+        cantidad: l.cantidadCaptura,
+        unidad: l.unidadCaptura,
+        importeDocumento: l.importe,
+        importe: l.importe,
+        // La del documento manda sobre la del catalogo: la factura es la factura. Cuando el
+        // documento no trae tasas (una nota de papel), se arranca con la del producto.
+        ivaRate: l.ivaRate ?? producto?.ivaRate ?? "0",
+        iepsRate: l.iepsRate ?? producto?.iepsRate ?? "0",
+        coincidencia: l.coincidencia,
+      };
+    }),
   );
 
   // El archivo viaja otra vez al servidor dentro del mismo envio que guarda la compra, para
@@ -91,7 +124,6 @@ export default function RevisarCompra({
     }
   }, [archivo]);
 
-  const productoPorId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos]);
   const opcionesProducto = useMemo(
     () => productos.map((p) => ({ id: p.id, label: `${p.name} · ${UNIT_LABELS[p.baseUnit]}` })),
     [productos],
@@ -103,6 +135,22 @@ export default function RevisarCompra({
 
   function actualizar(id: string, cambios: Partial<Fila>) {
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
+  }
+
+  /**
+   * La respuesta a "esta nota trae el IVA adentro". Recalcula todos los importes desde lo que
+   * decia el papel, no desde lo que quedo en pantalla: si no, contestar dos veces seguidas
+   * dividiria dos veces.
+   */
+  function contestarIva(tasa: string) {
+    setRespuestaIva(tasa);
+    setFilas((prev) =>
+      prev.map((f) => ({
+        ...f,
+        importe: sinImpuesto(f.importeDocumento, tasa),
+        ivaRate: tasa,
+      })),
+    );
   }
 
   function cambiarProducto(id: string, productId: string) {
@@ -124,7 +172,11 @@ export default function RevisarCompra({
               ? `PRES:${producto.bultos[0].id}`
               : producto.baseUnit
             : "";
-        return { ...f, productId, unidad: nueva };
+        // Las tasas del catalogo solo se heredan cuando el documento no traia las suyas.
+        const tasas = compra.desglosaIva
+          ? {}
+          : { ivaRate: respuestaIva || producto?.ivaRate || f.ivaRate, iepsRate: producto?.iepsRate ?? f.iepsRate };
+        return { ...f, productId, unidad: nueva, ...tasas };
       }),
     );
   }
@@ -146,15 +198,27 @@ export default function RevisarCompra({
   }
 
   const problemas = filas.map(problemaDe);
-  const listas = filas.filter((_, i) => problemas[i] === null);
-  const sumaListas = listas.reduce((acc, f) => acc + numero(f.importe), 0);
-  const sumaTodas = filas.reduce((acc, f) => acc + numero(f.importe), 0);
   const pendientes = problemas.filter(Boolean).length;
 
-  const subtotalDoc = compra.subtotal ? numero(compra.subtotal) : null;
-  const descuadre = subtotalDoc !== null && Math.abs(sumaTodas - subtotalDoc) > 0.05;
+  // Los impuestos se suman con la misma funcion que usa el resto de la app (IEPS primero a la
+  // base, IVA encima), para que lo que dice esta pantalla sea exactamente lo que va a quedar
+  // guardado y no una cuenta parecida hecha aparte.
+  const calculado = sumTaxes(
+    filas.map((f) => ({
+      subtotal: numero(f.importe),
+      rates: { ivaRate: numero(f.ivaRate), iepsRate: numero(f.iepsRate) },
+    })),
+  );
 
-  const rows = listas.flatMap((f) => {
+  // Lo retenido en el documento ya viene descontado del total del papel, asi que se le resta
+  // a la captura antes de comparar. Si no, una factura de fletes nunca cuadraria.
+  const retenciones = numero(compra.retenciones ?? "0");
+  const totalDelPapel = numero(totalNota);
+  const diferencia = calculado.total - retenciones - totalDelPapel;
+  const cuadra = totalDelPapel > 0 && Math.abs(diferencia) <= TOLERANCIA_CUADRE;
+  const faltaContestarIva = !compra.desglosaIva && respuestaIva === "";
+
+  const rows = filas.flatMap((f) => {
     const convertido = convertirCaptura(f.cantidad, f.unidad, productoPorId.get(f.productId));
     if (!convertido) return [];
     return [
@@ -164,8 +228,8 @@ export default function RevisarCompra({
         presentationQty: convertido.presentationQty,
         presentationUnit: convertido.presentationUnit,
         totalPrice: f.importe,
-        ...(f.ivaRate !== null ? { ivaRate: f.ivaRate } : {}),
-        ...(f.iepsRate !== null ? { iepsRate: f.iepsRate } : {}),
+        ivaRate: f.ivaRate,
+        iepsRate: f.iepsRate,
       },
     ];
   });
@@ -174,7 +238,7 @@ export default function RevisarCompra({
   // emparejarlo a mano la proxima vez. El factor es por una unidad del documento: asi sigue
   // sirviendo cuando la siguiente factura traiga otra cantidad.
   const asociaciones = recordar
-    ? listas.flatMap((f) => {
+    ? filas.flatMap((f) => {
         const convertido = convertirCaptura(f.cantidad, f.unidad, productoPorId.get(f.productId));
         if (!convertido) return [];
         const asociacion = asociacionDeRenglon(f, convertido);
@@ -182,7 +246,8 @@ export default function RevisarCompra({
       })
     : [];
 
-  const puedeGuardar = Boolean(fecha) && rows.length > 0 && !pending;
+  const puedeGuardar =
+    Boolean(fecha) && filas.length > 0 && pendientes === 0 && !faltaContestarIva && cuadra && !pending;
 
   return (
     <div className="space-y-5">
@@ -193,7 +258,6 @@ export default function RevisarCompra({
           </span>
           {compra.proveedor.nombre && <> · {compra.proveedor.nombre}</>}
           {compra.proveedor.rfc && <> · {compra.proveedor.rfc}</>}
-          {compra.total && <> · total del documento {pesos(numero(compra.total))}</>}
         </div>
         <button
           type="button"
@@ -223,6 +287,38 @@ export default function RevisarCompra({
         </div>
       )}
 
+      {!compra.desglosaIva && (
+        <div
+          className={`rounded-xl border p-4 ${
+            faltaContestarIva ? "border-brand-300 bg-brand-50" : "border-neutral-200 bg-white shadow-sm"
+          }`}
+        >
+          <p className="text-sm font-semibold text-neutral-900">
+            Esta nota no desglosa el IVA. ¿Los precios ya lo traen?
+          </p>
+          <p className="mt-0.5 text-sm text-neutral-600">
+            No lo puedo saber de la foto, y la diferencia no es menor: si los precios ya traen
+            IVA y se guardan tal cual, el costo de tus platillos sale 16% mas alto de lo que es.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {RESPUESTAS_IVA.map((opcion) => (
+              <button
+                key={opcion.valor}
+                type="button"
+                onClick={() => contestarIva(opcion.valor)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  respuestaIva === opcion.valor
+                    ? "bg-neutral-900 text-white shadow-sm"
+                    : "border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                {opcion.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {compra.proveedor.sinCatalogo && (
         <p className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
           El documento viene de <b>{compra.proveedor.nombre}</b> y no hay un proveedor con ese
@@ -239,9 +335,11 @@ export default function RevisarCompra({
         <input type="hidden" name="rows" value={JSON.stringify(rows)} />
         <input type="hidden" name="asociaciones" value={JSON.stringify(asociaciones)} />
         <input type="hidden" name="documentoTipo" value={compra.origen === "xml" ? "XML" : "FOTO"} />
+        <input type="hidden" name="documentoTotal" value={totalNota} />
+        <input type="hidden" name="documentoRetenciones" value={compra.retenciones ?? ""} />
         <input ref={inputDocumento} type="file" name="documento" className="hidden" tabIndex={-1} />
 
-        <div className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:grid-cols-3">
+        <div className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:grid-cols-4">
           <div className="space-y-1">
             <label htmlFor="purchaseDate" className="text-sm font-medium text-neutral-700">
               Fecha de compra
@@ -279,6 +377,26 @@ export default function RevisarCompra({
               className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm"
             />
           </div>
+          <div className="space-y-1">
+            <label htmlFor="totalNota" className="text-sm font-medium text-neutral-700">
+              Total que dice el papel
+            </label>
+            <input
+              id="totalNota"
+              type="number"
+              step="0.01"
+              min="0"
+              value={totalNota}
+              onChange={(e) => setTotalNota(e.target.value)}
+              readOnly={compra.origen === "xml" && Boolean(compra.total)}
+              className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums read-only:bg-neutral-50 read-only:text-neutral-500"
+            />
+            <p className="text-xs text-neutral-500">
+              {compra.origen === "xml" && compra.total
+                ? "Lo dice el XML: no se puede cambiar."
+                : "Con impuestos, lo que se le paga al proveedor."}
+            </p>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -290,6 +408,7 @@ export default function RevisarCompra({
                 <th className="px-3 py-3 w-28">Cantidad</th>
                 <th className="px-3 py-3 w-40">Unidad</th>
                 <th className="px-3 py-3 w-32">Importe sin IVA</th>
+                <th className="px-3 py-3 w-28">IVA / IEPS %</th>
                 <th className="px-3 py-3 w-10"></th>
               </tr>
             </thead>
@@ -375,6 +494,30 @@ export default function RevisarCompra({
                       />
                     </td>
                     <td className="px-3 py-2 align-top">
+                      <div className="flex gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={fila.ivaRate}
+                          onChange={(e) => actualizar(fila.id, { ivaRate: e.target.value })}
+                          title="IVA %"
+                          className="w-full rounded-md border border-neutral-200 px-1.5 py-1.5 text-sm tabular-nums"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={fila.iepsRate}
+                          onChange={(e) => actualizar(fila.id, { iepsRate: e.target.value })}
+                          title="IEPS %"
+                          className="w-full rounded-md border border-neutral-200 px-1.5 py-1.5 text-sm tabular-nums text-neutral-500"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
                       <button
                         type="button"
                         onClick={() => setFilas((prev) => prev.filter((f) => f.id !== fila.id))}
@@ -388,30 +531,60 @@ export default function RevisarCompra({
                 );
               })}
             </tbody>
-            <tfoot className="border-t border-neutral-200 bg-neutral-50 text-sm">
-              <tr>
-                <td colSpan={4} className="px-3 py-3 text-right font-medium text-neutral-600">
-                  Suma de lo que se va a guardar
-                </td>
-                <td className="px-3 py-3 font-semibold tabular-nums text-neutral-900">{pesos(sumaListas)}</td>
-                <td></td>
-              </tr>
-              {subtotalDoc !== null && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-2 text-right text-neutral-500">
-                    Subtotal del documento
-                  </td>
-                  <td
-                    className={`px-3 py-2 tabular-nums ${descuadre ? "font-semibold text-amber-700" : "text-neutral-500"}`}
-                  >
-                    {pesos(subtotalDoc)}
-                  </td>
-                  <td></td>
-                </tr>
-              )}
-            </tfoot>
           </table>
         </div>
+
+        <div
+          className={`rounded-xl border p-4 ${
+            cuadra ? "border-emerald-200 bg-emerald-50" : "border-amber-300 bg-amber-50"
+          }`}
+        >
+          <div className="grid gap-1 text-sm sm:grid-cols-2">
+            <span className="text-neutral-600">Suma de los renglones (subtotal)</span>
+            <span className="tabular-nums text-neutral-900 sm:text-right">{pesos(calculado.subtotal)}</span>
+            {calculado.ieps > 0 && (
+              <>
+                <span className="text-neutral-600">IEPS</span>
+                <span className="tabular-nums text-neutral-900 sm:text-right">{pesos(calculado.ieps)}</span>
+              </>
+            )}
+            <span className="text-neutral-600">IVA</span>
+            <span className="tabular-nums text-neutral-900 sm:text-right">{pesos(calculado.iva)}</span>
+            {retenciones > 0 && (
+              <>
+                <span className="text-neutral-600">Impuestos retenidos</span>
+                <span className="tabular-nums text-neutral-900 sm:text-right">
+                  −{pesos(retenciones)}
+                </span>
+              </>
+            )}
+            <span className="font-semibold text-neutral-900">Total de esta captura</span>
+            <span className="font-semibold tabular-nums text-neutral-900 sm:text-right">
+              {pesos(calculado.total - retenciones)}
+            </span>
+            <span className="text-neutral-600">Total que dice el papel</span>
+            <span className="tabular-nums text-neutral-900 sm:text-right">{pesos(totalDelPapel)}</span>
+          </div>
+          <p className={`mt-2 text-sm font-medium ${cuadra ? "text-emerald-800" : "text-amber-900"}`}>
+            {totalDelPapel <= 0
+              ? "Captura el total que dice el papel: es contra ese numero que se cuadra."
+              : cuadra
+                ? "Cuadra con el papel."
+                : `Diferencia de ${pesos(Math.abs(diferencia))}: la captura da ${
+                    diferencia > 0 ? "de mas" : "de menos"
+                  }. No se puede guardar asi.`}
+          </p>
+        </div>
+
+        {pendientes > 0 && (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {pendientes === 1
+              ? "Hay 1 renglon sin resolver."
+              : `Hay ${pendientes} renglones sin resolver.`}{" "}
+            Completalos para poder guardar. Quitar uno con la × tampoco sirve: el total dejaria
+            de cuadrar con el papel.
+          </p>
+        )}
 
         <label className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
           <input
@@ -436,15 +609,6 @@ export default function RevisarCompra({
           </span>
         </label>
 
-        {pendientes > 0 && (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            {pendientes === 1
-              ? "Hay 1 renglon sin resolver y no se va a guardar."
-              : `Hay ${pendientes} renglones sin resolver y no se van a guardar.`}{" "}
-            Completalos, o quitalos con la × si no los quieres cargar.
-          </p>
-        )}
-
         {state?.error && (
           <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{state.error}</p>
         )}
@@ -457,7 +621,7 @@ export default function RevisarCompra({
           >
             {pending
               ? "Guardando..."
-              : `Guardar ${rows.length} ${rows.length === 1 ? "renglon" : "renglones"} · ${pesos(sumaListas)}`}
+              : `Guardar ${filas.length} ${filas.length === 1 ? "renglon" : "renglones"} · ${pesos(calculado.total - retenciones)}`}
           </button>
           <Link
             href="/purchases"

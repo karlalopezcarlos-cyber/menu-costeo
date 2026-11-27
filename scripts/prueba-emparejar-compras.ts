@@ -7,6 +7,8 @@ const tequila: OpcionProducto = {
   baseUnit: "ML",
   presentationUnitLabel: "Botella",
   presentationUnitQty: "700",
+  ivaRate: "16",
+  iepsRate: "0",
   bultos: [
     { id: "legacy", label: "Botella", quantity: "700", unit: "ML" },
     { id: "caja", label: "Caja", quantity: "8400", unit: "ML" },
@@ -18,6 +20,8 @@ const cebolla: OpcionProducto = {
   baseUnit: "KG",
   presentationUnitLabel: null,
   presentationUnitQty: null,
+  ivaRate: "0",
+  iepsRate: "0",
   bultos: [],
 };
 const productos = [tequila, cebolla];
@@ -31,6 +35,8 @@ function borrador(lineas: { descripcion: string; cantidad: string; unidadDocumen
     proveedor: { nombre: "VINOS Y LICORES SA", rfc: "VLI010101AAA" },
     subtotal: null,
     total: null,
+    desglosaIva: true,
+    retenciones: null,
     lineas: lineas.map((l, i) => ({
       id: `l-${i}`,
       ...l,

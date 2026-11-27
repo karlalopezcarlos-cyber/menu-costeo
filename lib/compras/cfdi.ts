@@ -193,6 +193,17 @@ export function leerCfdi(xml: string): ResultadoCfdi {
     }
   }
 
+  // Retenciones: en una factura de fletes el total a pagar ya viene con el 4% de IVA retenido
+  // descontado. La app no modela retenciones, asi que se devuelven aparte para que el cuadre
+  // contra el total del papel no se caiga por algo que en realidad esta bien capturado.
+  const impuestosDoc = asArreglo(comprobante.Impuestos)[0];
+  const retenido = decimalDe(attr(impuestosDoc, "TotalImpuestosRetenidos")) ?? new Decimal(0);
+  if (retenido.gt(0)) {
+    avisos.push(
+      `Esta factura trae $${retenido.toFixed(2)} de impuestos retenidos. Se toman en cuenta al cuadrar contra el total, pero no se guardan: la app no lleva retenciones.`,
+    );
+  }
+
   return {
     borrador: {
       origen: "xml",
@@ -201,6 +212,9 @@ export function leerCfdi(xml: string): ResultadoCfdi {
       proveedor: { nombre: attr(emisor, "Nombre"), rfc: attr(emisor, "Rfc") },
       subtotal: subtotalNeto ? subtotalNeto.toDecimalPlaces(2).toString() : null,
       total: decimalDe(attr(comprobante, "Total"))?.toDecimalPlaces(2).toString() ?? null,
+      // Un CFDI siempre trae los impuestos separados por renglon: no hay nada que preguntar.
+      desglosaIva: true,
+      retenciones: retenido.gt(0) ? retenido.toDecimalPlaces(2).toString() : null,
       lineas,
       avisos,
     },

@@ -66,6 +66,8 @@ export async function cargarCatalogoDeCompras(organizationId: string): Promise<{
         baseUnit: true,
         presentationUnitLabel: true,
         presentationUnitQty: true,
+        ivaRate: true,
+        iepsRate: true,
         presentations: { select: { id: true, label: true, quantity: true, unit: true } },
       },
     }),
@@ -97,6 +99,8 @@ export async function cargarCatalogoDeCompras(organizationId: string): Promise<{
       presentationUnitLabel: p.presentationUnitLabel,
       presentationUnitQty: p.presentationUnitQty ? p.presentationUnitQty.toString() : null,
       bultos: bultosDe(p),
+      ivaRate: p.ivaRate.toString(),
+      iepsRate: p.iepsRate.toString(),
     })),
     proveedores,
     asociaciones: asociaciones.map((a) => ({

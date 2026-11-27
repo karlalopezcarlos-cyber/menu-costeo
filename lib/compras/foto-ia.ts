@@ -13,11 +13,16 @@ import type { BorradorCompra, LineaDocumento } from "./importar-tipos";
  *    cantidad inventada se convierte en costo unitario inventado y de ahi se mete al costo de
  *    todos los platillos que usan ese insumo.
  *
- * 2. Lo que se le pide es el importe SIN impuesto. Casi ninguna nota de papel desglosa IVA; en
- *    ese caso se le pide que devuelva el importe tal cual y marque `ivaIncluido`, y el calculo
- *    de desglosar lo hace la app, no el modelo: la aritmetica es trabajo de la computadora.
+ * 2. El modelo transcribe y no calcula. Copia los importes y los totales del pie tal como
+ *    estan escritos, impuestos incluidos; sacar la tasa de ahi es aritmetica, y la aritmetica
+ *    la hace la computadora. Antes se le preguntaba a la persona que IVA ponerle a la nota,
+ *    con 16% precargado: una nota de mercado que no causa impuesto se guardaba con 16% de
+ *    menos en el costo nomas porque nadie bajo a cambiar el numero.
  *
- * 3. Nada se guarda solo. Esto devuelve un borrador que una persona revisa renglon por renglon.
+ * 3. Cuando la nota no desglosa el IVA no se adivina: el borrador lo dice y la pantalla le
+ *    pregunta a la persona si los precios ya lo traen adentro.
+ *
+ * 4. Nada se guarda solo. Esto devuelve un borrador que una persona revisa renglon por renglon.
  */
 
 const MODELO = "claude-opus-5-5";
@@ -31,8 +36,9 @@ Reglas que no se rompen:
 - No calcules lo que no esta escrito. Si la nota no dice el precio unitario, deja precioUnitario en null; el importe es lo que importa.
 - Transcribe la descripcion del producto tal como viene, con sus abreviaturas ("CEB BCA", "JITOM BOLA"). No la traduzcas ni la "corrijas".
 - La cantidad y la unidad van separadas: "2 CAJAS" es cantidad 2, unidad "CAJAS".
-- Si la nota desglosa IVA, el importe de cada renglon va SIN IVA y pones ivaIncluido en false.
-- Si la nota NO desglosa IVA (lo normal en una nota de papel), copia el importe tal como aparece y pon ivaIncluido en true. No lo dividas tu.
+- Copia el importe de cada renglon TAL COMO APARECE en el papel. Nunca le sumes ni le quites impuesto: esa cuenta la hace la app.
+- Al pie de la nota hay casi siempre unos totales. Copialos tal cual en subtotalEscrito, ivaEscrito, iepsEscrito y totalEscrito. El que no venga escrito va en null; no lo calcules tu.
+- totalEscrito es lo que se le paga al proveedor, el numero mas grande del pie. Es el dato mas importante de la nota: si no se alcanza a leer, ponlo en null y dilo en "avisos".
 - Si en la foto hay varias notas distintas, lee solo la que esta completa y al frente, y dilo en "avisos".
 - La fecha va en formato AAAA-MM-DD. Si el papel trae la fecha sin anio, usa null.
 
@@ -48,13 +54,21 @@ const ESQUEMA = {
     rfc: { type: ["string", "null"], description: "RFC del proveedor si aparece." },
     fecha: { type: ["string", "null"], description: "AAAA-MM-DD, o null si no se lee." },
     folio: { type: ["string", "null"], description: "Folio o numero de la nota." },
-    ivaIncluido: {
-      type: "boolean",
-      description: "true si los importes de los renglones ya traen el IVA adentro porque la nota no lo desglosa.",
+    subtotalEscrito: {
+      type: ["string", "null"],
+      description: "El subtotal escrito al pie de la nota, tal cual. null si la nota no lo trae.",
+    },
+    ivaEscrito: {
+      type: ["string", "null"],
+      description: "El monto de IVA escrito al pie de la nota, tal cual. null si la nota no lo desglosa.",
+    },
+    iepsEscrito: {
+      type: ["string", "null"],
+      description: "El monto de IEPS escrito al pie de la nota, tal cual. null si no viene.",
     },
     totalEscrito: {
       type: ["string", "null"],
-      description: "El total que viene escrito al pie de la nota, tal cual.",
+      description: "El total a pagar escrito al pie de la nota, tal cual.",
     },
     lineas: {
       type: "array",
@@ -81,7 +95,18 @@ const ESQUEMA = {
       description: "Lo que la persona deberia mirar: foto borrosa, nota cortada, renglones tachados.",
     },
   },
-  required: ["proveedor", "rfc", "fecha", "folio", "ivaIncluido", "totalEscrito", "lineas", "avisos"],
+  required: [
+    "proveedor",
+    "rfc",
+    "fecha",
+    "folio",
+    "subtotalEscrito",
+    "ivaEscrito",
+    "iepsEscrito",
+    "totalEscrito",
+    "lineas",
+    "avisos",
+  ],
   additionalProperties: false,
 };
 
@@ -90,7 +115,9 @@ export type NotaLeida = {
   rfc: string | null;
   fecha: string | null;
   folio: string | null;
-  ivaIncluido: boolean;
+  subtotalEscrito: string | null;
+  ivaEscrito: string | null;
+  iepsEscrito: string | null;
   totalEscrito: string | null;
   lineas: {
     descripcion: string;
@@ -121,8 +148,6 @@ export type ResultadoFoto = { borrador: BorradorCompra } | { error: string };
 export async function leerNotaDeFoto(
   imagenBase64: string,
   mediaType: "image/jpeg" | "image/png" | "image/webp",
-  /** Tasa de IVA con la que se desglosa una nota que no lo separa. */
-  ivaPorDefecto: Decimal,
 ): Promise<ResultadoFoto> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return {
@@ -181,7 +206,7 @@ export async function leerNotaDeFoto(
     };
   }
 
-  const borrador = armarBorrador(bloque.input as NotaLeida, ivaPorDefecto);
+  const borrador = armarBorrador(bloque.input as NotaLeida);
   if (borrador.lineas.length === 0) {
     return {
       error: "No se alcanzo a leer ningun renglon en la foto. Tomala de nuevo, de frente y con buena luz.",
@@ -194,31 +219,49 @@ export async function leerNotaDeFoto(
  * Convierte lo que transcribio el modelo en el borrador que revisa la persona.
  *
  * Esta separado de la llamada a la IA para poder probarlo sin gastar una llamada: es la parte
- * que hace cuentas (quitarle el IVA al importe, sacar el unitario) y una cuenta mal hecha aqui
- * no se nota en pantalla, se nota tres meses despues en el costo de un platillo.
+ * que hace cuentas (sacar la tasa de los totales del pie, el unitario) y una cuenta mal hecha
+ * aqui no se nota en pantalla, se nota tres meses despues en el costo de un platillo.
+ *
+ * La tasa sale de lo que dice el papel, no de una preferencia: si la nota trae subtotal, IVA y
+ * total, la tasa es la division de esos numeros. El IEPS entra primero a la base, como en la
+ * ley y como en el resto de la app (lib/taxes.ts).
  */
-export function armarBorrador(nota: NotaLeida, ivaPorDefecto: Decimal): BorradorCompra {
+export function armarBorrador(nota: NotaLeida): BorradorCompra {
   const avisos = Array.isArray(nota.avisos) ? [...nota.avisos] : [];
 
-  // Si la nota no desglosa IVA, el importe escrito lo trae adentro. Desglosarlo es aritmetica,
-  // y la aritmetica la hace la app: el modelo solo transcribe.
-  const factor = nota.ivaIncluido ? new Decimal(1).plus(ivaPorDefecto.dividedBy(100)) : new Decimal(1);
-  if (nota.ivaIncluido && ivaPorDefecto.gt(0)) {
+  const subtotalEscrito = decimalDe(nota.subtotalEscrito);
+  const ivaEscrito = decimalDe(nota.ivaEscrito);
+  const iepsEscrito = decimalDe(nota.iepsEscrito);
+  const totalEscrito = decimalDe(nota.totalEscrito);
+
+  // La nota desglosa impuestos cuando trae el IVA escrito y un subtotal contra el cual medirlo.
+  const desglosaIva = Boolean(ivaEscrito && subtotalEscrito && subtotalEscrito.gt(0));
+
+  let tasaIva: string | null = null;
+  let tasaIeps: string | null = null;
+  if (desglosaIva && subtotalEscrito && ivaEscrito) {
+    const ieps = iepsEscrito ?? new Decimal(0);
+    tasaIeps = ieps.times(100).dividedBy(subtotalEscrito).toDecimalPlaces(2).toString();
+    tasaIva = ivaEscrito
+      .times(100)
+      .dividedBy(subtotalEscrito.plus(ieps))
+      .toDecimalPlaces(2)
+      .toString();
+  } else if (!totalEscrito) {
     avisos.push(
-      `La nota no desglosa IVA, asi que se le quito el ${ivaPorDefecto.toString()}% a cada importe para dejar el costo sin impuesto. Si esa nota no causa IVA, vuelve a subirla con el IVA en 0.`,
+      "No se leyo el total de la nota: capturalo antes de guardar, porque es contra ese numero que tiene que cuadrar la compra.",
     );
   }
 
   const lineas: LineaDocumento[] = [];
   (Array.isArray(nota.lineas) ? nota.lineas : []).forEach((linea, i) => {
     const descripcion = (linea.descripcion ?? "").trim() || "(sin descripcion)";
-    const importeBruto = decimalDe(linea.importe);
+    const importe = decimalDe(linea.importe);
 
     if (linea.ilegible) {
       avisos.push(`Renglon ${i + 1} ("${descripcion}"): ${linea.ilegible}`);
     }
 
-    const importe = importeBruto ? importeBruto.dividedBy(factor).toDecimalPlaces(2) : null;
     const cantidad = decimalDe(linea.cantidad);
 
     lineas.push({
@@ -230,11 +273,11 @@ export function armarBorrador(nota: NotaLeida, ivaPorDefecto: Decimal): Borrador
         importe && cantidad && cantidad.gt(0)
           ? importe.dividedBy(cantidad).toDecimalPlaces(6).toString()
           : null,
-      importe: importe ? importe.toString() : "",
-      // Una nota de papel no desglosa tasas por renglon: se deja al catalogo, que para eso
-      // guarda la tasa de cada producto.
-      ivaRate: null,
-      iepsRate: null,
+      // Tal como viene en el papel. Cuando la nota no desglosa, estos importes pueden traer el
+      // impuesto adentro y la pantalla pregunta antes de dejar guardar.
+      importe: importe ? importe.toDecimalPlaces(2).toString() : "",
+      ivaRate: tasaIva,
+      iepsRate: tasaIeps,
       claveProdServ: null,
     });
   });
@@ -247,8 +290,11 @@ export function armarBorrador(nota: NotaLeida, ivaPorDefecto: Decimal): Borrador
     fecha,
     folio: nota.folio?.trim() || null,
     proveedor: { nombre: nota.proveedor?.trim() || null, rfc: nota.rfc?.trim() || null },
-    subtotal: null,
-    total: decimalDe(nota.totalEscrito)?.toDecimalPlaces(2).toString() ?? null,
+    subtotal: subtotalEscrito ? subtotalEscrito.toDecimalPlaces(2).toString() : null,
+    total: totalEscrito ? totalEscrito.toDecimalPlaces(2).toString() : null,
+    desglosaIva,
+    // Una nota de papel no trae retenciones.
+    retenciones: null,
     lineas,
     avisos,
   };

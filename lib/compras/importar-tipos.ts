@@ -40,7 +40,27 @@ export type BorradorCompra = {
   proveedor: { nombre: string | null; rfc: string | null };
   /** Sin impuesto. Sirve para cuadrar contra la suma de los renglones. */
   subtotal: string | null;
+  /**
+   * Lo que dice el papel que se le paga al proveedor. Es contra esto que tiene que cuadrar lo
+   * que se guarda: un registro que no da el mismo total que la nota no sirve para cuadrar con
+   * el proveedor ni para la contabilidad, por bonito que se vea.
+   */
   total: string | null;
+  /**
+   * El documento separa el IVA (lo dice con sus letras) o no.
+   *
+   * Cuando no lo separa no se adivina: la pantalla le pregunta a la persona si los precios ya
+   * lo traen adentro. Antes se asumia 16% y eso le metia 16% de menos al costo de una nota de
+   * mercado que no causa impuesto.
+   */
+  desglosaIva: boolean;
+  /**
+   * Impuestos retenidos del documento (tipico en fletes: el 4% de IVA retenido). El total del
+   * papel ya viene con eso descontado, asi que el cuadre tiene que restarlo. No se guardan:
+   * la app no lleva retenciones, y hacer como que no existen volveria imposible cargar esa
+   * factura sin romper la regla de que la captura tiene que dar el total del papel.
+   */
+  retenciones: string | null;
   lineas: LineaDocumento[];
   /** Lo que el lector no pudo resolver y la persona tiene que mirar. */
   avisos: string[];
@@ -81,6 +101,8 @@ export type CompraResuelta = {
   folio: string | null;
   subtotal: string | null;
   total: string | null;
+  desglosaIva: boolean;
+  retenciones: string | null;
   proveedor: {
     nombre: string | null;
     rfc: string | null;
@@ -115,6 +137,9 @@ export type OpcionProducto = {
   presentationUnitLabel: string | null;
   presentationUnitQty: string | null;
   bultos: OpcionBulto[];
+  /** Las tasas del catalogo, que se usan cuando el documento no trae las suyas. */
+  ivaRate: string;
+  iepsRate: string;
 };
 
 export type OpcionProveedor = { id: string; name: string };

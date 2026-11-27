@@ -8,6 +8,8 @@ const tequila: OpcionProducto = {
   baseUnit: "ML",
   presentationUnitLabel: "Botella",
   presentationUnitQty: "700",
+  ivaRate: "16",
+  iepsRate: "0",
   bultos: [
     { id: "legacy", label: "Botella", quantity: "700", unit: "ML" },
     { id: "galon", label: "Galon", quantity: "3785", unit: "ML" },

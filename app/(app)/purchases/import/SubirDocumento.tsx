@@ -270,28 +270,6 @@ export default function SubirDocumento({
               </p>
             )}
 
-            <div className="space-y-1">
-              <label htmlFor="ivaNota" className="text-sm font-medium text-neutral-700">
-                IVA de esa nota
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="ivaNota"
-                  name="ivaNota"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  defaultValue="16"
-                  className="w-24 rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums"
-                />
-                <span className="text-sm text-neutral-500">%</span>
-              </div>
-              <p className="text-xs text-neutral-500">
-                Si la nota no desglosa IVA, se le quita este porcentaje a cada importe para dejar
-                el costo sin impuesto. Para una nota de mercado sin IVA, pon 0.
-              </p>
-            </div>
           </div>
         )}
 

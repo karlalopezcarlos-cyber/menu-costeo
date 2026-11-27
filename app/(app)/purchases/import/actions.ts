@@ -1,6 +1,5 @@
 "use server";
 
-import Decimal from "decimal.js";
 import { requireSucursalContext } from "@/lib/tenant";
 import { leerCfdi } from "@/lib/compras/cfdi";
 import { leerNotaDeFoto } from "@/lib/compras/foto-ia";
@@ -72,14 +71,6 @@ export async function leerDocumento(
       return { error: "Esa imagen no se puede leer. Usa una foto en JPG o PNG." };
     }
 
-    let ivaNota: Decimal;
-    try {
-      ivaNota = new Decimal(String(formData.get("ivaNota") ?? "16"));
-      if (!ivaNota.isFinite() || ivaNota.lt(0) || ivaNota.gt(100)) throw new Error();
-    } catch {
-      return { error: "El IVA de la nota debe ir de 0% a 100%." };
-    }
-
     let base64: string;
     try {
       base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
@@ -87,7 +78,7 @@ export async function leerDocumento(
       return { error: "No se pudo leer la foto. Vuelve a elegirla." };
     }
 
-    const resultado = await leerNotaDeFoto(base64, mediaType, ivaNota);
+    const resultado = await leerNotaDeFoto(base64, mediaType);
     if ("error" in resultado) return { error: resultado.error };
     return { compra: resolverBorrador(resultado.borrador, productos, proveedores, asociaciones) };
   }
