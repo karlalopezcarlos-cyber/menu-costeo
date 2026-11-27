@@ -128,6 +128,9 @@ export default async function RecipesPage({
               Ver archivadas
             </Link>
           )}
+          <Link href="/recipes/plu" className="text-sm text-neutral-500 hover:underline">
+            Cargar PLU
+          </Link>
           <Link href="/recipes/costs" className="text-sm text-neutral-500 hover:underline">
             Cargar costos
           </Link>
