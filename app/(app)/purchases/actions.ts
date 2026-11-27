@@ -244,11 +244,12 @@ export async function createPurchase(
       // solo si la compra quedo. Una compra sin su "quien la registro" seria justo el renglon
       // que nadie puede explicar despues.
       const total = toCreate.reduce((suma, fila) => suma.plus(fila.totalPrice), new Decimal(0));
-      const origen = documento
-        ? documento.tipo === "XML"
-          ? " desde el XML de la factura"
-          : " desde la foto de la nota"
-        : "";
+      // De donde salieron los renglones, no solo si venia papel: la captura a mano tambien
+      // puede traer la foto adjunta, y decir "desde la foto" de un registro que alguien
+      // teclearon haria creer que lo leyo la app.
+      const aMano = formData.get("capturaManual") === "1";
+      const papel = documento ? (documento.tipo === "XML" ? "el XML de la factura" : "la foto de la nota") : "";
+      const origen = !papel ? "" : aMano ? ` a mano, adjuntando ${papel}` : ` desde ${papel}`;
       await anotarEnBitacora(tx, {
         organizationId: user.organizationId,
         sucursalId: user.sucursalId,

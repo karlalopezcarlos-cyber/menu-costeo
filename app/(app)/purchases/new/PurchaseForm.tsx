@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useActionState, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useActionState,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import Decimal from "decimal.js";
 import {
@@ -19,6 +27,8 @@ import type { PresentationOption } from "../../_components/PresentationQuantityI
 import { sumTaxes } from "@/lib/taxes";
 import { formatMoney } from "@/lib/format";
 import { blockEnterSubmit } from "@/lib/ui/block-enter-submit";
+import { TOLERANCIA_CUADRE } from "@/lib/compras/cuadre";
+import { leerTotalDelPapel, type TotalDelPapel } from "./actions";
 
 type ProductOption = {
   id: string;
@@ -313,6 +323,37 @@ export default function PurchaseForm({
     [productById],
   );
 
+  // El papel adjunto. No arma renglones (para eso esta Subir XML o foto): se lee nada mas su
+  // total para avisar cuando lo capturado no da lo mismo, y se archiva con la compra.
+  const [papel, setPapel] = useState<TotalDelPapel | null>(null);
+  // El total del papel es editable aunque lo haya leido la app: una foto borrosa se puede leer
+  // mal, y un numero mal leido bloquearia una captura que si estaba bien. Quien tiene el papel
+  // enfrente es quien manda.
+  const [totalPapel, setTotalPapel] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("");
+  const [nombreDocumento, setNombreDocumento] = useState("");
+  const [leyendoPapel, startLectura] = useTransition();
+
+  function elegirDocumento(archivo: File | null) {
+    setPapel(null);
+    setTotalPapel("");
+    if (!archivo) {
+      setTipoDocumento("");
+      setNombreDocumento("");
+      return;
+    }
+    const esXml = archivo.type.includes("xml") || archivo.name.toLowerCase().endsWith(".xml");
+    setTipoDocumento(esXml ? "XML" : "FOTO");
+    setNombreDocumento(archivo.name);
+    const datos = new FormData();
+    datos.set("file", archivo);
+    startLectura(async () => {
+      const leido = await leerTotalDelPapel(datos);
+      setPapel(leido);
+      setTotalPapel(leido.total ?? "");
+    });
+  }
+
   // El impuesto se calcula renglon por renglon: una compra normal mezcla cosas en 0% y cosas
   // en 16%, y una tasa sola sobre el total seria inventada.
   const totales = useMemo(
@@ -351,10 +392,20 @@ export default function PurchaseForm({
     [rows, ratesFor],
   );
 
+  // El total del papel, cuando se adjunto uno. Es contra esto que se compara lo capturado.
+  const totalDelPapel = totalPapel.trim() && Number(totalPapel) > 0 ? Number(totalPapel) : null;
+  const retenciones = papel?.retenciones ? Number(papel.retenciones) : 0;
+  const diferencia = totalDelPapel === null ? null : totales.total - retenciones - totalDelPapel;
+  const descuadrado = diferencia !== null && Math.abs(diferencia) > TOLERANCIA_CUADRE;
+
   return (
     <form action={formAction} onKeyDown={blockEnterSubmit} className="space-y-4">
       <input type="hidden" name="rows" value={rowsPayload} />
       <input type="hidden" name="purchaseOrderId" value={selectedPedidoId} />
+      <input type="hidden" name="capturaManual" value="1" />
+      <input type="hidden" name="documentoTipo" value={tipoDocumento} />
+      <input type="hidden" name="documentoTotal" value={totalPapel} />
+      <input type="hidden" name="documentoRetenciones" value={papel?.retenciones ?? ""} />
 
       {pendingOrders.length > 0 && (
         <div className="space-y-1 rounded-xl border border-neutral-200 bg-white shadow-sm p-5">
@@ -690,12 +741,92 @@ export default function PurchaseForm({
         + Agregar otro producto
       </button>
 
+      <div
+        className={`space-y-3 rounded-xl border bg-white p-5 shadow-sm ${
+          descuadrado ? "border-amber-300" : "border-neutral-200"
+        }`}
+      >
+        <div className="space-y-1">
+          <label htmlFor="documento" className="text-sm font-medium text-neutral-700">
+            Foto de la nota o XML de la factura (opcional)
+          </label>
+          <input
+            id="documento"
+            name="documento"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,.xml,text/xml,application/xml"
+            onChange={(e) => elegirDocumento(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-200 file:bg-neutral-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-700"
+          />
+          <p className="text-xs text-neutral-500">
+            Se guarda con la compra para poder volver a verlo, y se compara su total contra lo
+            que capturaste. Para que la app llene los renglones sola, usa{" "}
+            <Link href="/purchases/import" className="font-medium text-brand-600 hover:underline">
+              Subir XML o foto
+            </Link>
+            .
+          </p>
+        </div>
+
+        {leyendoPapel && (
+          <p className="text-sm text-neutral-500">Leyendo {nombreDocumento}...</p>
+        )}
+
+        {papel?.error && !leyendoPapel && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {papel.error} El papel se guarda igual con la compra.
+          </p>
+        )}
+
+        {tipoDocumento && !leyendoPapel && (
+          <div className="space-y-1">
+            <label htmlFor="totalPapel" className="text-sm font-medium text-neutral-700">
+              Total que dice el papel
+            </label>
+            <input
+              id="totalPapel"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={totalPapel}
+              onChange={(e) => setTotalPapel(e.target.value)}
+              placeholder="0.00"
+              className="w-40 rounded-md border border-neutral-200 px-3 py-2 text-sm tabular-nums shadow-xs focus:border-neutral-400 focus:outline-none"
+            />
+            <p className="text-xs text-neutral-500">
+              {papel?.total
+                ? "Lo leyo la app del papel. Corrigelo si no es lo que dice."
+                : "Escribe el total del papel para que la app compare tu captura contra el."}
+            </p>
+          </div>
+        )}
+
+        {totalDelPapel !== null && !leyendoPapel && (
+          <div
+            className={`rounded-lg border p-3 text-sm ${
+              descuadrado ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"
+            }`}
+          >
+            <p>
+              El papel dice <strong>{formatMoney(totalDelPapel)}</strong> y tu captura da{" "}
+              <strong>{formatMoney(totales.total - retenciones)}</strong>.
+            </p>
+            <p className="mt-0.5 font-medium">
+              {descuadrado
+                ? `Hay una diferencia de ${formatMoney(Math.abs(diferencia ?? 0))}: revisa los renglones, no se puede guardar asi.`
+                : "Cuadra con el papel."}
+            </p>
+          </div>
+        )}
+      </div>
+
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || leyendoPapel || descuadrado}
           className="rounded-md bg-neutral-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           {pending ? "Guardando..." : rows.length > 1 ? `Guardar ${rows.length} compras` : "Guardar compra"}
